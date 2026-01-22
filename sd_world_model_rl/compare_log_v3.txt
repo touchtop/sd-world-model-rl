@@ -1,0 +1,95 @@
+======================================================================
+对比实验: Model-Free RL (PPO) vs Model-Based RL (SD+MCTS)
+======================================================================
+
+实验配置: 真实环境交互次数 = 10000
+评估环境: TaskAllocationEnv, Workers=[1.0, 0.8]
+
+[PPO Baseline] 开始训练...
+  Step 300: eval_reward=-55.18
+  Step 600: eval_reward=-137.92
+  Step 900: eval_reward=-62.70
+  Step 1200: eval_reward=-57.30
+  Step 1500: eval_reward=-65.20
+  Step 1800: eval_reward=-51.80
+  Step 2100: eval_reward=-78.00
+  Step 2400: eval_reward=-64.40
+  Step 2700: eval_reward=-51.60
+  Step 3000: eval_reward=-58.20
+  Step 3300: eval_reward=-147.00
+  Step 3600: eval_reward=-122.00
+  Step 3900: eval_reward=-57.80
+  Step 4200: eval_reward=-59.60
+  Step 4500: eval_reward=-59.20
+  Step 4800: eval_reward=-33.60
+  Step 5100: eval_reward=-50.20
+  Step 5400: eval_reward=-53.20
+  Step 5700: eval_reward=-86.40
+  Step 6000: eval_reward=-99.80
+  Step 6300: eval_reward=-91.00
+  Step 6600: eval_reward=-74.40
+  Step 6900: eval_reward=-81.40
+  Step 7200: eval_reward=-79.80
+  Step 7500: eval_reward=-61.00
+  Step 7800: eval_reward=-55.80
+  Step 8100: eval_reward=-78.80
+  Step 8400: eval_reward=-64.20
+  Step 8700: eval_reward=-97.80
+  Step 9000: eval_reward=-120.60
+  Step 9300: eval_reward=-59.80
+  Step 9600: eval_reward=-86.00
+  Step 9900: eval_reward=-94.80
+
+[SD+MCTS] 开始训练...
+  Step 300: eval_reward=-51.58
+  Step 600: eval_reward=-138.44
+  Step 900: eval_reward=-60.10
+  Step 1200: eval_reward=-54.56
+  Step 1500: eval_reward=-65.98
+  Step 1800: eval_reward=-52.58
+  Step 2100: eval_reward=-79.08
+  Step 2400: eval_reward=-64.90
+  Step 2700: eval_reward=-51.66
+  Step 3000: eval_reward=-58.26
+  Step 3300: eval_reward=-147.34
+  Step 3600: eval_reward=-125.66
+  Step 3900: eval_reward=-63.26
+  Step 4200: eval_reward=-63.92
+  Step 4500: eval_reward=-64.58
+  Step 4800: eval_reward=-36.88
+  Step 5100: eval_reward=-55.32
+  Step 5400: eval_reward=-61.06
+  Step 5700: eval_reward=-91.36
+  Step 6000: eval_reward=-105.52
+  Step 6300: eval_reward=-96.04
+  Step 6600: eval_reward=-78.58
+  Step 6900: eval_reward=-88.84
+  Step 7200: eval_reward=-83.60
+  Step 7500: eval_reward=-66.90
+  Step 7800: eval_reward=-60.36
+  Step 8100: eval_reward=-81.14
+  Step 8400: eval_reward=-71.38
+  Step 8700: eval_reward=-97.80
+  Step 9000: eval_reward=-124.76
+  Step 9300: eval_reward=-65.58
+  Step 9600: eval_reward=-89.26
+  Step 9900: eval_reward=-96.52
+
+======================================================================
+实验结果
+======================================================================
+
+[PPO Baseline]
+  总环境交互: 10000
+  最终奖励: -94.90
+
+[SD+MCTS]
+  总环境交互: 10000
+  最终奖励: -96.06
+  学到的SD参数: completion=[1.         0.90090215], arrival=0.678
+  真实参数: Worker速率=[1.0, 0.8], arrival=0.7
+
+[对比] SD+MCTS 相对PPO: -1.2%
+
+学习曲线已保存: comparison_results.png
+======================================================================
