@@ -1,0 +1,55 @@
+============================================================
+Beer Game Experiments - SD-MCTS (using proven infrastructure)
+============================================================
+
+[1] Training SD-MCTS (order_levels=3, actions=81)...
+Training SD-MCTS on Beer Game (state_dim=26, n_actions=81)
+Episode 10 | Steps 360/8000 | Avg Reward: -3082.20
+Episode 20 | Steps 720/8000 | Avg Reward: -2674.60
+Episode 30 | Steps 1080/8000 | Avg Reward: -4920.20
+Episode 40 | Steps 1440/8000 | Avg Reward: -2554.20
+Episode 50 | Steps 1800/8000 | Avg Reward: -1721.60
+Episode 60 | Steps 2160/8000 | Avg Reward: -1443.60
+Episode 70 | Steps 2520/8000 | Avg Reward: -1342.60
+Episode 80 | Steps 2880/8000 | Avg Reward: -1288.00
+Episode 90 | Steps 3240/8000 | Avg Reward: -1343.20
+Episode 100 | Steps 3600/8000 | Avg Reward: -867.40
+Episode 110 | Steps 3960/8000 | Avg Reward: -820.60
+Episode 120 | Steps 4320/8000 | Avg Reward: -877.60
+Episode 130 | Steps 4680/8000 | Avg Reward: -867.80
+Episode 140 | Steps 5040/8000 | Avg Reward: -981.00
+Episode 150 | Steps 5400/8000 | Avg Reward: -883.40
+Episode 160 | Steps 5760/8000 | Avg Reward: -1061.40
+Episode 170 | Steps 6120/8000 | Avg Reward: -1061.40
+Episode 180 | Steps 6480/8000 | Avg Reward: -1033.80
+Episode 190 | Steps 6840/8000 | Avg Reward: -898.80
+Episode 200 | Steps 7200/8000 | Avg Reward: -931.80
+Episode 210 | Steps 7560/8000 | Avg Reward: -1311.60
+Episode 220 | Steps 7920/8000 | Avg Reward: -1071.20
+Models saved to results/beer_game_v2
+
+[2] Evaluating SD-MCTS...
+  SD-MCTS: 2844.00 ± 0.00
+
+[3] Evaluating Baselines...
+  Evaluating Base-Stock...
+    Base-Stock: 2870.00 ± 0.00
+  Evaluating Anchoring...
+    Anchoring: 6380.00 ± 0.00
+  Evaluating Constant-4...
+    Constant-4: 4664.00 ± 0.00
+  Evaluating Reactive...
+    Reactive: 1184.00 ± 0.00
+
+============================================================
+RESULTS SUMMARY
+============================================================
+Method                    Total Cost    Bullwhip (R)    Bullwhip (F)
+-----------------------------------------------------------------
+SD-MCTS                      2844.00            5.24            0.69
+Base-Stock                   2870.00           14.45            1.19
+Anchoring                    6380.00           20.44            1.04
+Constant-4                   4664.00            0.00            0.00
+Reactive                     1184.00            4.00            1.00
+
+Results saved to results/beer_game_v2/results.json

@@ -70,6 +70,7 @@ def mcts_search(
     value_net=None,
     return_details: bool = False,
     n_workers: int = None,
+    rollout_depth: int = 10,
 ):
     """MuZero风格MCTS搜索
 
@@ -93,46 +94,69 @@ def mcts_search(
         node = root
         path = [node]
 
-        # Selection: 沿PUCT最大路径下降
-        while node.is_fully_expanded(n_actions) and node.children:
+        # Selection: 沿PUCT最大路径下降（只要有子节点就可以选择）
+        while node.children:
+            # 如果未完全扩展，以一定概率扩展新动作（渐进拓宽）
+            if not node.is_fully_expanded(n_actions):
+                # Progressive widening: 根据访问次数决定是否扩展
+                # 公式: 当 |children| < C * N^alpha 时扩展（C=1, alpha=0.5）
+                if len(node.children) < max(1, int(1.0 * (node.N ** 0.5))):
+                    break  # 扩展新动作
+            # 在已扩展的子节点中用PUCT选择
             node = max(node.children.values(), key=lambda ch: _puct_score(node, ch, c))
             path.append(node)
 
-        # Expansion: 扩展所有未访问动作
+        # Expansion: 渐进扩展 - 每次只扩展一个动作
         if not node.is_fully_expanded(n_actions):
-            # 当前节点的策略先验（而非根节点）
+            # 获取策略先验
             if policy_net is not None:
                 with torch.no_grad():
-                    node_priors = F.softmax(policy_net(node.state.unsqueeze(0)), dim=-1)[0].numpy()
+                    node_priors = F.softmax(policy_net(node.state.unsqueeze(0)), dim=-1)[0].cpu().numpy()
             else:
                 node_priors = np.ones(n_actions) / n_actions
 
             unexpanded = [a for a in range(n_actions) if a not in node.children]
-            states_batch = node.state.unsqueeze(0).expand(len(unexpanded), -1)
-            actions_batch = torch.tensor(unexpanded, dtype=torch.int64)
 
+            # 选择一个动作扩展：按先验概率加权随机选择
+            unexpanded_priors = np.array([node_priors[a] for a in unexpanded])
+            unexpanded_priors = unexpanded_priors / unexpanded_priors.sum()
+            action_to_expand = unexpanded[np.random.choice(len(unexpanded), p=unexpanded_priors)]
+
+            # 扩展单个动作
             with torch.no_grad():
-                next_states = world_model(states_batch, actions_batch)
+                next_state = world_model(
+                    node.state.unsqueeze(0),
+                    torch.tensor([action_to_expand], dtype=torch.int64)
+                )[0]
 
-            for i, action in enumerate(unexpanded):
-                # 计算转移即时奖励
-                child_reward = reward_fn(next_states[i].detach().numpy())
-                # 子节点先验来自当前节点的策略分布
-                child = MCTSNode(next_states[i], parent=node, action=action, prior=node_priors[action], reward=child_reward)
-                node.children[action] = child
-
-            # 用PUCT在新扩展的子节点中选择评估分支
-            node = max(node.children.values(), key=lambda ch: _puct_score(node, ch, c))
+            child_reward = reward_fn(next_state.detach().cpu().numpy(), action_to_expand)
+            child = MCTSNode(next_state, parent=node, action=action_to_expand,
+                           prior=node_priors[action_to_expand], reward=child_reward)
+            node.children[action_to_expand] = child
+            node = child
             path.append(node)
 
-        # Leaf evaluation: 使用Value网络，或设为0避免双重计数
+        # Leaf evaluation: 使用Value网络，或Monte Carlo rollout
         if value_net is not None:
             with torch.no_grad():
                 leaf_value = value_net(node.state.unsqueeze(0)).item()
         else:
-            # 没有价值网络时，用0作为叶节点的未来回报估计
-            # 即时奖励已在node.reward中，避免重复计入
-            leaf_value = 0.0
+            # Monte Carlo rollout: 随机策略模拟rollout_depth步
+            rollout_state = node.state
+            rollout_return = 0.0
+            discount = 1.0
+            for _ in range(rollout_depth):
+                rand_action = np.random.randint(n_actions)
+                with torch.no_grad():
+                    next_state = world_model(
+                        rollout_state.unsqueeze(0),
+                        torch.tensor([rand_action], dtype=torch.int64)
+                    )[0]
+                r = reward_fn(next_state.detach().cpu().numpy(), rand_action)
+                rollout_return += discount * r
+                discount *= gamma
+                rollout_state = next_state
+            leaf_value = rollout_return
 
         # Backpropagation: 先加即时奖励再更新W，使Q表示Q(s,a)而非V(s')
         G = leaf_value

@@ -1,0 +1,35 @@
+============================================================
+Beer Game Experiments - SD-MCTS (using proven infrastructure)
+============================================================
+
+[1] Loading trained models from results/beer_game_v2...
+Models loaded successfully.
+
+[2] Evaluating SD-MCTS...
+  SD-MCTS: 833.60 ± 140.39
+
+[3] Evaluating Baselines...
+  Evaluating Base-Stock...
+    Base-Stock: 2554.18 ± 641.84
+  Evaluating Anchoring...
+    Anchoring: 6006.32 ± 394.21
+  Evaluating Constant-4...
+    Constant-4: 4663.05 ± 117.73
+  Evaluating Reactive...
+    Reactive: 775.45 ± 238.74
+  Evaluating Oracle-MPC...
+    Oracle-MPC: 610.50 ± 79.86
+
+============================================================
+RESULTS SUMMARY
+============================================================
+Method                    Total Cost    Bullwhip (R)    Bullwhip (F)
+-----------------------------------------------------------------
+SD-MCTS                       833.60           16.16            1.34
+Base-Stock                   2554.18           15.34            1.23
+Anchoring                    6006.32           19.95            1.05
+Constant-4                   4663.05            0.00            0.00
+Reactive                      775.45            2.77            1.00
+Oracle-MPC                    610.50           19.15            1.01
+
+Results saved to results/beer_game_v2/results.json
