@@ -155,6 +155,115 @@ class DelayedCollapseEnv(gym.Env):
         return min(1.0, a_safe)
 
 
+class MultiSurgeEnv(gym.Env):
+    """Environment with multiple surge events at irregular intervals.
+
+    This increases planning complexity - agent must balance multiple
+    surge opportunities, making value network's long-term evaluation crucial.
+    """
+
+    def __init__(
+        self,
+        alpha: float = 1.0,
+        beta: float = 0.1,
+        F: float = 10.0,
+        F_req: float = 5.0,
+        surge_times: list = None,  # e.g., [5, 9, 14] - surge at steps 4, 8, 13
+        surge_bonuses: list = None,  # e.g., [8.0, 10.0, 15.0]
+        T: int = 20,
+        n_actions: int = 11,
+        seed: int = None,
+    ):
+        super().__init__()
+        self.alpha = alpha
+        self.beta = beta
+        self.F = F
+        self.F_req = F_req
+        self.surge_times = surge_times or [5, 9, 14]
+        self.surge_bonuses = surge_bonuses or [8.0, 10.0, 15.0]
+        self.T = T
+        self.n_actions = n_actions
+        self._seed = seed
+        self.rng = np.random.default_rng(seed)
+
+        # State: [fatigue, alive, next_surge_idx, time_to_next_surge]
+        self.observation_space = spaces.Box(
+            low=np.array([0.0, 0.0, 0.0, 0.0], dtype=np.float32),
+            high=np.array([F * 2, 1.0, len(self.surge_times), float(T)], dtype=np.float32),
+            dtype=np.float32
+        )
+        self.action_space = spaces.Discrete(n_actions)
+
+        self.fatigue = 0.0
+        self.alive = True
+        self.t = 0
+        self.surge_idx = 0  # Index of next surge to occur
+
+    def _get_action_intensity(self, action: int) -> float:
+        return action / (self.n_actions - 1)
+
+    def _get_obs(self) -> np.ndarray:
+        if self.surge_idx < len(self.surge_times):
+            time_to_next = max(0.0, self.surge_times[self.surge_idx] - 1 - self.t)
+        else:
+            time_to_next = 0.0
+        return np.array([
+            min(self.fatigue, self.F * 2),
+            1.0 if self.alive else 0.0,
+            float(self.surge_idx),
+            time_to_next
+        ], dtype=np.float32)
+
+    def reset(self, *, seed=None, options=None):
+        if seed is not None:
+            self.rng = np.random.default_rng(seed)
+        self.fatigue = 0.0
+        self.alive = True
+        self.t = 0
+        self.surge_idx = 0
+        return self._get_obs(), {}
+
+    def step(self, action: int):
+        if not self.alive:
+            self.t += 1
+            terminated = self.t >= self.T
+            return self._get_obs(), 0.0, terminated, False, {"collapsed": True}
+
+        a_t = self._get_action_intensity(action)
+
+        # Fatigue dynamics
+        self.fatigue = max(0.0, self.fatigue + (self.alpha + self.beta) * a_t - self.beta)
+
+        # Check collapse
+        if self.fatigue >= self.F:
+            self.alive = False
+            self.t += 1
+            terminated = self.t >= self.T
+            return self._get_obs(), 0.0, terminated, False, {"collapsed": True}
+
+        # Base reward
+        reward = a_t
+
+        # Check surge events
+        surge_captured = False
+        if self.surge_idx < len(self.surge_times):
+            if self.t == self.surge_times[self.surge_idx] - 1:
+                if self.fatigue <= self.F_req:
+                    reward += self.surge_bonuses[self.surge_idx]
+                    surge_captured = True
+                self.surge_idx += 1
+
+        self.t += 1
+        terminated = self.t >= self.T
+
+        info = {
+            "fatigue": self.fatigue,
+            "surge_captured": surge_captured,
+            "surges_remaining": len(self.surge_times) - self.surge_idx,
+        }
+        return self._get_obs(), reward, terminated, False, info
+
+
 class DelayedCollapseWorldModel:
     """Simplified world model for delayed collapse environment.
 

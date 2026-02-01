@@ -1,0 +1,49 @@
+============================================================
+Beer Game Experiments - SD-MCTS (using proven infrastructure)
+============================================================
+
+[1] Training SD-MCTS (order_levels=3, actions=81)...
+Training SD-MCTS on Beer Game (state_dim=26, n_actions=81)
+Episode 10 | Steps 360/5000 | Avg Reward: -2156.00
+Episode 20 | Steps 720/5000 | Avg Reward: -2303.80
+Episode 30 | Steps 1080/5000 | Avg Reward: -2376.40
+Episode 40 | Steps 1440/5000 | Avg Reward: -7176.80
+Episode 50 | Steps 1800/5000 | Avg Reward: -5534.80
+Episode 60 | Steps 2160/5000 | Avg Reward: -5399.60
+Episode 70 | Steps 2520/5000 | Avg Reward: -5209.60
+Episode 80 | Steps 2880/5000 | Avg Reward: -5227.20
+Episode 90 | Steps 3240/5000 | Avg Reward: -3176.00
+Episode 100 | Steps 3600/5000 | Avg Reward: -2401.80
+Episode 110 | Steps 3960/5000 | Avg Reward: -1328.80
+Episode 120 | Steps 4320/5000 | Avg Reward: -1239.40
+Episode 130 | Steps 4680/5000 | Avg Reward: -984.40
+Models saved to results/beer_game_v2
+
+[2] Evaluating SD-MCTS...
+  SD-MCTS: 3500.00 ± 0.00
+
+[3] Evaluating Baselines...
+  Evaluating Base-Stock...
+    Base-Stock: 2870.00 ± 0.00
+  Evaluating Anchoring...
+    Anchoring: 6380.00 ± 0.00
+  Evaluating Constant-4...
+    Constant-4: 4664.00 ± 0.00
+  Evaluating Reactive...
+    Reactive: 1184.00 ± 0.00
+  Evaluating Oracle-MPC...
+    Oracle-MPC: 575.80 ± 71.09
+
+============================================================
+RESULTS SUMMARY
+============================================================
+Method                    Total Cost    Bullwhip (R)    Bullwhip (F)
+-----------------------------------------------------------------
+SD-MCTS                      3500.00            8.57            1.29
+Base-Stock                   2870.00           14.45            1.19
+Anchoring                    6380.00           20.44            1.04
+Constant-4                   4664.00            0.00            0.00
+Reactive                     1184.00            4.00            1.00
+Oracle-MPC                    575.80           19.10            0.99
+
+Results saved to results/beer_game_v2/results.json
