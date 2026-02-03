@@ -87,7 +87,17 @@ def mcts_search(
         else:
             reward_fn = default_reward_fn
 
-    root_tensor = torch.tensor(root_state, dtype=torch.float32)
+    # Detect device from networks or world_model
+    device = torch.device('cpu')
+    for net in [policy_net, value_net, world_model]:
+        if net is not None:
+            try:
+                device = next(net.parameters()).device
+                break
+            except (StopIteration, AttributeError):
+                continue
+
+    root_tensor = torch.tensor(root_state, dtype=torch.float32, device=device)
     root = MCTSNode(root_tensor)
 
     for sim in range(num_simulations):
@@ -126,7 +136,7 @@ def mcts_search(
             with torch.no_grad():
                 next_state = world_model(
                     node.state.unsqueeze(0),
-                    torch.tensor([action_to_expand], dtype=torch.int64)
+                    torch.tensor([action_to_expand], dtype=torch.int64, device=device)
                 )[0]
 
             child_reward = reward_fn(next_state.detach().cpu().numpy(), action_to_expand)
@@ -150,7 +160,7 @@ def mcts_search(
                 with torch.no_grad():
                     next_state = world_model(
                         rollout_state.unsqueeze(0),
-                        torch.tensor([rand_action], dtype=torch.int64)
+                        torch.tensor([rand_action], dtype=torch.int64, device=device)
                     )[0]
                 r = reward_fn(next_state.detach().cpu().numpy(), rand_action)
                 rollout_return += discount * r

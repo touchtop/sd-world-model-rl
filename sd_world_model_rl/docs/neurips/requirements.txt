@@ -1,0 +1,22 @@
+# Core dependencies
+torch>=2.0.0
+numpy>=1.24.0
+scipy>=1.10.0
+matplotlib>=3.7.0
+pandas>=2.0.0
+gymnasium>=0.29.0
+tqdm>=4.65.0
+
+# Model-free RL baseline
+stable-baselines3>=2.0.0
+
+# SOTA MBRL baselines
+dreamerv3>=1.5.0                    # pip install dreamerv3 (官方PyPI包)
+
+# TD-MPC2: 无PyPI包，需从源码安装
+# git clone https://github.com/nicklashansen/tdmpc2.git
+# cd tdmpc2 && pip install -e .
+
+# MuZero: 使用第三方实现
+# git clone https://github.com/werner-duvaud/muzero-general.git
+# cd muzero-general && pip install -r requirements.txt
