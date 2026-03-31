@@ -1,0 +1,20 @@
+{
+  "experiment_name": "physics_violation",
+  "environments": [
+    "beer_game",
+    "delayed_collapse"
+  ],
+  "methods": [
+    "sd_mcts",
+    "blackbox_mcts",
+    "dreamerv3"
+  ],
+  "test_conditions": [
+    "in_distribution",
+    "demand_shift_1.5x",
+    "demand_shift_2x",
+    "parameter_drift_30pct"
+  ],
+  "n_seeds": 10,
+  "eval_episodes": 50
+}

@@ -1,0 +1,122 @@
+[
+  {
+    "variant": "sd_mcts",
+    "scenario": "standard",
+    "seed": 0,
+    "component": "",
+    "expected": "",
+    "eval_return_mean": -664.5,
+    "eval_return_std": 0.0,
+    "train_time": 222.30224108695984,
+    "total_steps": 3024,
+    "error": null
+  },
+  {
+    "variant": "blackbox_mlp",
+    "scenario": "standard",
+    "seed": 0,
+    "component": "",
+    "expected": "",
+    "eval_return_mean": -9240.0,
+    "eval_return_std": 0.0,
+    "train_time": 396.517630815506,
+    "total_steps": 3024,
+    "error": null
+  },
+  {
+    "variant": "no_vnet",
+    "scenario": "standard",
+    "seed": 0,
+    "component": "",
+    "expected": "",
+    "eval_return_mean": -762.0,
+    "eval_return_std": 0.0,
+    "train_time": 1467.1724598407745,
+    "total_steps": 3024,
+    "error": null
+  },
+  {
+    "variant": "greedy_1step",
+    "scenario": "standard",
+    "seed": 0,
+    "component": "",
+    "expected": "",
+    "eval_return_mean": -4761.0,
+    "eval_return_std": 0.0,
+    "train_time": 51.77664256095886,
+    "total_steps": 3024,
+    "error": null
+  },
+  {
+    "variant": "wrong_prior",
+    "scenario": "standard",
+    "seed": 0,
+    "component": "",
+    "expected": "",
+    "eval_return_mean": -604.5,
+    "eval_return_std": 0.0,
+    "train_time": 228.72849035263062,
+    "total_steps": 3024,
+    "error": null
+  },
+  {
+    "variant": "sd_mcts",
+    "scenario": "low_sample_shift",
+    "seed": 0,
+    "component": "",
+    "expected": "",
+    "eval_return_mean": -669.0,
+    "eval_return_std": 0.0,
+    "train_time": 80.50592923164368,
+    "total_steps": 1008,
+    "error": null
+  },
+  {
+    "variant": "blackbox_mlp",
+    "scenario": "low_sample_shift",
+    "seed": 0,
+    "component": "SD >> MLP expected: structural prior helps in low-sample regime",
+    "expected": "SD >> MLP expected: structural prior helps in low-sample regime",
+    "eval_return_mean": -11551.0,
+    "eval_return_std": 0.0,
+    "train_time": 136.49735021591187,
+    "total_steps": 1008,
+    "error": null
+  },
+  {
+    "variant": "no_vnet",
+    "scenario": "low_sample_shift",
+    "seed": 0,
+    "component": "",
+    "expected": "",
+    "eval_return_mean": -762.0,
+    "eval_return_std": 0.0,
+    "train_time": 487.3865125179291,
+    "total_steps": 1008,
+    "error": null
+  },
+  {
+    "variant": "greedy_1step",
+    "scenario": "low_sample_shift",
+    "seed": 0,
+    "component": "",
+    "expected": "",
+    "eval_return_mean": -5656.0,
+    "eval_return_std": 0.0,
+    "train_time": 16.741156339645386,
+    "total_steps": 1008,
+    "error": null
+  },
+  {
+    "variant": "wrong_prior",
+    "scenario": "low_sample_shift",
+    "seed": 0,
+    "component": "",
+    "expected": "",
+    "eval_return_mean": -1138.0,
+    "eval_return_std": 0.0,
+    "train_time": 81.96355652809143,
+    "total_steps": 1008,
+    "error": null
+  }
+]

@@ -1,0 +1,256 @@
+{
+  "runner": "run_cartpole_onestep_paper.py",
+  "created_at": "2026-03-31 08:59:00",
+  "tier": "T4",
+  "paper_seeds": [
+    0,
+    42,
+    84
+  ],
+  "source_experiment_tag": "sharedpriorv1_dev10-21-30-55-63-72-95_pwd0p0001_psn0p001_pe500_fwd0_fsn0_fe500_seloverall_paperformal_20260330_r1",
+  "policy": {
+    "name": "one_step_no_mcts",
+    "action_bins": 11,
+    "action_repeat": 2,
+    "score_rule": "immediate_reward + gamma^k * V(next_state)"
+  },
+  "evaluation": {
+    "eval_episodes": 5,
+    "max_steps": 1000
+  },
+  "per_seed": [
+    {
+      "seed": 0,
+      "checkpoint_path": "/home/data/round/code/sd_world_model_rl/results/si_robust_ckpts/T4_sharedpriorv1_dev10-21-30-55-63-72-95_pwd0p0001_psn0p001_pe500_fwd0_fsn0_fe500_seloverall_paperformal_20260330_r1_seed0.pt",
+      "selected_cfg": {
+        "selector_mode": "shared_prior",
+        "weight_decay": 0.0,
+        "state_noise": 0.0,
+        "val_loss": 0.4673786759376526,
+        "val_metrics": {
+          "all": {
+            "n": 4500,
+            "mse": 0.4673786759376526,
+            "bias": 0.021183598786592484
+          },
+          "upright": {
+            "n": 221,
+            "mse": 1.5438398122787476,
+            "bias": -0.0014921410474926233
+          },
+          "transition": {
+            "n": 498,
+            "mse": 1.4958750009536743,
+            "bias": 0.02045309543609619
+          },
+          "high_thdot": {
+            "n": 900,
+            "mse": 1.1228128671646118,
+            "bias": 0.07167041301727295
+          },
+          "cart_far": {
+            "n": 900,
+            "mse": 0.09017487615346909,
+            "bias": 0.004656021483242512
+          }
+        },
+        "selection_metric": "overall",
+        "prior_tag": "sharedpriorv1_dev10-21-30-55-63-72-95_pwd0p0001_psn0p001_pe500_fwd0_fsn0_fe500_seloverall_paperformal_20260330_r1",
+        "prior_dev_seeds": [
+          10,
+          21,
+          30,
+          55,
+          63,
+          72,
+          95
+        ],
+        "prior_val_loss": 0.4785243272781372
+      },
+      "si_params": {
+        "gravity": 9.8100004196167,
+        "masscart": 1.0070208311080933,
+        "masspole": 0.09731261432170868,
+        "length": 0.5144141912460327,
+        "true_gravity": 9.8100004196167,
+        "true_masscart": 1.0,
+        "true_masspole": 0.10000000149011612,
+        "true_length": 0.5
+      },
+      "mp_err_percent": 2.687385678291326,
+      "val_loss": 0.4673786759376526,
+      "eval": {
+        "returns": [
+          752.2627563476562,
+          748.2047119140625,
+          744.2052001953125,
+          764.7617797851562,
+          745.7198486328125
+        ],
+        "mean": 751.0308837890625,
+        "std": 7.3870062828063965,
+        "min": 744.2052001953125,
+        "max": 764.7617797851562
+      }
+    },
+    {
+      "seed": 42,
+      "checkpoint_path": "/home/data/round/code/sd_world_model_rl/results/si_robust_ckpts/T4_sharedpriorv1_dev10-21-30-55-63-72-95_pwd0p0001_psn0p001_pe500_fwd0_fsn0_fe500_seloverall_paperformal_20260330_r1_seed42.pt",
+      "selected_cfg": {
+        "selector_mode": "shared_prior",
+        "weight_decay": 0.0,
+        "state_noise": 0.0,
+        "val_loss": 0.40384721755981445,
+        "val_metrics": {
+          "all": {
+            "n": 4500,
+            "mse": 0.40384721755981445,
+            "bias": 0.01725369691848755
+          },
+          "upright": {
+            "n": 210,
+            "mse": 0.9277024865150452,
+            "bias": 0.1380302608013153
+          },
+          "transition": {
+            "n": 438,
+            "mse": 1.2713100910186768,
+            "bias": 0.06618485599756241
+          },
+          "high_thdot": {
+            "n": 900,
+            "mse": 1.218300700187683,
+            "bias": 0.183919757604599
+          },
+          "cart_far": {
+            "n": 900,
+            "mse": 0.0644596517086029,
+            "bias": 0.002181778661906719
+          }
+        },
+        "selection_metric": "overall",
+        "prior_tag": "sharedpriorv1_dev10-21-30-55-63-72-95_pwd0p0001_psn0p001_pe500_fwd0_fsn0_fe500_seloverall_paperformal_20260330_r1",
+        "prior_dev_seeds": [
+          10,
+          21,
+          30,
+          55,
+          63,
+          72,
+          95
+        ],
+        "prior_val_loss": 0.4785243272781372
+      },
+      "si_params": {
+        "gravity": 9.8100004196167,
+        "masscart": 1.0467772483825684,
+        "masspole": 0.10087275505065918,
+        "length": 0.5156450271606445,
+        "true_gravity": 9.8100004196167,
+        "true_masscart": 1.0,
+        "true_masspole": 0.10000000149011612,
+        "true_length": 0.5
+      },
+      "mp_err_percent": 0.8727550506591741,
+      "val_loss": 0.40384721755981445,
+      "eval": {
+        "returns": [
+          683.8582763671875,
+          849.4476928710938,
+          848.9974975585938,
+          680.7516479492188,
+          846.2692260742188
+        ],
+        "mean": 781.8648681640625,
+        "std": 81.30353546142578,
+        "min": 680.7516479492188,
+        "max": 849.4476928710938
+      }
+    },
+    {
+      "seed": 84,
+      "checkpoint_path": "/home/data/round/code/sd_world_model_rl/results/si_robust_ckpts/T4_sharedpriorv1_dev10-21-30-55-63-72-95_pwd0p0001_psn0p001_pe500_fwd0_fsn0_fe500_seloverall_paperformal_20260330_r1_seed84.pt",
+      "selected_cfg": {
+        "selector_mode": "shared_prior",
+        "weight_decay": 0.0,
+        "state_noise": 0.0,
+        "val_loss": 0.3603699505329132,
+        "val_metrics": {
+          "all": {
+            "n": 4500,
+            "mse": 0.3603699505329132,
+            "bias": -0.03426801413297653
+          },
+          "upright": {
+            "n": 217,
+            "mse": 1.1976070404052734,
+            "bias": 0.016168033704161644
+          },
+          "transition": {
+            "n": 459,
+            "mse": 0.9478939175605774,
+            "bias": -0.07638593763113022
+          },
+          "high_thdot": {
+            "n": 900,
+            "mse": 0.9921960234642029,
+            "bias": -0.03026132844388485
+          },
+          "cart_far": {
+            "n": 900,
+            "mse": 0.12225719541311264,
+            "bias": -0.05971559137105942
+          }
+        },
+        "selection_metric": "overall",
+        "prior_tag": "sharedpriorv1_dev10-21-30-55-63-72-95_pwd0p0001_psn0p001_pe500_fwd0_fsn0_fe500_seloverall_paperformal_20260330_r1",
+        "prior_dev_seeds": [
+          10,
+          21,
+          30,
+          55,
+          63,
+          72,
+          95
+        ],
+        "prior_val_loss": 0.4785243272781372
+      },
+      "si_params": {
+        "gravity": 9.8100004196167,
+        "masscart": 1.0169429779052734,
+        "masspole": 0.0991377905011177,
+        "length": 0.5196128487586975,
+        "true_gravity": 9.8100004196167,
+        "true_masscart": 1.0,
+        "true_masspole": 0.10000000149011612,
+        "true_length": 0.5
+      },
+      "mp_err_percent": 0.8622094988822993,
+      "val_loss": 0.3603699505329132,
+      "eval": {
+        "returns": [
+          768.4864501953125,
+          813.3541870117188,
+          823.2410278320312,
+          810.4785766601562,
+          817.853271484375
+        ],
+        "mean": 806.6826782226562,
+        "std": 19.57973861694336,
+        "min": 768.4864501953125,
+        "max": 823.2410278320312
+      }
+    }
+  ],
+  "aggregate": {
+    "mean": 779.8594360351562,
+    "median": 781.8648681640625,
+    "iqm": 779.8594767252604,
+    "num_below_700": 0,
+    "count": 3
+  },
+  "artifacts": {
+    "summary_path": "/home/data/round/code/sd_world_model_rl/results/si_robust_summaries/T4_onestep_paperformal_20260330_r1_summary.json"
+  },
+  "total_runtime_sec": 168.34925389289856
+}

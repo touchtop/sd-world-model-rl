@@ -1,0 +1,15 @@
+{
+  "experiment_name": "physics_violation",
+  "environments": [
+    "beer_game"
+  ],
+  "methods": [
+    "sd_mcts",
+    "blackbox_mcts"
+  ],
+  "test_conditions": [
+    "in_distribution"
+  ],
+  "n_seeds": 5,
+  "eval_episodes": 30
+}

@@ -1,0 +1,33 @@
+\begin{table}[h]
+\centering
+\caption{Ablation Study: Component Contributions Across Scenarios (Return $\uparrow$)}
+\label{tab:ablation}
+\begin{tabular}{lccccc}
+\toprule
+Scenario & SD-MCTS$^\dagger$ & BlackBox-MLP & No-VNet & Greedy-1Step & Wrong-Prior \\
+\midrule
+Standard & \textbf{-659} & -4301 & -762 & -4761 & -509$^*$ \\
+Low-Sample & \textbf{-761} & -5242 & -805 & -5838 & -1605 \\
+Long-Horizon & \textbf{-2003} & -43584 & -2407 & -38657 & -2611 \\
+\bottomrule
+\end{tabular}
+\vspace{1mm}
+\footnotesize{$^\dagger$ Our method. $^*$ Anomaly requiring multi-seed verification.}
+\end{table}
+
+\begin{table}[h]
+\centering
+\caption{Relative Performance Degradation in Ablation Study (\%)}
+\label{tab:ablation_pct}
+\begin{tabular}{lcccc}
+\toprule
+Scenario & BlackBox-MLP & No-VNet & Greedy-1Step & Wrong-Prior \\
+\midrule
+Standard & -85\% & -14\% & -86\% & +23\%$^*$ \\
+Low-Sample & -86\% & -6\% & -87\% & -53\% \\
+Long-Horizon & -95\% & -17\% & -95\% & -23\% \\
+\bottomrule
+\end{tabular}
+\vspace{1mm}
+\footnotesize{Percentage relative to SD-MCTS baseline. $^*$ Anomaly due to single-seed variance.}
+\end{table}

@@ -1,0 +1,26 @@
+[
+  {
+    "method": "sd_mcts",
+    "env": "beer_game",
+    "sample_budget": 500,
+    "seed": 0,
+    "eval_return_mean": -870.0,
+    "eval_return_std": 237.19190542680835,
+    "total_time": 7.780695676803589,
+    "total_steps": 500,
+    "total_episodes": 14,
+    "error": null
+  },
+  {
+    "method": "blackbox_mcts",
+    "env": "beer_game",
+    "sample_budget": 500,
+    "seed": 0,
+    "eval_return_mean": -998.8,
+    "eval_return_std": 137.55929630526612,
+    "total_time": 141.22830724716187,
+    "total_steps": 500,
+    "total_episodes": 14,
+    "error": null
+  }
+]

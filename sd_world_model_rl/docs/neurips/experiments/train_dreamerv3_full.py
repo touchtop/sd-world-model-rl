@@ -36,6 +36,10 @@ os.environ.setdefault("JAX_TRANSFER_GUARD", "allow")
 import jax
 jax.config.update("jax_transfer_guard", "allow")
 
+# Print JAX device info at startup
+print(f"JAX backend: {jax.default_backend()}")
+print(f"JAX devices: {jax.devices()}")
+
 import numpy as np
 
 
@@ -120,14 +124,14 @@ def _sample_from_space(space):
 
 
 class ReplayBuffer:
-    def __init__(self, capacity: int, sequence_length: int, time_major: bool = True):
+    def __init__(self, capacity: int, sequence_length: int, time_major: bool = True, seed: int = 0):
         self.capacity = int(capacity)
         self.sequence_length = int(sequence_length)
         self.time_major = bool(time_major)
         self.episodes: deque = deque()
         self._current: List[Dict[str, Any]] = []
         self._size = 0
-        self._rng = np.random.default_rng()
+        self._rng = np.random.default_rng(seed)  # Reproducible sampling
 
     def add(self, transition: Dict[str, Any]) -> None:
         self._current.append(transition)
@@ -157,7 +161,8 @@ class ReplayBuffer:
             raise RuntimeError("Replay buffer is not ready for sampling.")
         sequences = []
         for _ in range(batch_size):
-            episode = random.choice(episodes)
+            ep_idx = int(self._rng.integers(0, len(episodes)))
+            episode = episodes[ep_idx]
             start = int(self._rng.integers(0, len(episode) - self.sequence_length + 1))
             seq = episode[start : start + self.sequence_length]
             sequences.append(seq)
@@ -168,12 +173,29 @@ class ReplayBuffer:
         batch = _tree_map(lambda *xs: np.stack(xs), *time_major_seqs)
 
         # DreamerV3 expects batch-major format [B, T, ...]
-        # Note: self.time_major=True was intended for different output, but DreamerV3 needs [B, T]
-
-        # Add required keys for DreamerV3
         B, T = next(iter(batch.values())).shape[:2]
-        batch['stepid'] = np.zeros((B, T, 20), dtype=np.uint8)
-        batch['consec'] = np.ones((B, T), dtype=np.int32)
+
+        # Compute consec: counts steps since last is_first (episode boundary)
+        # This is critical for RSSM temporal learning
+        if 'is_first' in batch:
+            is_first = batch['is_first'].astype(bool)
+            consec = np.zeros((B, T), dtype=np.int32)
+            for b in range(B):
+                count = 0
+                for t in range(T):
+                    if is_first[b, t]:
+                        count = 0
+                    consec[b, t] = count
+                    count += 1
+        else:
+            # Fallback: assume sequences are consecutive within episode
+            consec = np.broadcast_to(np.arange(T, dtype=np.int32), (B, T)).copy()
+        batch['consec'] = consec
+
+        # stepid: one-hot encoding of position, capped at 20
+        stepid_size = 20
+        stepid_idx = np.minimum(consec, stepid_size - 1).astype(np.int32)
+        batch['stepid'] = np.eye(stepid_size, dtype=np.uint8)[stepid_idx]
 
         return batch
 
@@ -224,6 +246,9 @@ def _build_transition(obs: Dict[str, Any], action: Any) -> Dict[str, Any]:
         transition.update(action)
     else:
         transition["action"] = action
+    # Ensure is_first is preserved (critical for RSSM reset)
+    if 'is_first' not in transition:
+        transition['is_first'] = obs.get('is_first', False) if isinstance(obs, dict) else False
     return _to_numpy(transition)
 
 
@@ -242,27 +267,29 @@ def _policy_step(agent, carry, obs, mode: str):
     return new_carry, _unbatch(action)
 
 
-def _train_step(agent, carry, batch):
+def _train_step(agent, batch):
     """Run training step using the agent wrapper.
 
     The embodied.jax.Agent wrapper has properly compiled _train that handles
     ninjax pure function wrapping internally.
+
+    Note: We reinitialize carry for each batch since sequences are randomly
+    sampled and not consecutive. The RSSM will use is_first/consec to reset
+    internal state at episode boundaries within the batch.
     """
-    # Initialize carry if needed
     B, T = next(iter(batch.values())).shape[:2]
-    if carry is None:
-        carry = agent.init_train(batch_size=B)
+    # Always reinitialize carry for randomly sampled batches
+    carry = agent.init_train(batch_size=B)
 
     # Add seed to batch (required by agent.train)
-    # The seed is used for stochastic operations in training
     counter = getattr(agent, '_train_counter', 0)
     agent._train_counter = counter + 1
     seed = agent._seeds(counter, agent.train_mirrored)
     batch = {**batch, 'seed': seed}
 
-    # Call the wrapper's train method (NOT model.train)
+    # Call the wrapper's train method
     carry, outs, metrics = agent.train(carry, batch)
-    return carry, metrics
+    return metrics
 
 
 def _save_checkpoint(logdir: Path, agent, step: int) -> None:
@@ -369,6 +396,8 @@ def parse_args():
     parser.add_argument("--train-ratio", type=float, default=4.0)
     parser.add_argument("--save-every", type=int, default=10000)
     parser.add_argument("--log-every", type=int, default=1000)
+    parser.add_argument("--eval-episodes", type=int, default=10)
+    parser.add_argument("--eval-seed-base", type=int, default=1000)
     return parser.parse_args()
 
 
@@ -403,11 +432,15 @@ def main():
     print(f"  Act space: {list(act_space.keys())}")
 
     # Load config
+    # NOTE: replay_context must be 0 because our ReplayBuffer doesn't store
+    # the dyn/deter, dyn/stoch context entries that DreamerV3 expects when
+    # replay_context > 0. The consec field correctly signals episode boundaries
+    # so the RSSM can reset at the right places.
     overrides = {
         "seed": args.seed,
         "batch_size": args.batch_size,
         "batch_length": args.batch_length,
-        "replay_context": 0,  # Disable replay context for simplified training
+        "replay_context": 0,
     }
 
     try:
@@ -424,17 +457,17 @@ def main():
         traceback.print_exc()
         raise RuntimeError(f"DreamerV3 initialization failed: {e}") from e
 
-    # Create replay buffer
+    # Create replay buffer with seed for reproducibility
     replay = ReplayBuffer(
         capacity=args.replay_size,
         sequence_length=args.batch_length,
         time_major=True,
+        seed=args.seed,
     )
 
     # Training loop
     obs = _to_numpy(env.reset())
     policy_carry = None
-    train_carry = None
     env_steps = 0
     episode_return = 0.0
     episode_length = 0
@@ -447,6 +480,7 @@ def main():
     env_time = 0.0  # Time spent in environment interactions
     train_time = 0.0  # Time spent in training updates
     train_steps = 0  # Number of training updates
+    first_train_logged = False  # Track JIT compilation time
 
     while env_steps < args.steps:
         terminal = bool(obs.get("is_last", False)) or bool(obs.get("is_terminal", False))
@@ -478,12 +512,7 @@ def main():
         if env_steps < args.random_steps or not use_agent:
             action = _sample_from_space(act_space)
         else:
-            try:
-                policy_carry, action = _policy_step(agent, policy_carry, obs, mode="train")
-            except Exception as e:
-                if env_steps == args.random_steps:
-                    print(f"  Warning: Policy failed, using random: {e}")
-                action = _sample_from_space(act_space)
+            policy_carry, action = _policy_step(agent, policy_carry, obs, mode="train")
 
         # Step environment FIRST, then add transition with correct reward
         t0 = time.time()
@@ -508,18 +537,17 @@ def main():
         if use_agent and replay.ready(args.batch_size) and env_steps >= args.random_steps:
             train_budget += args.train_ratio
             while train_budget >= 1.0:
-                try:
-                    batch = replay.sample(args.batch_size)
-                    t0 = time.time()
-                    train_carry, metrics = _train_step(agent, train_carry, batch)
-                    train_time += time.time() - t0
-                    train_steps += 1
-                    train_budget -= 1.0
-                except Exception as e:
-                    if train_budget == args.train_ratio:
-                        print(f"  Warning: Training failed: {e}")
-                    train_budget = 0.0
-                    break
+                batch = replay.sample(args.batch_size)
+                t0 = time.time()
+                metrics = _train_step(agent, batch)
+                step_time = time.time() - t0
+                train_time += step_time
+                train_steps += 1
+                train_budget -= 1.0
+                # Log first training step (includes JIT compilation)
+                if not first_train_logged:
+                    print(f"  First train step (incl. JIT): {step_time:.1f}s")
+                    first_train_logged = True
 
         # Logging
         if args.log_every and env_steps % args.log_every == 0:
@@ -544,34 +572,45 @@ def main():
     if use_agent:
         _save_checkpoint(logdir, agent, env_steps)
 
+    # Close training environment before evaluation
+    env.close()
+
     # === Evaluation Phase (separate from training) ===
     eval_returns = []
-    eval_episodes = 10
+    eval_episodes = args.eval_episodes
     print(f"\nRunning evaluation ({eval_episodes} episodes with test seeds)...")
 
     for eval_ep in range(eval_episodes):
-        eval_obs = _to_numpy(env.reset())
-        # Use test seeds (1000+) for fair comparison with other methods
-        if hasattr(env, '_env') and hasattr(env._env, 'reset'):
-            eval_obs = _to_numpy(env.reset())
-        eval_return = 0.0
-        eval_done = False
-        eval_policy_carry = None
+        # Use deterministic test seeds for fair comparison with other methods
+        # Create new environment for each episode to guarantee seed is applied correctly
+        # (some wrappers may ignore seed passed to reset())
+        eval_seed = args.eval_seed_base + eval_ep
+        eval_env_kwargs = env_kwargs.copy()
+        eval_env_kwargs['seed'] = eval_seed
+        eval_env = make_env(args.env, **eval_env_kwargs)
 
-        while not eval_done:
-            if use_agent:
-                try:
-                    eval_policy_carry, eval_action = _policy_step(agent, eval_policy_carry, eval_obs, mode="eval")
-                except Exception:
+        try:
+            eval_obs = _to_numpy(eval_env.reset())
+            eval_return = 0.0
+            eval_done = False
+            eval_policy_carry = None
+
+            while not eval_done:
+                if use_agent:
+                    try:
+                        eval_policy_carry, eval_action = _policy_step(agent, eval_policy_carry, eval_obs, mode="eval")
+                    except Exception:
+                        eval_action = _sample_from_space(act_space)
+                else:
                     eval_action = _sample_from_space(act_space)
-            else:
-                eval_action = _sample_from_space(act_space)
 
-            eval_obs = _to_numpy(env.step(eval_action))
-            eval_return += float(eval_obs.get("reward", 0.0))
-            eval_done = bool(eval_obs.get("is_last", False)) or bool(eval_obs.get("is_terminal", False))
+                eval_obs = _to_numpy(eval_env.step(eval_action))
+                eval_return += float(eval_obs.get("reward", 0.0))
+                eval_done = bool(eval_obs.get("is_last", False)) or bool(eval_obs.get("is_terminal", False))
 
-        eval_returns.append(eval_return)
+            eval_returns.append(eval_return)
+        finally:
+            eval_env.close()
 
     eval_mean = np.mean(eval_returns) if eval_returns else 0.0
     eval_std = np.std(eval_returns) if eval_returns else 0.0
@@ -602,7 +641,6 @@ def main():
     print(f"  Results saved to: {logdir}")
 
     logger.close()
-    env.close()
 
     return summary
 

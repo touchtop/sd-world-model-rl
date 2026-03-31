@@ -810,6 +810,130 @@
 
     ─────────────────────────────────────────────────────────────────────────────────────
 
+    【实验C: 因果干预下的零样本鲁棒性】(n=3 seeds, budget=5000) ⭐ **支撑C3的核心实验**
+    数据来源: results/causal_intervention/20260224_201339/results.json
+    代码: experiments/run_causal_intervention.py
+
+    **研究目标**: 量化 SD-MCTS 在因果图发生结构性突变时的两层优势来源：
+    (1) 守恒律精确编码提供的**结构精度增益**；
+    (2) 符号因果图编辑提供的**零样本适配增益**。
+    通过 `SD_no_update` 对照组将两者分离。
+
+    **前提声明** (scope conditions):
+    - 干预事件（产能暴跌/通信中断）在实际场景中是**可观测的**——运营方知道工厂停工了
+    - SD 的优势在于其模型**架构支持将已知变化编译进状态转移函数**，而非独享信息
+    - SD 的 RMSE=0 是**设计保证**：守恒律（库存=库存+到货-发货）被精确编码为先验知识，
+      仅需求预测（3参数）通过数据学习；这不是"学到了完美预测"，而是"先验知识精确"
+
+    **实验设计**:
+    - **训练阶段**: SD-MCTS 和 BlackBox-MCTS 均在标准 4 echelon Beer Game 上训练（无干预）
+    - **测试阶段**: 在 3 种因果干预场景下进行零样本评估，包含**3 个变体**：
+
+    | 变体 | 描述 | 干预信息 |
+    |------|------|----------|
+    | **SD** | SD 模型 + 因果图编辑 | 更新 `intervention_type` 属性 |
+    | **SD_no_update** | 同一 SD 模型，**不做图编辑** | 保持 `intervention_type="none"` |
+    | **BB** | BlackBox MLP | 无适配机制 |
+
+    | 干预类型 | 因果图修改描述 | do() 操作 |
+    |----------|----------------|-----------| 
+    | `none` (基线) | 无干预 | — |
+    | `capacity_shock` | 工厂产能从20降至2 (t≥15) | do(C_factory = 2) |
+    | `comm_severed` | 批发商订单通信截断 (10≤t≤20) | do(Order_1 = 0) |
+
+    **实验结果** (budget=5000, n=3 seeds):
+
+    ┌──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+    │ Table X: Causal Intervention — Three-Variant Comparison (mean±std across 3 seeds)                                       │
+    ├────────────────────┬──────────────┬──────────────────┬──────────────┬──────────────────┬──────────────────────────────────┤
+    │ Intervention       │ SD Cost↓     │ SD_no_upd Cost↓  │ BB Cost↓     │ 图编辑增益       │ 结构精度增益 (BB/SD_noUpd)       │
+    ├────────────────────┼──────────────┼──────────────────┼──────────────┼──────────────────┼──────────────────────────────────┤
+    │ none (baseline)    │ **913±57**   │ 884±40           │ 2104±231     │ -3.4% (噪声)     │ 2.38x                            │
+    │ capacity_shock     │ **1331±107** │ 1791±230         │ 3585±144     │ **25.7%** 🔥     │ 2.00x                            │
+    │ comm_severed       │ **1865±132** │ 2216±122         │ 4059±171     │ **15.9%**        │ 1.83x                            │
+    └────────────────────┴──────────────┴──────────────────┴──────────────┴──────────────────┴──────────────────────────────────┘
+    † 图编辑增益 = (SD_no_upd − SD) / SD_no_upd，衡量符号图编辑的增量价值。
+    ‡ 结构精度增益 = BB / SD_no_upd，衡量守恒律编码的固有优势（与编辑无关）。
+    ‡ Cost 报告绝对值 (lower is better)。±为跨 3 个随机种子的标准差。
+
+    ┌────────────────────────────────────────────────────────────────────────────────────────────┐
+    │ RMSE: World Model Prediction Error (t=10..24 evaluation window, mean±std, 3 seeds)        │
+    ├────────────────────┬──────────────┬──────────────────┬──────────────┤                      │
+    │ Intervention       │ SD           │ SD_no_update     │ BB           │                      │
+    ├────────────────────┼──────────────┼──────────────────┼──────────────┤                      │
+    │ none               │ 0.00±0.00    │ 0.00±0.00        │ 9.11±1.08    │                      │
+    │ capacity_shock     │ 0.00±0.00    │ **5.02±0.89**    │ 12.35±0.40   │                      │
+    │ comm_severed       │ 0.00±0.00    │ **11.46±4.18**   │ 13.87±1.92   │                      │
+    └────────────────────┴──────────────┴──────────────────┴──────────────┘                      │
+    │ RMSE 窗口 t=10..24 覆盖两种干预: capacity_shock(t≥15), comm_severed(t∈[10,20])           │
+    └────────────────────────────────────────────────────────────────────────────────────────────┘
+
+    **核心发现：两层优势分解**
+
+    SD-MCTS 的性能优势可被精确分解为两个独立的、互补的来源：
+
+    1. **Layer 1 — 结构精度增益 (~2x, 主导效应)**
+       即使不做任何干预更新（SD_no_update），SD 在所有干预下仍以 1.83x-2.38x
+       领先 BB。这完全来自守恒律精确编码的先验优势。
+       → **启示**: 在领域知识可获得的场景中，将其编码为归纳偏置的价值远超
+         从零学习——即使数据充足（5000 步训练后优势仍不收敛）。
+
+    2. **Layer 2 — 因果图编辑增益 (额外 16-26%, 增量效应)**
+       符号图编辑在 capacity_shock 下额外降低成本 25.7%（1791→1331），
+       在 comm_severed 下额外降低 15.9%（2216→1865）。
+       SD_no_update 对照确认: 这一增益**专属于图编辑机制**，而非模型精度。
+       → **启示**: 世界模型的"可编辑性"是一种独立于预测精度的架构属性，
+         它赋予了模型**零样本适应突发结构变化**的能力。
+
+    **三个启发性洞见**:
+
+    ★ **洞见 1: 预测精度 ≠ 决策质量**
+      comm_severed 下 SD_no_update 的 RMSE(11.46) 已接近 BB(13.87)——
+      两者的预测误差仅差 17%。但策略成本差距却高达 **1.83 倍** (2216 vs 4059)。
+      → 这揭示了一个深刻现象: **守恒律结构约束提供的决策改善**远超其在
+        预测指标上的体现。可能的机制: 守恒律确保了状态空间中的**不变量守恒**，
+        即使单步预测有误差，长期累积的状态仍满足物理约束，
+        而 MLP 的误差则违反守恒律 → 在 MCTS 多步规划中级联放大。
+
+    ★ **洞见 2: SD_no_update 的 RMSE 梯度映射了干预的"可观测性"**
+      - none: RMSE = 0±0（无干预→无信息缺失→零误差）
+      - capacity_shock: RMSE = 5.02±0.89（产能约束是"局部"修改→中等误差，低方差）
+      - comm_severed: RMSE = 11.46±**4.18**（通信截断影响全局订单流→高误差，**极高方差**）
+      → 这个梯度 (0→5→11) 恰好反映了**未编辑模型对干预的"认知盲区"大小**。
+        它为"何时需要图编辑"提供了定量判据:
+        当模型的未更新 RMSE 显著上升时，图编辑的价值就越大。
+      → **方差维度的额外洞见**: comm_severed 下 SD_no_update 的 RMSE 标准差高达 ±4.18
+        (三个种子分别为 5.94、12.38、16.06)，而 SD（图编辑后）始终为 0.00±0.00。
+        这说明**全局性干预**（截断通信流）不仅使平均预测误差飙升，
+        还使误差的**跨种子离散度**急剧增加——不同训练轨迹的 SD 模型
+        对同一全局干预产生了差异巨大的"误判模式"。
+        相比之下，一旦执行图编辑（SD），所有种子的 RMSE 归零且方差消失。
+        → 图编辑不仅是"降低均值"的工具，更是**消除不确定性**的机制:
+          它将模型从"依赖训练经验猜测"切换到"依据结构知识推演"，
+          从根本上消除了预测行为对训练随机性的依赖。
+
+    ★ **洞见 3: 对照实验的验证性——"none" 场景是自然安慰剂**
+      在 none (无干预) 下，SD 与 SD_no_update 的性能几乎相同
+      (914 vs 884, 差 -3.4% 属噪声范围，RMSE 均为 0)。
+      → 这是一个**内建的安慰剂检验**: 当无需编辑时，编辑确实不产生虚假增益。
+        这强化了 capacity_shock 和 comm_severed 下观察到的编辑增益的因果归因。
+
+    **图表**:
+    - Figure X(a): fig_intervention_cost.png — 三变体柱状图 (SD / SD_no_upd / BB)
+    - Figure X(b): fig_intervention_rmse.png — 三变体 RMSE 对比
+
+    **叙事核心**:
+    此实验通过 SD_no_update 对照，将 SD-MCTS 的优势精确分解为两个可量化的来源。
+    在已知干预类型和时间、且结构方程可用的前提下(scope condition)，
+    SD-MCTS 展示了两个互补能力:
+    (1) 守恒律编码提供约 2 倍的结构精度增益（不依赖干预更新即可获得）；
+    (2) 符号因果图编辑提供额外 16-26% 的零样本适配增益。
+    两者共同使 SD-MCTS 在 capacity_shock 下以 2.69 倍(=1331 vs 3585)领先 BB。
+    这验证了 C3: **在因果图可编辑的前提下，符号化世界模型具有
+    不可替代的零样本结构迁移能力**。
+
+    ─────────────────────────────────────────────────────────────────────────────────────
+
     **后续研究**（不在本文范围，回应审稿人可能的延伸要求）:
 
     1. **结构扰动分析**: 当守恒律本身有误差时，性能如何衰减？
@@ -1164,6 +1288,58 @@ python plot_multi_step_results.py
 - `fig4_growth_rate_comparison.png`: 指数增长率柱状图（论文副图）
 - `fig3_relative_error_growth.png`: 对数刻度的相对增长
 
+### 6.3b 因果干预实验 (实验C: Table X + Figure X)
+
+**数据来源**: `results/causal_intervention/20260224_201339/results.json`
+
+**实验C: 因果干预下的零样本鲁棒性**
+
+```bash
+cd /home/data/round/code/sd_world_model_rl
+
+# 完整运行 (2 models × 3 interventions × 3 seeds)
+conda run -n mapf python docs/neurips/experiments/run_causal_intervention.py \
+    --budget 5000 \
+    --seeds 3 \
+    --verbose
+
+# 快速测试 (单seed)
+conda run -n mapf python docs/neurips/experiments/run_causal_intervention.py \
+    --budget 1000 \
+    --seeds 1 \
+    --verbose
+
+# 生成图表 (自动读取最新结果)
+conda run -n mapf python docs/neurips/experiments/plot_intervention_results.py
+
+# 输出:
+# - results/causal_intervention/<timestamp>/results.json
+# - results/causal_intervention/<timestamp>/fig_intervention_cost.png
+# - results/causal_intervention/<timestamp>/fig_intervention_rmse.png
+```
+
+**实验配置**:
+| 参数 | 值 |
+|------|-----|
+| 环境 | Beer Game 4-echelon (BeerGameEnvIntervention) |
+| 回合长度 | 36 steps |
+| 训练样本 | 5000 steps (标准无干预环境) |
+| 评估episodes | 10 per intervention per seed |
+| MCTS模拟次数 | 200 |
+| 干预类型 | none, capacity_shock (do(C=2) at t≥15), comm_severed (do(Order₁=0) at t∈[10,20]) |
+| 模型 | SD-MCTS (零样本图更新), BlackBox-MCTS (无适配机制) |
+| Conda环境 | mapf |
+
+**预计耗时** (3 seeds):
+- SD训练: ~10 min/seed
+- BlackBox训练: ~10 min/seed
+- MCTS评估 (3干预 × 10episodes): ~30 min/seed
+- **总计: ~2.5小时**
+
+**关键图表**:
+- `fig_intervention_cost.png`: 策略成本柱状图 (SD vs BB, 3种干预)
+- `fig_intervention_rmse.png`: 世界模型RMSE柱状图 (SD零误差 vs BB高误差)
+
 ### 6.4 依赖安装
 
 ```bash
@@ -1204,6 +1380,15 @@ docs/neurips/results/
 │           ├── fig3_relative_error_growth.png
 │           ├── fig4_growth_rate_comparison.png
 │           └── fig5_comparison_summary.png
+├── causal_intervention/
+│   ├── 20260224_155905/      # 初步测试 (budget=1000, seed=1)
+│   │   └── results.json
+│   ├── 20260224_162058/      # 二变体旧版 (budget=5000, seeds=3, 无SD_no_update)
+│   │   └── results.json
+│   └── 20260224_201339/      # 正式结果 (budget=5000, seeds=3, 含SD_no_update+RMSE修复) ★
+│       ├── results.json
+│       ├── fig_intervention_cost.png
+│       └── fig_intervention_rmse.png
 └── figures/
     ├── table1_sample_efficiency.tex
     ├── table2_ablation_study.tex
@@ -1213,7 +1398,7 @@ docs/neurips/results/
 
 ---
 
-**文档版本**: v1.1
+**文档版本**: v1.2
 **创建时间**: 2026-02-02
-**最后更新**: 2026-02-12 (添加实验复现指南)
+**最后更新**: 2026-02-24 (添加因果干预实验C及复现指南)
 **协商参与**: Codex, Gemini, Claude

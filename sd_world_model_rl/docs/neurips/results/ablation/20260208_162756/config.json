@@ -1,0 +1,14 @@
+{
+  "experiment_type": "ablation",
+  "env_name": "beer_game",
+  "sample_budgets": [
+    500
+  ],
+  "n_seeds": 1,
+  "eval_episodes": 5,
+  "mcts_simulations": 50,
+  "methods": [
+    "sd_mcts",
+    "blackbox_mcts"
+  ]
+}

@@ -99,3 +99,98 @@ Based on IJOC experiments and theoretical analysis:
 | Samples to 90% | ~10K | ~50K | ~100K |
 | Physics Violation | 0% | ~15% | ~8% |
 | Transfer (3→5 node) | >85% | <50% | <40% |
+
+---
+
+## Experiment Reproduction Commands
+
+### Table 1: Sample Efficiency (Main Result)
+
+**Current paper data source**: `results/main_revised/20260331_full_merged/results.json`
+
+```bash
+cd /home/data/round/code/sd_world_model_rl/docs/neurips
+
+# Revised runner used for the current paper Table 1 SD-MCTS line
+python experiments/run_comparison_revised.py \
+    --budgets 1000 3000 10000 \
+    --seeds 3 \
+    --eval-episodes 10
+
+# Quick test (single budget, single seed)
+python experiments/run_comparison_revised.py \
+    --experiment main \
+    --budgets 1000 \
+    --seeds 1
+```
+
+**Configuration**:
+- Environment: Beer Game 4-echelon, T=36 steps, 81 discrete actions
+- Methods in the current paper table: `sd_mcts`, `dreamerv3`, `ppo`
+- Evaluation: 10 episodes with seeds 1000-1009
+- Note: `results/main/20260208_201101/results.json` is retained as the historical DreamerV3/PPO source used when merging the revised Table 1 input.
+
+**Estimated runtime** (3 seeds):
+| Budget | Time |
+|--------|------|
+| 1K | ~5 min |
+| 3K | ~40 min |
+| 10K | ~3 hrs |
+
+### Table 2: Ablation Study
+
+**Data source**: `results/ablation/20260212_102554/results.json`
+
+```bash
+cd /home/data/round/code/sd_world_model_rl/docs/neurips
+
+# Core scenarios (5 variants × 3 scenarios × 1 seed = 15 runs)
+python experiments/run_ablation_principled.py \
+    --suite core \
+    --seeds 1 \
+    --eval-episodes 10
+
+# Multi-seed for statistical significance (recommended)
+python experiments/run_ablation_principled.py \
+    --suite core \
+    --seeds 5 \
+    --eval-episodes 10
+
+# View experiment design
+python experiments/run_ablation_principled.py --describe
+```
+
+**Variants**:
+| Variant | Model | VNet | MCTS | Tests |
+|---------|-------|------|------|-------|
+| `sd_mcts` | SD | ✓ | ✓ | Baseline |
+| `blackbox_mlp` | MLP | ✓ | ✓ | Structural prior |
+| `no_vnet` | SD | ✗ | ✓ | Terminal value |
+| `greedy_1step` | SD | ✗ | ✗ | Multi-step planning |
+| `wrong_prior` | SD* | ✓ | ✓ | Prior correctness |
+
+**Scenarios**:
+| Scenario | Budget | T | Description |
+|----------|--------|---|-------------|
+| `standard` | 3000 | 36 | Standard setup |
+| `low_sample_shift` | 1000 | 36 | Low data + OOD |
+| `long_horizon_delay` | 10000 | 100 | Long horizon |
+
+### Results Directory
+
+```
+docs/neurips/results/
+├── main_revised/
+│   ├── 20260331_full_sdmcts/ # Revised SD-MCTS rerun
+│   └── 20260331_full_merged/ # Current Table 1 merged data
+├── main/
+│   └── 20260208_201101/      # Historical DreamerV3/PPO source
+│       ├── config.json
+│       └── results.json
+├── ablation/
+│   └── 20260212_102554/      # Table 2 final data
+│       └── results.json
+└── figures/
+    ├── table1_sample_efficiency.tex
+    └── table2_ablation_study.tex
+```

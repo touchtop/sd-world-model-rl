@@ -1,0 +1,122 @@
+[
+  {
+    "variant": "sd_mcts",
+    "scenario": "low_sample_shift",
+    "seed": 0,
+    "component": "sd_model",
+    "expected": "SD >> MLP: structural prior helps in low-sample regime",
+    "eval_return_mean": -966.9,
+    "eval_return_std": 191.7558082562299,
+    "train_time": 78.1162896156311,
+    "total_steps": 1000,
+    "error": null
+  },
+  {
+    "variant": "sd_mcts",
+    "scenario": "low_sample_shift",
+    "seed": 1,
+    "component": "sd_model",
+    "expected": "SD >> MLP: structural prior helps in low-sample regime",
+    "eval_return_mean": -963.0,
+    "eval_return_std": 102.77451045857626,
+    "train_time": 87.49796986579895,
+    "total_steps": 1000,
+    "error": null
+  },
+  {
+    "variant": "sd_mcts",
+    "scenario": "low_sample_shift",
+    "seed": 2,
+    "component": "sd_model",
+    "expected": "SD >> MLP: structural prior helps in low-sample regime",
+    "eval_return_mean": -1129.4,
+    "eval_return_std": 305.03776815338784,
+    "train_time": 80.62817168235779,
+    "total_steps": 1000,
+    "error": null
+  },
+  {
+    "variant": "blackbox_mlp",
+    "scenario": "low_sample_shift",
+    "seed": 0,
+    "component": "sd_model",
+    "expected": "SD >> MLP: structural prior helps in low-sample regime",
+    "eval_return_mean": -3428.5,
+    "eval_return_std": 1005.0866878035944,
+    "train_time": 153.71697282791138,
+    "total_steps": 1000,
+    "error": null
+  },
+  {
+    "variant": "blackbox_mlp",
+    "scenario": "low_sample_shift",
+    "seed": 1,
+    "component": "sd_model",
+    "expected": "SD >> MLP: structural prior helps in low-sample regime",
+    "eval_return_mean": -3500.0,
+    "eval_return_std": 982.9771106185535,
+    "train_time": 157.40791940689087,
+    "total_steps": 1000,
+    "error": null
+  },
+  {
+    "variant": "blackbox_mlp",
+    "scenario": "low_sample_shift",
+    "seed": 2,
+    "component": "sd_model",
+    "expected": "SD >> MLP: structural prior helps in low-sample regime",
+    "eval_return_mean": -4654.6,
+    "eval_return_std": 1499.629300860716,
+    "train_time": 149.94094586372375,
+    "total_steps": 1000,
+    "error": null
+  },
+  {
+    "variant": "sd_mcts",
+    "scenario": "long_horizon",
+    "seed": 0,
+    "component": "value_net",
+    "expected": "VNet >> NoVNet: terminal value essential for long horizons",
+    "eval_return_mean": -5380.0,
+    "eval_return_std": 503.4751235165448,
+    "train_time": 483.6048514842987,
+    "total_steps": 5000,
+    "error": null
+  },
+  {
+    "variant": "sd_mcts",
+    "scenario": "long_horizon",
+    "seed": 1,
+    "component": "value_net",
+    "expected": "VNet >> NoVNet: terminal value essential for long horizons",
+    "eval_return_mean": -4550.0,
+    "eval_return_std": 537.3095941819762,
+    "train_time": 527.4549243450165,
+    "total_steps": 5000,
+    "error": null
+  },
+  {
+    "variant": "sd_mcts",
+    "scenario": "long_horizon",
+    "seed": 2,
+    "component": "value_net",
+    "expected": "VNet >> NoVNet: terminal value essential for long horizons",
+    "eval_return_mean": -4752.8,
+    "eval_return_std": 1370.169099053106,
+    "train_time": 482.6350803375244,
+    "total_steps": 5000,
+    "error": null
+  },
+  {
+    "variant": "no_vnet",
+    "scenario": "long_horizon",
+    "seed": 0,
+    "component": "value_net",
+    "expected": "VNet >> NoVNet: terminal value essential for long horizons",
+    "eval_return_mean": -2020.6,
+    "eval_return_std": 160.7558397073027,
+    "train_time": 4436.534243345261,
+    "total_steps": 5000,
+    "error": null
+  }
+]

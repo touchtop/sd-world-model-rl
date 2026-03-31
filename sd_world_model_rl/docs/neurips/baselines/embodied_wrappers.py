@@ -118,9 +118,12 @@ class EmbodiedEnvWrapper:
             }
         return spaces
 
-    def reset(self):
+    def reset(self, seed=None, **kwargs):
         """Reset environment and return initial observation."""
-        obs = self._env.reset()
+        if seed is not None:
+            obs = self._env.reset(seed=seed, **kwargs)
+        else:
+            obs = self._env.reset(**kwargs)
 
         # Handle new gymnasium API that returns (obs, info)
         if isinstance(obs, tuple):
@@ -198,8 +201,11 @@ class BeerGameEmbodied(EmbodiedEnvWrapper):
     """Embodied wrapper specifically for Beer Game environment."""
 
     def __init__(self, **kwargs):
-        from src.env.beer_game_env import BeerGameEnv
-        env = BeerGameEnv(**kwargs)
+        from src.env.beer_game_env import BeerGameEnvFlat
+        # Use order_levels=3 for consistency with SD-MCTS/BlackBox-MCTS
+        if 'order_levels' not in kwargs:
+            kwargs['order_levels'] = 3
+        env = BeerGameEnvFlat(**kwargs)
         super().__init__(env, obs_key="vector")
 
 

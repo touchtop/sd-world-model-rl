@@ -1,22 +1,20 @@
-# Python
 __pycache__/
-*.py[cod]
-*.egg-info/
-.eggs/
-dist/
-build/
+*.pyc
 
-# Large binary files
-*.deb
-*.tar.gz
-
-# IDE
-.vscode/
-.idea/
-
-# Results (keep figures, ignore large logs)
+# LaTeX build artifacts
+*.aux
+*.out
 *.log
+*.synctex.gz
 
-# Temporary files
-*.tmp
-*.swp
+# Local generated copies from ad-hoc compilation
+/full_draft_zh.pdf
+/full_draft_zh.aux
+/full_draft_zh.out
+/full_draft_zh_pre_review_backup.pdf
+/full_draft_zh_pre_review_backup.aux
+/full_draft_zh_pre_review_backup.out
+
+# Experiment runtime logs
+docs/neurips/experiments/*.log
+docs/neurips/results/*.log
