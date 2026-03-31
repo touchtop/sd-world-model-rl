@@ -1,0 +1,50 @@
+[
+  {
+    "variant": "sd_mcts",
+    "scenario": "standard",
+    "seed": 0,
+    "component": "",
+    "expected": "",
+    "eval_return_mean": -971.0,
+    "eval_return_std": 0.0,
+    "train_time": 272.53831601142883,
+    "total_steps": 3000,
+    "error": null
+  },
+  {
+    "variant": "blackbox_mlp",
+    "scenario": "standard",
+    "seed": 0,
+    "component": "",
+    "expected": "",
+    "eval_return_mean": -6352.5,
+    "eval_return_std": 0.0,
+    "train_time": 514.3180236816406,
+    "total_steps": 3000,
+    "error": null
+  },
+  {
+    "variant": "no_vnet",
+    "scenario": "standard",
+    "seed": 0,
+    "component": "",
+    "expected": "",
+    "eval_return_mean": -636.5,
+    "eval_return_std": 0.0,
+    "train_time": 1775.3763008117676,
+    "total_steps": 3000,
+    "error": null
+  },
+  {
+    "variant": "greedy_1step",
+    "scenario": "standard",
+    "seed": 0,
+    "component": "",
+    "expected": "",
+    "eval_return_mean": 0.0,
+    "eval_return_std": 0.0,
+    "train_time": 0.0,
+    "total_steps": 0,
+    "error": "make_beer_game_reward_fn.<locals>.reward_fn() takes from 1 to 2 positional arguments but 3 were given"
+  }
+]

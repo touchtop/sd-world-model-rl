@@ -1,0 +1,52 @@
+{
+  "summary": {
+    "sd_mcts": {
+      "violation_rate_mean": 0.0,
+      "violation_rate_std": 0.0,
+      "mean_return_mean": -654.4666666666667,
+      "n_seeds": 3
+    },
+    "blackbox_mcts": {
+      "violation_rate_mean": 0.9898148148148148,
+      "violation_rate_std": 0.0013094570021973055,
+      "mean_return_mean": -2256.9333333333334,
+      "n_seeds": 3
+    }
+  },
+  "raw": {
+    "sd_mcts": [
+      {
+        "seed": 0,
+        "violation_rate": 0.0,
+        "mean_return": -660.2
+      },
+      {
+        "seed": 1,
+        "violation_rate": 0.0,
+        "mean_return": -716.2
+      },
+      {
+        "seed": 2,
+        "violation_rate": 0.0,
+        "mean_return": -587.0
+      }
+    ],
+    "blackbox_mcts": [
+      {
+        "seed": 0,
+        "violation_rate": 0.9888888888888889,
+        "mean_return": -2198.6
+      },
+      {
+        "seed": 1,
+        "violation_rate": 0.9888888888888889,
+        "mean_return": -2102.4
+      },
+      {
+        "seed": 2,
+        "violation_rate": 0.9916666666666667,
+        "mean_return": -2469.8
+      }
+    ]
+  }
+}

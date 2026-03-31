@@ -1,0 +1,14 @@
+[
+  {
+    "variant": "sd_mcts",
+    "scenario": "low_sample_shift",
+    "seed": 0,
+    "component": "sd_model",
+    "expected": "SD >> MLP: structural prior helps in low-sample regime",
+    "eval_return_mean": -4686.0,
+    "eval_return_std": 21.0,
+    "train_time": 80.48898124694824,
+    "total_steps": 1000,
+    "error": null
+  }
+]

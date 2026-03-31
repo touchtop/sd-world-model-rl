@@ -1,0 +1,16 @@
+{
+  "sd_budget": 15000,
+  "blackbox_budget": 30000,
+  "train_pattern": "step",
+  "test_patterns": [
+    "step",
+    "sinusoidal",
+    "random_walk",
+    "bursty"
+  ],
+  "n_seeds": 5,
+  "eval_episodes": 20,
+  "num_simulations": 200,
+  "gamma": 0.99,
+  "device": "cpu"
+}

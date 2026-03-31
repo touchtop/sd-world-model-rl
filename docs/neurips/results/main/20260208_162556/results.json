@@ -1,0 +1,50 @@
+[
+  {
+    "method": "sd_mcts",
+    "env": "beer_game",
+    "sample_budget": 500,
+    "seed": 0,
+    "eval_return_mean": -951.2,
+    "eval_return_std": 248.54214934292332,
+    "total_time": 8.00520634651184,
+    "total_steps": 500,
+    "total_episodes": 14,
+    "error": null
+  },
+  {
+    "method": "dreamerv3",
+    "env": "beer_game",
+    "sample_budget": 500,
+    "seed": 0,
+    "eval_return_mean": -3098.8,
+    "eval_return_std": 998.1203133891224,
+    "total_time": 7.356035947799683,
+    "total_steps": 500,
+    "total_episodes": 13,
+    "error": null
+  },
+  {
+    "method": "ppo",
+    "env": "beer_game",
+    "sample_budget": 500,
+    "seed": 0,
+    "eval_return_mean": -5576.0,
+    "eval_return_std": 0.0,
+    "total_time": 1.9270665645599365,
+    "total_steps": 500,
+    "total_episodes": 0,
+    "error": null
+  },
+  {
+    "method": "dqn",
+    "env": "beer_game",
+    "sample_budget": 500,
+    "seed": 0,
+    "eval_return_mean": -2812.0,
+    "eval_return_std": 0.0,
+    "total_time": 0.6385886669158936,
+    "total_steps": 500,
+    "total_episodes": 0,
+    "error": null
+  }
+]

@@ -13,21 +13,21 @@ from typing import Dict, List
 from datetime import datetime
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent.parent
+sys.path.insert(0, str(ROOT_DIR))
+sys.path.insert(0, str(ROOT_DIR / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 
 CONFIG = {
     "experiment_name": "physics_violation",
-    "environments": ["beer_game", "delayed_collapse"],
-    "methods": ["sd_mcts", "blackbox_mcts", "dreamerv3"],
+    "environments": ["beer_game"],
+    "methods": ["sd_mcts", "blackbox_mcts"],
     "test_conditions": [
         "in_distribution",
-        "demand_shift_1.5x",
-        "demand_shift_2x",
-        "parameter_drift_30pct",
     ],
-    "n_seeds": 10,
-    "eval_episodes": 50,
+    "n_seeds": 5,
+    "eval_episodes": 30,
 }
 
 

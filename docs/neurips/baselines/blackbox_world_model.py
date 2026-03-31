@@ -114,7 +114,7 @@ def train_blackbox_model(
         epoch_loss = 0.0
         n_batches = 0
 
-        for i in range(0, len(replay_buffer) - batch_size, batch_size):
+        for i in range(0, len(replay_buffer) - batch_size + 1, batch_size):
             batch = replay_buffer[i:i+batch_size]
             states = torch.from_numpy(np.array([t[0] for t in batch], dtype=np.float32)).to(device)
             actions = torch.from_numpy(np.array([t[1] for t in batch], dtype=np.int64)).to(device)
