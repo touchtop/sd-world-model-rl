@@ -1,0 +1,53 @@
+[
+  {
+    "seed": 0,
+    "epsilon_1_sd": 0.0,
+    "variants": {
+      "baseline": {
+        "mean_return": -2244.24,
+        "std_return": 404.07101158088534,
+        "total_simulations": 360000,
+        "avg_simulations_per_step": 200.0,
+        "rollout_depth": 10,
+        "num_simulations": 200,
+        "deterministic_ratio": 0.0
+      },
+      "adaptive_h": {
+        "mean_return": -2165.48,
+        "std_return": 357.75942978487654,
+        "total_simulations": 360000,
+        "avg_simulations_per_step": 200.0,
+        "rollout_depth": 10,
+        "num_simulations": 200,
+        "deterministic_ratio": 0.0
+      },
+      "adaptive_sims": {
+        "mean_return": -2257.2,
+        "std_return": 428.38356644483923,
+        "total_simulations": 538200,
+        "avg_simulations_per_step": 299.0,
+        "rollout_depth": 10,
+        "num_simulations": 299,
+        "deterministic_ratio": 0.0
+      },
+      "tracker": {
+        "mean_return": -2272.52,
+        "std_return": 417.72427461185447,
+        "total_simulations": 360000,
+        "avg_simulations_per_step": 200.0,
+        "rollout_depth": 10,
+        "num_simulations": 200,
+        "deterministic_ratio": 1.0
+      },
+      "all_optimizations": {
+        "mean_return": -2272.72,
+        "std_return": 408.53685464104706,
+        "total_simulations": 538200,
+        "avg_simulations_per_step": 299.0,
+        "rollout_depth": 10,
+        "num_simulations": 299,
+        "deterministic_ratio": 1.0
+      }
+    }
+  }
+]
