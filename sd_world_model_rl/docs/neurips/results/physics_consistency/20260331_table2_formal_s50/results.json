@@ -1,0 +1,102 @@
+{
+  "config": {
+    "sample_budget": 3000,
+    "n_seeds": 3,
+    "eval_episodes": 10,
+    "mcts_simulations": 50,
+    "rollout_depth": 10,
+    "env": {
+      "order_levels": 3,
+      "tau_info": 2,
+      "tau_ship": 2,
+      "T": 36,
+      "demand_std": 0.0
+    }
+  },
+  "results": [
+    {
+      "method": "sd_mcts",
+      "seed": 0,
+      "sample_budget": 3000,
+      "eval_return_mean": -962.0,
+      "eval_return_std": 178.35246003349658,
+      "imagined_state_count": 18000,
+      "imagined_state_violation_rate": 0.0,
+      "train_time_sec": 62.93680810928345
+    },
+    {
+      "method": "sd_mcts",
+      "seed": 1,
+      "sample_budget": 3000,
+      "eval_return_mean": -1126.6,
+      "eval_return_std": 178.44674275536664,
+      "imagined_state_count": 18000,
+      "imagined_state_violation_rate": 0.0,
+      "train_time_sec": 63.22555899620056
+    },
+    {
+      "method": "sd_mcts",
+      "seed": 2,
+      "sample_budget": 3000,
+      "eval_return_mean": -1246.6,
+      "eval_return_std": 343.4356417147178,
+      "imagined_state_count": 18000,
+      "imagined_state_violation_rate": 0.0,
+      "train_time_sec": 62.88277339935303
+    },
+    {
+      "method": "bb_mcts",
+      "seed": 0,
+      "sample_budget": 3000,
+      "eval_return_mean": -2892.6,
+      "eval_return_std": 1405.9929018313,
+      "imagined_state_count": 18000,
+      "imagined_state_violation_rate": 0.9555,
+      "train_time_sec": 158.80063104629517
+    },
+    {
+      "method": "bb_mcts",
+      "seed": 1,
+      "sample_budget": 3000,
+      "eval_return_mean": -2917.4,
+      "eval_return_std": 1560.1576971575662,
+      "imagined_state_count": 18000,
+      "imagined_state_violation_rate": 0.8976666666666666,
+      "train_time_sec": 170.83320236206055
+    },
+    {
+      "method": "bb_mcts",
+      "seed": 2,
+      "sample_budget": 3000,
+      "eval_return_mean": -2129.8,
+      "eval_return_std": 642.7462640887148,
+      "imagined_state_count": 18000,
+      "imagined_state_violation_rate": 0.9566666666666667,
+      "train_time_sec": 167.31651949882507
+    }
+  ],
+  "summary": {
+    "bb_mcts": {
+      "n_seeds": 3,
+      "sample_budget": 3000,
+      "imagined_state_count_mean": 18000.0,
+      "imagined_state_violation_rate_mean": 0.9366111111111111,
+      "imagined_state_violation_rate_std": 0.033731922456222314,
+      "imagined_state_violation_rate_se": 0.019475134510383536,
+      "eval_return_mean": -2646.6,
+      "eval_return_std": 447.73367083568763,
+      "eval_return_se": 258.49915538224354
+    },
+    "sd_mcts": {
+      "n_seeds": 3,
+      "sample_budget": 3000,
+      "imagined_state_count_mean": 18000.0,
+      "imagined_state_violation_rate_mean": 0.0,
+      "imagined_state_violation_rate_std": 0.0,
+      "imagined_state_violation_rate_se": 0.0,
+      "eval_return_mean": -1111.7333333333333,
+      "eval_return_std": 142.8812560601751,
+      "eval_return_se": 82.49253164849395
+    }
+  }
+}

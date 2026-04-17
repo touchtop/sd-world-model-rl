@@ -685,3 +685,39 @@ formal SD-MCTS 主结果（同一组 checkpoint 来源、同一环境协议）�
 当前阶段建议：
 - 先将此结果保留在 worklog 中；
 - 之后再决定是否写入主文或附录。
+
+## 2026-04-13：Cartpole 中 SD 与 TVA 的训练组织方式复核
+
+对当前 Cartpole 实现再次复核后，可确认其训练方式并非 Beer Game 式的交替更新，而是较为明确的分阶段训练。
+
+在基础脚本 `scripts/run_dmcontrol_cartpole.py` 中，主流程为：
+- 先收集环境数据；
+- 再通过 `train_sd_model(...)` 完成 SD 系统辨识；
+- 之后在固定模型上训练 `value_net / VNet`；
+- 最后在评估阶段将 VNet 接入搜索。
+
+即使在 `distill_rollout` 分支下，流程也仍然是：
+- 先固定 SD 模型；
+- 再生成 imagination data；
+- 之后训练初始 VNet；
+- 如有需要，再基于 rollout/refinement 数据继续训练 VNet。
+
+该过程中并不存在“VNet 更新后再回头更新 SD”的交替闭环。
+
+在论文当前使用的正式口径中，这一特征更加明确。`scripts/sweep_si_robust.py` 与 `scripts/run_cartpole_sharedprior_paper.py` 的共享先验流程可概括为：
+- `prepare_seed_payload` 先完成 SD 训练，并生成 imagination data；
+- `train_seed` 再在这些 imagination data 与共享先验基础上训练或微调 VNet；
+- `evaluate_seed` 仅做最终评估。
+
+因此，当前 paper-facing Cartpole 的实际训练方式应表述为：
+
+- 先独立训练 SD；
+- 再独立训练 TVA/VNet；
+- 最后在固定好的 SD + VNet 上执行搜索评估。
+
+从方法选择上看，这种分阶段训练对于当前 Cartpole 任务是合理的。原因在于：
+- Cartpole 动力学低维、结构清晰、系统辨识难度相对较低；
+- 先将 SD 参数稳定识别出来，再训练 TVA，有助于保持训练稳定性与解释性；
+- 这样可以避免 VNet 的搜索分布信号反向扰动本已可辨识的物理参数。
+
+因此，现阶段不宜将 Cartpole 的非交替训练方式视为缺陷。相反，就本任务与论文当前主张而言，这一组织方式大概率优于更复杂的交替更新。只有在后续进入动力学更复杂、模型失配更强或观测噪声更显著的场景时，Beer Game 式的交替训练才更有必要重新考虑。

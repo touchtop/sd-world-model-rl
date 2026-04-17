@@ -71,6 +71,7 @@ def mcts_search(
     return_details: bool = False,
     n_workers: int = None,
     rollout_depth: int = 10,
+    imagined_state_recorder: Optional[Callable[[np.ndarray], None]] = None,
 ):
     """MuZero风格MCTS搜索
 
@@ -80,6 +81,7 @@ def mcts_search(
         value_net: 价值网络，用于叶节点评估（可选，否则用reward_fn）
         return_details: 如果True，返回MCTSResult
         n_workers: 工人数量，用于正确计算奖励（避免将fatigue计入backlog）
+        imagined_state_recorder: 若提供，则记录搜索过程中生成的内部想象状态
     """
     if reward_fn is None:
         if n_workers is not None:
@@ -139,7 +141,10 @@ def mcts_search(
                     torch.tensor([action_to_expand], dtype=torch.int64, device=device)
                 )[0]
 
-            child_reward = reward_fn(next_state.detach().cpu().numpy(), action_to_expand)
+            next_state_np = next_state.detach().cpu().numpy()
+            if imagined_state_recorder is not None:
+                imagined_state_recorder(next_state_np.copy())
+            child_reward = reward_fn(next_state_np, action_to_expand)
             child = MCTSNode(next_state, parent=node, action=action_to_expand,
                            prior=node_priors[action_to_expand], reward=child_reward)
             node.children[action_to_expand] = child
@@ -162,7 +167,10 @@ def mcts_search(
                         rollout_state.unsqueeze(0),
                         torch.tensor([rand_action], dtype=torch.int64, device=device)
                     )[0]
-                r = reward_fn(next_state.detach().cpu().numpy(), rand_action)
+                next_state_np = next_state.detach().cpu().numpy()
+                if imagined_state_recorder is not None:
+                    imagined_state_recorder(next_state_np.copy())
+                r = reward_fn(next_state_np, rand_action)
                 rollout_return += discount * r
                 discount *= gamma
                 rollout_state = next_state

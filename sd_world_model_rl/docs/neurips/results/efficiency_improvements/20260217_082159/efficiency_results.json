@@ -1,0 +1,155 @@
+[
+  {
+    "seed": 0,
+    "epsilon_1_sd": 0.0,
+    "variants": {
+      "baseline": {
+        "mean_return": -1147.28,
+        "std_return": 225.32456945482,
+        "total_simulations": 360000,
+        "avg_simulations_per_step": 200.0,
+        "rollout_depth": 10,
+        "num_simulations": 200,
+        "deterministic_ratio": 0.0
+      },
+      "adaptive_h": {
+        "mean_return": -1160.12,
+        "std_return": 244.1600819134856,
+        "total_simulations": 360000,
+        "avg_simulations_per_step": 200.0,
+        "rollout_depth": 20,
+        "num_simulations": 200,
+        "deterministic_ratio": 0.0
+      },
+      "adaptive_sims": {
+        "mean_return": -1119.72,
+        "std_return": 180.89024738774614,
+        "total_simulations": 90000,
+        "avg_simulations_per_step": 50.0,
+        "rollout_depth": 10,
+        "num_simulations": 50,
+        "deterministic_ratio": 0.0
+      },
+      "tracker": {
+        "mean_return": -1078.2,
+        "std_return": 226.92703673207384,
+        "total_simulations": 360000,
+        "avg_simulations_per_step": 200.0,
+        "rollout_depth": 10,
+        "num_simulations": 200,
+        "deterministic_ratio": 1.0
+      },
+      "all_optimizations": {
+        "mean_return": -1091.92,
+        "std_return": 180.92913972049942,
+        "total_simulations": 90000,
+        "avg_simulations_per_step": 50.0,
+        "rollout_depth": 20,
+        "num_simulations": 50,
+        "deterministic_ratio": 1.0
+      }
+    }
+  },
+  {
+    "seed": 1,
+    "epsilon_1_sd": 0.0,
+    "variants": {
+      "baseline": {
+        "mean_return": -1162.16,
+        "std_return": 182.66289825796588,
+        "total_simulations": 360000,
+        "avg_simulations_per_step": 200.0,
+        "rollout_depth": 10,
+        "num_simulations": 200,
+        "deterministic_ratio": 0.0
+      },
+      "adaptive_h": {
+        "mean_return": -1102.96,
+        "std_return": 203.82747214249602,
+        "total_simulations": 360000,
+        "avg_simulations_per_step": 200.0,
+        "rollout_depth": 20,
+        "num_simulations": 200,
+        "deterministic_ratio": 0.0
+      },
+      "adaptive_sims": {
+        "mean_return": -1028.68,
+        "std_return": 178.3303047717914,
+        "total_simulations": 90000,
+        "avg_simulations_per_step": 50.0,
+        "rollout_depth": 10,
+        "num_simulations": 50,
+        "deterministic_ratio": 0.0
+      },
+      "tracker": {
+        "mean_return": -1112.92,
+        "std_return": 222.6007044014012,
+        "total_simulations": 360000,
+        "avg_simulations_per_step": 200.0,
+        "rollout_depth": 10,
+        "num_simulations": 200,
+        "deterministic_ratio": 1.0
+      },
+      "all_optimizations": {
+        "mean_return": -1048.44,
+        "std_return": 168.05203479874916,
+        "total_simulations": 90000,
+        "avg_simulations_per_step": 50.0,
+        "rollout_depth": 20,
+        "num_simulations": 50,
+        "deterministic_ratio": 1.0
+      }
+    }
+  },
+  {
+    "seed": 2,
+    "epsilon_1_sd": 0.0,
+    "variants": {
+      "baseline": {
+        "mean_return": -1106.84,
+        "std_return": 194.98229252934738,
+        "total_simulations": 360000,
+        "avg_simulations_per_step": 200.0,
+        "rollout_depth": 10,
+        "num_simulations": 200,
+        "deterministic_ratio": 0.0
+      },
+      "adaptive_h": {
+        "mean_return": -1108.36,
+        "std_return": 177.0630125124951,
+        "total_simulations": 360000,
+        "avg_simulations_per_step": 200.0,
+        "rollout_depth": 20,
+        "num_simulations": 200,
+        "deterministic_ratio": 0.0
+      },
+      "adaptive_sims": {
+        "mean_return": -1194.6,
+        "std_return": 191.73074870766035,
+        "total_simulations": 90000,
+        "avg_simulations_per_step": 50.0,
+        "rollout_depth": 10,
+        "num_simulations": 50,
+        "deterministic_ratio": 0.0
+      },
+      "tracker": {
+        "mean_return": -1061.64,
+        "std_return": 156.21507737731335,
+        "total_simulations": 360000,
+        "avg_simulations_per_step": 200.0,
+        "rollout_depth": 10,
+        "num_simulations": 200,
+        "deterministic_ratio": 1.0
+      },
+      "all_optimizations": {
+        "mean_return": -1199.28,
+        "std_return": 204.48755854574625,
+        "total_simulations": 90000,
+        "avg_simulations_per_step": 50.0,
+        "rollout_depth": 20,
+        "num_simulations": 50,
+        "deterministic_ratio": 1.0
+      }
+    }
+  }
+]
