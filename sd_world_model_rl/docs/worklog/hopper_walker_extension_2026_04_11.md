@@ -2713,3 +2713,126 @@ v4 主线即将建立，ablation0_transition2x 与 ablation1_no_struct_residual 
   - `/tmp/sdwm_ablation1_no_struct_residual/sd_world_model_rl/logs/hopper-hop/3/sd_hopper_5k_ablation1_no_struct_residual_smoke_20260418/`
 
 注：/tmp 不持久，正式归档应把 patch 复制到 docs/worklog/patches/ 下，下一步 v4 commit 前一起做。
+
+---
+
+## 2026-04-18 v4 立项：SD 结构化诊断与非对称接触建模
+
+### 背景与动机
+
+修复 bug + 去 submodule + 重跑 50k × 3（`sd_hopper_50k_v3b_hh005_fixrerun_20260418`）后，均值 **23.0 ± 12.6**（seed 1=5.64 / seed 2=27.99 / seed 3=35.39）。相比 v3b 32.93 下降约 10 分，但仍显著优于 TD-MPC2 100k (13.6 ± 10.4) 和 DreamerV3 100k (9.7 ± 13.6) —— **一半预算打赢两倍预算的 baseline**。
+
+然而 50k × 10 eval 中 seed 3 仍有 6 条 0-reward 轨迹；对 v3b checkpoint 的 10 episode 渲染观察到：
+
+1. 零回报轨迹几乎都终止于"骨盆/躯干贴地、躯干后仰 30-45°、一腿前屈"的**坐死盆地**
+2. 高回报轨迹并非跳跃，而是**"前躯支撑 + 脚部配合"的低姿前向爬行**
+3. planner 的 viability 门用 `cos(pitch)`，**前后对称**，不能区分"前倾可恢复"与"后仰死锁"
+
+三位外部专家（结构独立咨询）的意见一致：这是 SD 建模的一阶问题，应纳入结构化求解过程，方向是"更少但更准"的结构量。
+
+### Phase 0：状态日志硬数据诊断
+
+**脚本**：`scripts/phase0_state_log.py`（v4 worktree 内）  
+**Checkpoint**：`logs/hopper-hop/3/sd_hopper_50k_v3b_hh005/models/final.pt`（v3b）  
+**输出**：`results/phase0_state_log/episode_{00..09}.csv` + `summary.csv`
+
+#### Summary（来自 `summary.csv`）
+
+| 组 | episodes | 成败 | final_torso_z 范围 | final_pitch 范围 | max_rootx 范围 | backward_pitch_frac |
+|---|---|---|---|---|---|---|
+| 成功（R>88）| 1, 5, 9 | 94.8 / 99.0 / 101.6 | 0.69–0.88 | +0.04 ~ +0.54 | 7.17–7.51 | **0% / 0% / 0%** |
+| 失败（R≈0）| 0, 2, 3, 4, 6, 7, 8 | 0.007 / 0 / 0.001 / 0 / 0 / 0 / 0 | **0.07–0.20** | **-1.40 ~ -0.74**（除 ep6 旋转异常）| 0–0.38 | **78%–99%** |
+
+**完全分离**：torso_z gap ≥ 0.49m；pitch gap ≥ 0.34 rad；rootx gap ≥ 6.8m。
+
+#### 代表性轨迹快照（step 0 / 10 / 30 / 60 / 120 / 240 / 499）
+
+```
+ep0 (fail R=0.007):  
+  step 0:   torso=1.07  pitch=+0.32  ← 初始前倾
+  step 10:  torso=0.86  pitch=-0.55  ← 10 步内已倒向后
+  step 30:  torso=0.23  pitch=-0.62  ← 骨盆接地
+  step 60:  torso=0.09  pitch=-1.40  ← 坐死锁定
+  step 499: torso=0.09  pitch=-1.40  ← 500 步无恢复
+
+ep2 (fail R=0):
+  step 0:   torso=0.93  pitch=-2.95  ← 初始几乎倒立
+  step 30:  torso=0.29  pitch=-0.37  ← 短暂恢复
+  step 60:  torso=0.37  pitch=+0.32  ← 前倾成功一次
+  step 120: torso=0.11  pitch=-1.18  ← 再次坠入坐死
+  step 499: torso=0.15  pitch=-0.97
+
+ep5 (succ R=99):
+  step 0:   torso=0.99  pitch=+1.76  ← 初始强前倾
+  step 30:  torso=0.17  pitch=+2.48  ← 躯干低但 pitch 保持正
+  step 60:  torso=0.18  pitch=+2.67  ← 爬行中
+  step 240: torso=0.18  pitch=+2.68
+  step 499: torso=0.88  pitch=+0.27  rootx=+7.50  ← 立起来前进 7.5m
+
+ep9 (succ R=101):
+  step 0:   torso=0.95  pitch=+2.27  ← 初始强前倾
+  step 10:  torso=0.19  pitch=+1.75
+  step 30:  torso=0.83  pitch=+0.22  ← 起跳恢复
+  step 499: torso=0.80  pitch=+0.04  rootx=+7.17
+```
+
+#### 关键推论
+
+1. **初始姿态符号不是单一预测器**：ep0 初始 pitch=+0.32（前倾）仍失败；ep2 初始 pitch=-2.95（几乎倒立）短暂恢复过。**决定成败的是恢复动力学**，不是初态。
+2. **低 torso_z 不是失败信号**：成功 ep5 在 step 30-240 的 torso_z 长期保持 0.17-0.24（"爬行"姿态）；失败 ep0 也是 torso_z≈0.08。**低姿本身不可判定**。
+3. **"低 torso_z" ∧ "负 pitch" 同时成立 → 不可逆**：所有失败 episode 的终态都是 `torso<0.25 ∧ pitch<-0.7`；所有成功 episode 的低姿段 `torso<0.25` 时 pitch 都保持 +1.7 ~ +2.7。
+4. **v3b 学到的"成功"策略**：前倾爬行（pitch≈+2.5 低姿）→ 积累前向速度 → 最终立起来（torso→0.8, pitch→0.1）→ 续航 7m。不是论文里想象的"垂直跳跃"。
+
+### v4 设计（基于 Phase 0 硬数据）
+
+#### 新增 3 个结构量（纯代数推演，非 learned head）
+
+| 量 | 公式 | 语义 | 阈值来源 |
+|---|---|---|---|
+| `torso_down` | `sigmoid((0.35 - torso_z) / 0.05)` | 躯干是否贴地 | 成功组长期低姿 0.17-0.24，失败组 0.07-0.10；0.35 给出 clean margin |
+| `rear_trap` | `torso_down * sigmoid(-(pitch + 0.3) / 0.1)` | 死盆地标签（躯干贴地 ∧ pitch<-0.3）| 成功组 backward_pitch_frac=0%；失败组 78-99% |
+| `forward_recoverability` | `sigmoid((pitch - 0.3) / 0.1) * sigmoid(torso_z / 0.5)` | 前倾可救（pitch>+0.3 ∧ torso 未完全倒）| 成功组 forward_pitch_frac=77-83%；失败组 0-2% |
+
+#### Viability 门改造
+
+- **原**：`predict_plan_reward` 用 `cos(pitch)` 做姿态 viability（前后对称）
+- **新**：`forward_recoverability * (1 - rear_trap)`
+  - 前倾可救 → viability ≈ 1（原有 standing×hopping reward 放行）
+  - 死盆地触发 → viability ≈ 0（planner 拒绝该轨迹）
+
+#### 代码落点
+
+1. `src/world_model/dmcontrol_hopper_sd_model.py`：
+   - `STATE_DIM` 15 → 18
+   - `TORSO_DOWN_IDX=15`、`REAR_TRAP_IDX=16`、`FORWARD_RECOVER_IDX=17`
+   - `encode_observation()` 追加三列代数计算
+   - `forward()` / `_forward_one_substep()` 推进这三维
+   - `predict_plan_reward()` 用新门控
+2. `external/tdmpc2/tdmpc2/common/sd_world_model.py`：
+   - `struct_dim` 假设自动跟随（从 `DMControlHopperSDModel.STATE_DIM` 读取）；检查 `_trend_protected_idx` / `_coupling_bridge_idx` 覆盖范围是否需要更新
+
+#### 兼容性保证
+
+- 与 ablation 1 的 `sd_use_struct_residual=false` 正交：新结构量不经过 `_struct_residual`，纯代数
+- 与 ablation 0 的 `ENV_ACTION_REPEAT=2` 正交：新量通过 `forward()` 外层的循环自然继承双步推进
+- 训练侧无需新辅助监督：三个量都是 obs 的代数函数，梯度从 consistency_loss 自然流动
+
+### 执行顺序
+
+1. ✅ Phase 0 状态日志（完成，硬数据 CSV 已落盘）
+2. ⏳ v4 baseline smoke（进行中，GPU 0，5k seed=3，对比 fixrerun seed 3 10k=0.92）
+3. 🔜 v4 结构改造代码落地（`sd_v4_asymmetric_contact` 分支）
+4. 🔜 v4 structural smoke 5k seed=3
+5. 🔜 v4 full 50k × 3（GPU 1/2/3）
+6. 🔜 对 v4 checkpoint 重跑 Phase 0（渲染 + 状态日志）验证死盆地是否被打破
+
+### 基线锚点汇总
+
+| 配置 | 50k eval (mean ± std) | 代码版本 | 备注 |
+|---|---|---|---|
+| v3b_hh005（含 bug，已废弃）| 32.93 ± 13.03 | pre-fix + routeB | 不可复现，ablation/appendix |
+| fixrerun（bug 修复后）| **23.0 ± 12.6** | master `a612a3f` | **论文当前主结果**，干净可复现 |
+| ablation 0 + 1（transition 2× + no struct residual）| 待实验 | sd_v4 `ce5ed36` | v4 baseline smoke 验证后决定 |
+| v4（+ asymmetric contact）| 待实验 | sd_v4 + structural commit | 目标 ≥ 23，同时希望 seed 1 的 5.64 盆地被打破 |
+| TD-MPC2 100k (official) | 13.6 ± 10.4 | —— | 两倍预算 |
+| DreamerV3 100k (official) | 9.7 ± 13.6 | —— | 两倍预算 |
