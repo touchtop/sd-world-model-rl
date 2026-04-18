@@ -380,7 +380,7 @@ class DMControlHopperSDModel(nn.Module):
         cols[self.IMPACT_IDX] = torch.clamp(cols[self.IMPACT_IDX], min=0.0, max=2.0)
         return torch.stack(cols, dim=-1)
 
-    def forward(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
+    def _forward_one_substep(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
         if state.dim() == 1:
             state = state.unsqueeze(0)
         if action.dim() == 1:
@@ -448,6 +448,18 @@ class DMControlHopperSDModel(nn.Module):
             ],
             dim=-1,
         )
+
+    def forward(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
+        if state.dim() == 1:
+            state = state.unsqueeze(0)
+        if action.dim() == 1:
+            action = action.unsqueeze(0)
+
+        # Match the DMControl wrapper, which advances the simulator twice per environment step.
+        next_state = state
+        for _ in range(self.ENV_ACTION_REPEAT):
+            next_state = self._forward_one_substep(next_state, action)
+        return next_state
 
     @staticmethod
     def _tolerance_interval(x: torch.Tensor, lower: float, upper: float) -> torch.Tensor:
