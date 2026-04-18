@@ -38,7 +38,8 @@ class SDWorldModel(nn.Module):
 
 		self.struct_dim = int(getattr(cfg, 'sd_struct_dim', DMControlHopperSDModel.STATE_DIM))
 		self.latent_dim = int(getattr(cfg, 'sd_latent_dim', max(self.struct_dim, 32)))
-		assert self.struct_dim == DMControlHopperSDModel.STATE_DIM, 'sd_hopper currently expects 15 structured dims.'
+		assert self.struct_dim == DMControlHopperSDModel.STATE_DIM, \
+			f'sd_hopper expects struct_dim={DMControlHopperSDModel.STATE_DIM}, got {self.struct_dim}.'
 		assert self.latent_dim >= self.struct_dim, 'sd_latent_dim must be >= sd_struct_dim.'
 		self.resid_dim = self.latent_dim - self.struct_dim
 		self.reward_mode = getattr(cfg, 'sd_reward_mode', 'learned')

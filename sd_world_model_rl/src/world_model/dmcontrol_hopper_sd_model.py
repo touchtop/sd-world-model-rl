@@ -59,7 +59,7 @@ class DMControlHopperSDModel(nn.Module):
     VELOCITY_DIM = 7
     TOUCH_DIM = 2
     RAW_OBS_DIM = 15
-    STATE_DIM = 15
+    STATE_DIM = 16
     ACTION_DIM = 4
     ANGLE_SLICE = slice(1, 6)
     STOCK_RATE_IDX = (1, 2, 3, 4, 5, 6)
@@ -91,8 +91,18 @@ class DMControlHopperSDModel(nn.Module):
     STANCE_IDX = 12
     IMPACT_IDX = 13
     CLEARANCE_IDX = 14
+    ROOTZ_IDX = 15  # v4: raw rootz (slide joint) for asymmetric contact viability
     RATE_LIKE_IDX = (VX_IDX, VZ_IDX, PITCH_RATE_IDX, COMP_RATE_IDX, SWING_RATE_IDX, FOOT_RATE_IDX, IMPACT_IDX)
     ENV_ACTION_REPEAT = 2
+
+    # v4 asymmetric-contact viability thresholds (derived from Phase 0 diagnostic,
+    # see docs/worklog/hopper_walker_extension_2026_04_11.md for data support).
+    V4_ROOTZ_LOW_CENTER = -0.5     # sigmoid center for "body is down"
+    V4_ROOTZ_LOW_SCALE = 0.1
+    V4_PITCH_BACK_CENTER = -0.3    # pitch below this is "tilted backward"
+    V4_PITCH_BACK_SCALE = 0.1
+    V4_PITCH_FWD_CENTER = 0.3      # pitch above this is "tilted forward (viable)"
+    V4_PITCH_FWD_SCALE = 0.1
 
     def __init__(
         self,
@@ -286,6 +296,10 @@ class DMControlHopperSDModel(nn.Module):
         stance_mix = contact["stance_mix"]
         impact = torch.relu(-(contact["toe_vz"] + contact["heel_vz"]) * 0.5) * support
         clearance = torch.minimum(kin["toe_z"], kin["heel_z"])
+        # v4 new structural dim: raw rootz (slide joint position).
+        # Empirically separates success (rootz > -0.3) from failure basin (rootz < -0.8)
+        # when combined with pitch sign in predict_plan_reward.
+        rootz = pos[:, 0]
 
         latent = torch.stack(
             [
@@ -304,6 +318,7 @@ class DMControlHopperSDModel(nn.Module):
                 stance_mix,
                 impact,
                 clearance,
+                rootz,
             ],
             dim=-1,
         )
@@ -378,6 +393,7 @@ class DMControlHopperSDModel(nn.Module):
         cols[self.SUPPORT_IDX] = torch.clamp(cols[self.SUPPORT_IDX], min=0.0, max=1.0)
         cols[self.STANCE_IDX] = torch.clamp(cols[self.STANCE_IDX], min=-1.0, max=1.0)
         cols[self.IMPACT_IDX] = torch.clamp(cols[self.IMPACT_IDX], min=0.0, max=2.0)
+        cols[self.ROOTZ_IDX] = torch.clamp(cols[self.ROOTZ_IDX], min=-1.5, max=1.5)
         return torch.stack(cols, dim=-1)
 
     def _forward_one_substep(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
@@ -427,6 +443,9 @@ class DMControlHopperSDModel(nn.Module):
         clearance_residual = self.HEIGHT_RESIDUAL_SCALE * torch.tanh(self.clearance_head(state).squeeze(-1))
         clearance_contact_penalty = 0.12 * next_support + 0.06 * torch.sigmoid(next_impact)
         next_clearance = clearance_geom - clearance_contact_penalty + clearance_residual
+        # v4: propagate rootz via vertical velocity (bounded to a wide physical range).
+        rootz = state[:, self.ROOTZ_IDX]
+        next_rootz = torch.clamp(rootz + self.dt * next_vz, min=-1.5, max=1.5)
 
         return torch.stack(
             [
@@ -445,6 +464,7 @@ class DMControlHopperSDModel(nn.Module):
                 next_stance,
                 next_impact,
                 next_clearance,
+                next_rootz,
             ],
             dim=-1,
         )
@@ -563,11 +583,20 @@ class DMControlHopperSDModel(nn.Module):
         prev_support = torch.clamp(state[:, self.SUPPORT_IDX], min=0.0, max=1.0)
         clearance = next_state[:, self.CLEARANCE_IDX]
         prev_clearance = state[:, self.CLEARANCE_IDX]
+        next_rootz = next_state[:, self.ROOTZ_IDX]
 
+        # v4 asymmetric-contact viability: replace symmetric cos(pitch) gate with a
+        # signed combination that kills the "body-down + backward-pitch" sitting basin
+        # while passing "forward-leaning crawl" that Phase 0 showed to be the only
+        # mode yielding non-zero episode reward in v3b-trained agents.
         height_gate = self._lower_tolerance(height, lower=0.45, margin=0.15, value_at_margin=0.0)
-        upright = 0.5 * (1.0 + torch.cos(pitch))
-        pitch_gate = torch.clamp((upright - 0.35) / 0.45, min=0.0, max=1.0)
-        viability = height_gate * pitch_gate
+        body_low = torch.sigmoid((self.V4_ROOTZ_LOW_CENTER - next_rootz) / self.V4_ROOTZ_LOW_SCALE)
+        rear_trap = body_low * torch.sigmoid(-(pitch - self.V4_PITCH_BACK_CENTER) / self.V4_PITCH_BACK_SCALE)
+        forward_lean = torch.sigmoid((pitch - self.V4_PITCH_FWD_CENTER) / self.V4_PITCH_FWD_SCALE)
+        # height_gate stays as a mild upper bound on the body being fully underground;
+        # forward_lean admits the crawling regime; (1 - rear_trap) multiplicatively
+        # removes the sitting-backward basin.
+        viability = height_gate * forward_lean * (1.0 - rear_trap)
 
         speed_progress = torch.clamp(x_dot / max(self.hop_speed, 1e-6), min=0.0, max=1.0)
         upward_progress = torch.clamp(z_dot / 0.60, min=0.0, max=1.0)
@@ -583,7 +612,9 @@ class DMControlHopperSDModel(nn.Module):
             + 0.08 * liftoff_progress
             + 0.08 * clearance_gain
         )
-        penalty = 0.10 * sticky_contact
+        # v4: add an explicit penalty for entering the rear-trap basin so that the
+        # planner actively avoids it, not only dampens reward there.
+        penalty = 0.10 * sticky_contact + 0.20 * rear_trap
 
         return true_reward + positive - penalty
 
@@ -602,7 +633,7 @@ class DMControlHopperSDModel(nn.Module):
             "latent_layout": [
                 "height", "vx", "vz", "pitch", "pitch_rate", "compression", "compression_rate",
                 "swing", "swing_rate", "foot_angle", "foot_rate", "support", "stance_mix",
-                "impact", "clearance",
+                "impact", "clearance", "rootz",
             ],
         }
 
