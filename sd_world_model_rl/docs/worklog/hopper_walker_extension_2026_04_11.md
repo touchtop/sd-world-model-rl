@@ -2836,3 +2836,87 @@ ep9 (succ R=101):
 | v4（+ asymmetric contact）| 待实验 | sd_v4 + structural commit | 目标 ≥ 23，同时希望 seed 1 的 5.64 盆地被打破 |
 | TD-MPC2 100k (official) | 13.6 ± 10.4 | —— | 两倍预算 |
 | DreamerV3 100k (official) | 9.7 ± 13.6 | —— | 两倍预算 |
+
+---
+
+## 2026-04-18 v4 结构改造修订（commit 2a2b2f8 → 后续修订）
+
+### 背景
+
+外部代码审查（第三位专家）对 commit `2a2b2f8` 的 viability gate 提出三条 finding，经数据复核确认一条 HIGH 问题（gate 设计缺陷）和两条 MED 问题（Phase 0 脚本未适配 v4 维度）。本节记录修订。
+
+### 设计简化说明（与立项 worklog 的一致性更正）
+
+立项 worklog（本文件 2026-04-18 "v4 立项"章节）声明了 **"3 个新 struct dim (STATE_DIM 18)"** 的方案，但在 `2a2b2f8` commit 实际落地时我简化为 **"1 个新 struct dim (rootz, STATE_DIM 16) + viability 门里在线推导 body_low / rear_trap / forward_lean"**。
+
+**简化动机**：
+- 3 个衍生量（body_low / rear_trap / forward_lean）是 (rootz, pitch) 的代数函数，冗余地加入 latent 只是"便于 Q/policy 读取"
+- 但 Q/policy 的 MLP 有足够容量从 (rootz, pitch) 直接学到相同非线性组合
+- 加 3 维会级联到 `_trend_protected_idx` 需要决定是否保护、sd_world_model.py 的多个硬编码位置
+- 只加 rootz 一维：最小 cascade，功能等价
+
+**结果**：立项 worklog 里的 "STATE_DIM = 18 / 新增 3 维" 描述与实际代码不符。本条记录以当前代码为准：**STATE_DIM = 16，新增 `ROOTZ_IDX = 15`**。
+
+### Viability gate 修订（修 Finding 1）
+
+**问题**：初版 `forward_lean = sigmoid((pitch - 0.3) / 0.1)` 对 "已恢复到 near-upright" 的成功态过度压制：
+- ep9 终态 pitch=+0.04 → forward_lean ≈ 0.07（错误地把成功态判为 non-viable）
+- ep5 终态 pitch=+0.27 → forward_lean ≈ 0.43（边界）
+
+专家指出此 bug，但其建议（"按 worklog 乘 torso_z/0.5 因子"）也不正确——该因子会把 **爬行态（torso_z≈0.17, pitch≈+2.5）**同时压低，而 Phase 0 数据证明爬行态是成功模式。
+
+**修订设计（两条合法通道的 max）**：
+
+```python
+body_low = sigmoid((ROOTZ_LOW_CENTER=-0.5 - rootz) / 0.1)
+body_high = 1 - body_low
+
+# 通道 (a)：前倾爬行或前倾恢复（pitch ≥ 0 顺利通过）
+forward_lean = sigmoid((pitch - PITCH_FWD_CENTER=0.0) / 0.15)
+
+# 通道 (b)：身体立起 + |pitch| 小（已恢复 upright hopping）
+recovered_upright = body_high * sigmoid((1.0 - |pitch|) / 0.3)
+
+viable_lane = max(forward_lean, recovered_upright)
+rear_trap = body_low * sigmoid(-(pitch - PITCH_BACK_CENTER=-0.3) / 0.1)
+viability = height_gate * viable_lane * (1 - rear_trap)
+penalty += 0.20 * rear_trap
+```
+
+**代表态数值验证**（sanity-test 脚本输出）：
+
+| 态 | rootz | pitch | forward_lean | recovered_upright | viable_lane | rear_trap | viability |
+|---|---|---|---|---|---|---|---|
+| Near-upright recovered (ep9 final) | -0.20 | +0.04 | 0.57 | 0.92 | **0.92** | 0.002 | **0.91** ✅ |
+| Forward crawl (ep5 mid) | -0.90 | +2.50 | 1.00 | ~0 | **1.00** | ~0 | **1.00** ✅ |
+| Rear trap (ep0 final) | -0.90 | -1.40 | ~0 | 0.004 | 0.004 | 0.98 | **~0** ✅ |
+| Slight back tilt (ep2 mid) | -0.80 | -0.40 | 0.065 | 0.042 | 0.065 | 0.70 | **0.02** ✅ |
+
+gate 修订前 ep9 final 被压到 0.07，修订后 0.91，**正确识别为 viable**。
+
+### Phase 0 脚本修订（修 Finding 2 + Finding 3）
+
+**Finding 2（v3b checkpoint 兼容性）**：v4 分支的 `STATE_DIM=16` 与 v3b checkpoint 的 15 维不兼容；`strict=True` load 必然失败。
+
+修订：脚本加载 checkpoint 前 peek `_dynamics.passive_flow.0.weight.shape[1]` 检测 struct_dim；不匹配则直接报错并建议切回 master 分支。未来 v4 checkpoint 则正常运行。
+
+**Finding 3（STRUCT_FIELD_NAMES 顺序错位）**：初版脚本的列名顺序（"vx, vz, ..., height" 结尾）与 `encode_observation` 实际输出（"height, vx, vz, ..., clearance, [rootz]"）错位 1 位。之前 Phase 0 分析只用了 physics 字段（`torso_z`, `qpos_rooty`, `qpos_rootx`），**未被污染**；但后续若用 struct_* 列做对照会被误导。
+
+修订：STRUCT_FIELD_NAMES 改为正确顺序 `[height, vx, vz, pitch, pitch_rate, compression, compression_rate, swing, swing_rate, foot_angle, foot_rate, support, stance_mix, impact, clearance, rootz]`（16 维，末尾加 rootz）。
+
+### 阈值与超参数（当前权威值）
+
+```python
+V4_ROOTZ_LOW_CENTER = -0.5     # rootz sigmoid 中心
+V4_ROOTZ_LOW_SCALE = 0.1
+V4_PITCH_BACK_CENTER = -0.3    # pitch 向后的切换点
+V4_PITCH_BACK_SCALE = 0.1
+V4_PITCH_FWD_CENTER = 0.0      # forward_lean 中心（0 而非 0.3，以便 pitch>0 平滑通过）
+V4_PITCH_FWD_SCALE = 0.15      # 比 0.1 略宽，避免过陡
+V4_PITCH_NEUTRAL_SPREAD = 0.3  # recovered_upright 允许 |pitch| ~1 rad 内平滑衰减
+```
+
+### 未决事项
+
+- **v4 structural smoke 尚未启动**（之前 GPU 1 smoke 命令被用户中断）。修订 commit 完成后应启动新 smoke 并与 v4 baseline smoke 5k=1.21 对比
+- **论文叙事**里，v4 设计的"1 dim rootz + derived gates"比立项的"3 dim"更简洁；应在论文方法节用当前最终版本

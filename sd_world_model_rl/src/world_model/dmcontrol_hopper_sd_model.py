@@ -101,8 +101,9 @@ class DMControlHopperSDModel(nn.Module):
     V4_ROOTZ_LOW_SCALE = 0.1
     V4_PITCH_BACK_CENTER = -0.3    # pitch below this is "tilted backward"
     V4_PITCH_BACK_SCALE = 0.1
-    V4_PITCH_FWD_CENTER = 0.3      # pitch above this is "tilted forward (viable)"
-    V4_PITCH_FWD_SCALE = 0.1
+    V4_PITCH_FWD_CENTER = 0.0      # forward_lean admits any positive pitch smoothly
+    V4_PITCH_FWD_SCALE = 0.15
+    V4_PITCH_NEUTRAL_SPREAD = 0.3  # recovered_upright admits |pitch| up to ~1 rad
 
     def __init__(
         self,
@@ -586,17 +587,21 @@ class DMControlHopperSDModel(nn.Module):
         next_rootz = next_state[:, self.ROOTZ_IDX]
 
         # v4 asymmetric-contact viability: replace symmetric cos(pitch) gate with a
-        # signed combination that kills the "body-down + backward-pitch" sitting basin
-        # while passing "forward-leaning crawl" that Phase 0 showed to be the only
-        # mode yielding non-zero episode reward in v3b-trained agents.
+        # two-lane signed composition. Phase 0 showed that successful trajectories
+        # occupy either (a) forward-leaning crawl (pitch > 0, body low) or (b)
+        # recovered upright hopping (body high, |pitch| small). Failure is
+        # unambiguously "body low AND pitch negative" (rear-trap). The gate
+        # therefore admits lane (a) via forward_lean and lane (b) via
+        # recovered_upright, taking their elementwise max, then subtracts
+        # rear-trap probability multiplicatively and via an explicit penalty.
         height_gate = self._lower_tolerance(height, lower=0.45, margin=0.15, value_at_margin=0.0)
         body_low = torch.sigmoid((self.V4_ROOTZ_LOW_CENTER - next_rootz) / self.V4_ROOTZ_LOW_SCALE)
-        rear_trap = body_low * torch.sigmoid(-(pitch - self.V4_PITCH_BACK_CENTER) / self.V4_PITCH_BACK_SCALE)
+        body_high = 1.0 - body_low
         forward_lean = torch.sigmoid((pitch - self.V4_PITCH_FWD_CENTER) / self.V4_PITCH_FWD_SCALE)
-        # height_gate stays as a mild upper bound on the body being fully underground;
-        # forward_lean admits the crawling regime; (1 - rear_trap) multiplicatively
-        # removes the sitting-backward basin.
-        viability = height_gate * forward_lean * (1.0 - rear_trap)
+        recovered_upright = body_high * torch.sigmoid((1.0 - torch.abs(pitch)) / self.V4_PITCH_NEUTRAL_SPREAD)
+        viable_lane = torch.maximum(forward_lean, recovered_upright)
+        rear_trap = body_low * torch.sigmoid(-(pitch - self.V4_PITCH_BACK_CENTER) / self.V4_PITCH_BACK_SCALE)
+        viability = height_gate * viable_lane * (1.0 - rear_trap)
 
         speed_progress = torch.clamp(x_dot / max(self.hop_speed, 1e-6), min=0.0, max=1.0)
         upward_progress = torch.clamp(z_dot / 0.60, min=0.0, max=1.0)

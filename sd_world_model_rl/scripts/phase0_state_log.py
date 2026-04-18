@@ -42,13 +42,15 @@ NUM_EPISODES = 10
 GEOM_NAMES = ["torso", "nose", "pelvis", "thigh", "calf", "foot"]
 QPOS_NAMES = ["rootx", "rootz", "rooty", "waist", "hip", "knee", "ankle"]
 STRUCT_FIELD_NAMES = [
-    "vx", "vz", "pitch", "pitch_rate", "comp", "comp_rate",
-    "swing", "swing_rate", "foot_struct", "foot_rate",
-    "support", "stance", "impact", "clearance", "height",
+    "height", "vx", "vz", "pitch", "pitch_rate",
+    "compression", "compression_rate",
+    "swing", "swing_rate", "foot_angle", "foot_rate",
+    "support", "stance_mix", "impact", "clearance",
+    "rootz",
 ]
 
 
-def build_cfg():
+def build_cfg(struct_dim_override: int | None = None):
     hydra.utils.get_original_cwd = lambda: str(REPO_ROOT)
     cfg = OmegaConf.load(TDMPC2_ROOT / "config.yaml")
     overrides = {
@@ -73,6 +75,8 @@ def build_cfg():
         "sd_height_loss_coef": 0.05,
         "eval_episodes": NUM_EPISODES,
     }
+    if struct_dim_override is not None:
+        overrides["sd_struct_dim"] = struct_dim_override
     for key, value in overrides.items():
         cfg[key] = value
     cfg = parse_cfg(cfg)
@@ -105,7 +109,28 @@ def physics_snapshot(physics):
 def main():
     assert torch.cuda.is_available(), "CUDA is required."
     assert CHECKPOINT.exists(), f"Checkpoint not found: {CHECKPOINT}"
-    cfg, env = build_cfg()
+    # Peek checkpoint to detect the struct_dim it was trained with. The v4
+    # branch bumps DMControlHopperSDModel.STATE_DIM to 16 (adds rootz); older
+    # v3b checkpoints were trained with STATE_DIM=15. The model class layout
+    # is fixed per branch, so a mismatched checkpoint cannot be loaded here.
+    # If you need to replay a pre-v4 checkpoint, run this script from the
+    # master branch or add a legacy adapter.
+    _peek = torch.load(CHECKPOINT, map_location="cpu", weights_only=False)
+    _peek_sd = _peek["model"] if isinstance(_peek, dict) and "model" in _peek else _peek
+    _ckpt_struct_dim = None
+    _passive_w = _peek_sd.get("_dynamics.passive_flow.0.weight")
+    if _passive_w is not None:
+        _ckpt_struct_dim = int(_passive_w.shape[1])
+    del _peek, _peek_sd
+    from src.world_model.dmcontrol_hopper_sd_model import DMControlHopperSDModel as _Cls
+    if _ckpt_struct_dim is not None and _ckpt_struct_dim != _Cls.STATE_DIM:
+        raise RuntimeError(
+            f"Checkpoint struct_dim={_ckpt_struct_dim} does not match current "
+            f"DMControlHopperSDModel.STATE_DIM={_Cls.STATE_DIM}. "
+            "Replay from a branch whose class matches the checkpoint (e.g. master "
+            "for v3b/fixrerun checkpoints)."
+        )
+    cfg, env = build_cfg(struct_dim_override=_ckpt_struct_dim)
     set_seed(cfg.seed)
 
     agent = TDMPC2(cfg)
