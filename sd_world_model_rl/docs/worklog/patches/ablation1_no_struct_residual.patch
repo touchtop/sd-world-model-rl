@@ -1,0 +1,97 @@
+diff --git a/tdmpc2/common/sd_world_model.py b/tdmpc2/common/sd_world_model.py
+index bcab44d..d2fd278 100644
+--- a/tdmpc2/common/sd_world_model.py
++++ b/tdmpc2/common/sd_world_model.py
+@@ -56,10 +56,11 @@ class SDWorldModel(nn.Module):
+ 			residual_scale=getattr(cfg, 'sd_residual_scale', 5.0),
+ 			passive_scale=getattr(cfg, 'sd_passive_scale', 10.0),
+ 		)
++		self.use_struct_residual = bool(getattr(cfg, 'sd_use_struct_residual', True))
+ 		if self.resid_dim > 0:
+ 			self._residual_encoder = layers.mlp(cfg.obs_shape['state'][0], 2*[cfg.mlp_dim], self.resid_dim)
+ 			self._residual_dynamics = layers.mlp(self.latent_dim + cfg.action_dim, 2*[cfg.mlp_dim], self.resid_dim)
+-			self._struct_residual = layers.mlp(self.latent_dim + cfg.action_dim, 2*[cfg.mlp_dim], self.struct_dim)
++			self._struct_residual = layers.mlp(self.latent_dim + cfg.action_dim, 2*[cfg.mlp_dim], self.struct_dim) if self.use_struct_residual else None
+ 			self.max_resid_scale = float(getattr(cfg, 'sd_max_resid_scale', 5.0))
+ 		else:
+ 			self._residual_encoder = None
+@@ -170,35 +171,38 @@ class SDWorldModel(nn.Module):
+ 		next_struct_base = self._dynamics(z_struct, a_flat)
+ 		if self.resid_dim > 0:
+ 			hybrid = torch.cat([z_flat, a_flat], dim=-1)
+-			raw_correction = self._struct_residual(hybrid)
+-			base_delta = next_struct_base - z_struct
+-
+-			# --- trend-protected dimensions ---
+-			p_idx = list(self._trend_protected_idx)
+-			p_delta = base_delta[:, p_idx]
+-			p_mag = p_delta.abs()
+-			p_sign = p_delta.sign()
+-			p_corr = torch.tanh(raw_correction[:, p_idx])
+-			scale_factor = 1.0 + self.trend_protect_max_scale * p_corr
+-			gated_mag = p_mag * scale_factor.abs()
+-			hard_floor = torch.maximum(
+-				(1.0 - self.trend_protect_max_scale) * p_mag,
+-				torch.full_like(p_mag, self.trend_protect_min_correction),
+-			)
+-			hard_ceil = (1.0 + self.trend_protect_max_scale) * p_mag + self.trend_protect_min_correction
+-			protected_signed = p_sign * torch.clamp(gated_mag, min=hard_floor, max=hard_ceil)
+-
+-			# --- free dimensions ---
+-			free_mask = torch.ones(self.struct_dim, dtype=torch.bool, device=z_flat.device)
+-			free_mask[p_idx] = False
+-			free_scale = torch.full((self.struct_dim,), self.struct_residual_scale, device=z_flat.device, dtype=z_flat.dtype)
+-			free_scale[list(self._coupling_bridge_idx)] = self.coupling_residual_scale
+-			free_delta = free_scale.unsqueeze(0) * torch.tanh(raw_correction)
+-
+-			next_struct = next_struct_base.clone()
+-			next_struct[:, p_idx] = z_struct[:, p_idx] + protected_signed
+-			next_struct[:, free_mask] = next_struct_base[:, free_mask] + free_delta[:, free_mask]
+-			next_struct = self._dynamics.project_state(next_struct)
++			if self._struct_residual is not None:
++				raw_correction = self._struct_residual(hybrid)
++				base_delta = next_struct_base - z_struct
++
++				# --- trend-protected dimensions ---
++				p_idx = list(self._trend_protected_idx)
++				p_delta = base_delta[:, p_idx]
++				p_mag = p_delta.abs()
++				p_sign = p_delta.sign()
++				p_corr = torch.tanh(raw_correction[:, p_idx])
++				scale_factor = 1.0 + self.trend_protect_max_scale * p_corr
++				gated_mag = p_mag * scale_factor.abs()
++				hard_floor = torch.maximum(
++					(1.0 - self.trend_protect_max_scale) * p_mag,
++					torch.full_like(p_mag, self.trend_protect_min_correction),
++				)
++				hard_ceil = (1.0 + self.trend_protect_max_scale) * p_mag + self.trend_protect_min_correction
++				protected_signed = p_sign * torch.clamp(gated_mag, min=hard_floor, max=hard_ceil)
++
++				# --- free dimensions ---
++				free_mask = torch.ones(self.struct_dim, dtype=torch.bool, device=z_flat.device)
++				free_mask[p_idx] = False
++				free_scale = torch.full((self.struct_dim,), self.struct_residual_scale, device=z_flat.device, dtype=z_flat.dtype)
++				free_scale[list(self._coupling_bridge_idx)] = self.coupling_residual_scale
++				free_delta = free_scale.unsqueeze(0) * torch.tanh(raw_correction)
++
++				next_struct = next_struct_base.clone()
++				next_struct[:, p_idx] = z_struct[:, p_idx] + protected_signed
++				next_struct[:, free_mask] = next_struct_base[:, free_mask] + free_delta[:, free_mask]
++				next_struct = self._dynamics.project_state(next_struct)
++			else:
++				next_struct = self._dynamics.project_state(next_struct_base)
+ 			next_resid = self._clamp_resid(self._residual_dynamics(hybrid))
+ 			next_z = self._merge_latent(next_struct, next_resid)
+ 		else:
+diff --git a/tdmpc2/config.yaml b/tdmpc2/config.yaml
+index 7fd0d5f..fe1b9e9 100755
+--- a/tdmpc2/config.yaml
++++ b/tdmpc2/config.yaml
+@@ -21,6 +21,7 @@ sd_reward_curriculum_alpha: 0.5
+ sd_reward_curriculum_alpha_min: 0.1
+ sd_max_resid_scale: 5.0
+ sd_height_loss_coef: 0.05
++sd_use_struct_residual: true
+ init_from: null
+ resume_from: null
+ save_full_state: false
