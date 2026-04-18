@@ -2177,3 +2177,503 @@ smoke 结果表明脚本可以完整运行，且 intent 分布已明显受支持
 
 - 仅凭当前这版单步 intent + 查表力矩 + coarse phase mask，还不能验证其优越性；
 - 若继续推进，更可能需要改动的是“相位跃迁可达性”本身，例如更细的 subphase 判别、显式的阶段过渡条件，或短程宏动作，而不宜继续只在 soft/hard prior 之间来回切换。
+
+### 2026-04-17：TD-MPC2 100k 对照渲染代理点位确定
+
+为了补充 Hopper 论文材料中的视觉对比，对 TD-MPC2 `hopper-hop` 100k 设定对应的 checkpoint 进行了再次核查。当前可核实的信息如下：
+
+- TD-MPC2 官方公开材料中可以确认存在收敛后的最终单任务权重，但未发现 `hopper-hop @ 100k` 的公开中间 checkpoint 下载入口；
+- 本地仓库内也未找到官方原版 TD-MPC2 的 `100k` Hopper 中间权重，仅有官方结果表 `external/tdmpc2/results/tdmpc2/hopper-hop.csv`；
+- 因此，本轮视觉对比改为选取一个本地可实际回放、且数值接近 TD-MPC2 官方 100k 均值 `13.6` 的代理点位。
+
+筛选标准为：`eval.csv` 中存在明确评估回报，且对应 `models/<step>.pt` 或同预算 `final.pt` 真实存在。按与 `13.6` 的绝对差值排序后，最接近的可回放点位为：
+
+- `logs/hopper-hop/3/sd_hopper_100k_v2_r1/models/final.pt`
+- 对应回报：`15.8251`
+- 与 TD-MPC2 官方 `100k=13.6` 的差值：`2.2251`
+
+为保证后续同类对照可以重复执行，新增脚本：
+
+- `scripts/make_hopper_checkpoint_eval_mp4.py`
+
+该脚本用于按真实评估协议回放任意 Hopper checkpoint，并将每条 episode 单独保存为 `mp4`，同时输出 `episode_summary.txt` 记录 checkpoint 与关键评估配置。
+
+### Hopper Route B：局部模型修正尝试
+
+在 retorque 版本中，动作表与离散语义已经对齐，训练主干也已稳定切换为 `drive + launch`。因此，本轮不再修改动作表，而是直接针对对齐诊断中最明确的偏差做最小世界模型修正，目标仅限于：
+
+1. 压低 `stance_release` 中对 `launch / drive` 的竖直收益和离地收益高估；
+2. 压低 `landing_impact` 中对 `clearance` 保持的高估。
+
+对应改动位于 `src/world_model/dmcontrol_hopper_sd_model.py`：
+
+- 在显式动力学中加入 `contact_lock`，使“高支撑、低净空”状态下的正向 release 不会被直接当成强起跳；
+- 在 `next_support` 中加入 `support_hold`，避免释放段无依据地过快丢失接触；
+- 在 `next_clearance` 中加入与 `next_support / next_impact` 相关的接触惩罚，降低净空快速上升的高估；
+- 随后又将 upward lift 改成阈值化形式：只有足够强的正向 `drive_action` 才转化为真正的竖直 lift，从而在模型里把 `drive` 与 `launch` 拉开。
+
+### 修正后的方向性诊断
+
+继续使用 `results/hopper_mcts_5k_seed3_retorque_gpu.pt` 中的训练后模型，在真实环境中做两条 200-step on-policy rollout，对比模型一步预测与真实下一状态。
+
+关键结果如下。
+
+#### 1. `launch @ stance_release`
+
+真实环境：
+
+- `Δvx = -0.0063`
+- `Δvz = +0.0140`
+- `Δsupport = +0.0151`
+- `Δclearance = +0.0000`
+
+初始 retorque 版本预测：
+
+- `Δvx = +0.0005`
+- `Δvz = +0.0632`
+- `Δsupport = -0.0755`
+- `Δclearance = +0.1126`
+
+加入局部修正后预测：
+
+- `Δvx = +0.0005`
+- `Δvz = +0.0311`
+- `Δsupport = +0.0236`
+- `Δclearance = -0.0302`
+
+再加阈值化 lift 后预测：
+
+- `Δvx = +0.0005`
+- `Δvz = +0.0283`
+- `Δsupport = +0.0238`
+- `Δclearance = -0.0303`
+
+这说明：
+
+- `launch` 的 `Δvz` 高估已明显收敛；
+- `Δsupport` 的符号也已从“错误的明显减小”纠正为“略增”，与真实方向一致；
+- 但 `Δclearance` 已出现过修正，从原先的正向高估转为小幅负值。
+
+#### 2. `drive @ stance_release`
+
+真实环境：
+
+- `Δvx = +0.0046`
+- `Δvz = -0.0167`
+- `Δsupport = -0.0080`
+- `Δclearance = +0.0001`
+
+初始 retorque 版本预测：
+
+- `Δvz = +0.0488`
+- `Δsupport = -0.0764`
+- `Δclearance = +0.1150`
+
+加入局部修正后预测：
+
+- `Δvz = +0.0279`
+- `Δsupport = +0.0208`
+- `Δclearance = -0.0274`
+
+再加阈值化 lift 后预测：
+
+- `Δvz = +0.0227`
+- `Δsupport = +0.0213`
+- `Δclearance = -0.0275`
+
+这说明：
+
+- `drive` 的竖直收益高估虽有所下降，但仍未纠正到真实负值；
+- `support` 与 `clearance` 的方向仍不完全正确。
+
+#### 3. `absorb @ landing_impact`
+
+真实环境：
+
+- `Δvx = -0.0034`
+- `Δvz = +0.0254`
+- `Δsupport = +0.0043`
+- `Δclearance = -0.0154`
+
+修正后预测仍为：
+
+- `Δvx = +0.0017`
+- `Δvz = -0.0172`
+- `Δsupport = +0.0559`
+- `Δclearance = +0.0567`
+
+说明 landing 区域的方向性错配仍较明显，尤其 `Δvz` 与 `Δclearance` 的符号尚未对齐。
+
+### 短 smoke
+
+使用修正后的模型前向运行：
+
+`python -u scripts/run_hopper_mcts.py --budget 600 --seed_steps 300 --eval_episodes 1 --eval_freq 300 --num_simulations 16 --rollout_depth 4 --train_updates 8 --train_batch 32 --device cpu --save_path /tmp/hopper_mcts_modelpatch_smoke.pt`
+
+结果如下：
+
+- `seed ep @500 = 4.9136`
+- `steps=600` 的训练分布为：
+  - `drive=31, launch=28, absorb=41`
+- 最终 eval 仍为 0
+
+与修正前 retorque smoke 基本同型。这说明当前局部修正主要是在**缓和预测方向偏差**，尚不足以在极短预算内显著改变 planner 的主吸引子。
+
+### 当前结论
+
+这轮结果表明：
+
+1. 依据第一性原理做的小规模局部修正，确实可以把 `launch` 的方向性预测拉近真实环境；
+2. 但 `drive` 与 `absorb` 的关键错配仍然存在，且行为分布几乎不变；
+3. 因此，继续靠这种手工小补丁逐项修正 world model，边际收益已经开始递减。
+
+据此，后续更有价值的方向将不再是继续调单个系数，而是：
+
+- 把 `vz / support / clearance` 明确纳入更系统的训练约束或辅助监督；
+- 或者转向更长 horizon / 更强终端价值的 solver 对照，检查在当前模型偏差仍存在时，求解层是否有办法避免被这些局部高估误导。
+
+### Solver 对照筛查：单纯增加 lookahead 强度并不能改变当前主吸引子
+
+在局部模型修正后，又对求解层做了一个最小对照，目的是区分：
+
+- “当前失败是否只是因为 planner 看得还不够远”
+
+与
+
+- “当前模型对动作序列的排序本身就已经把同一条轨迹判为最优”。
+
+为避免再次直接投入一轮完整 5k 训练，本轮先固定当前 `retorque` checkpoint：
+
+- `results/hopper_mcts_5k_seed3_retorque_gpu.pt`
+
+只在真实环境中做 `200` 步短评估，对比三组 solver 配置：
+
+- `base`: `num_simulations=50`, `rollout_depth=8`
+- `deep`: `num_simulations=100`, `rollout_depth=12`
+- `deeper`: `num_simulations=150`, `rollout_depth=16`
+
+三组结果完全一致：
+
+- 回报均为 `0.0`
+- 动作分布均为：
+  - `compress=7`
+  - `drive=70`
+  - `launch=65`
+  - `absorb=58`
+- 终点根节点诊断保持在：
+  - `root_phase = compression`
+  - `root_subphase = stance_release`
+
+这说明，在当前模型下：
+
+1. 单纯增加 MCTS 仿真数与 rollout 深度，并不会把 policy 推离现有 `drive + launch + absorb` 主吸引子；
+2. planner 的决策对 solver 强度不敏感，意味着当前瓶颈更可能不在“看得不够远”，而在于模型对这条轨迹的局部排序本身就过于稳定；
+3. 因而，再继续只从 solver 侧做小幅 lookahead 增强，边际收益预计有限。
+
+#### 当前更新后的判断
+
+结合前面的 world-model 对齐诊断与本轮 solver 对照，可进一步收缩出一个更稳妥的阶段性结论：
+
+- 当前 retorque 版本的主要限制，优先仍落在 **model ranking bias**，而非 solver budget 不足；
+- 既然更深 lookahead 也无法改变动作选择，那么下一阶段更有价值的方向应优先是：
+  - 将 `vz / support / clearance` 纳入更系统的训练约束或辅助监督；
+  - 而不是继续做局部求解层参数增强。
+
+### Hopper Route B：`2k key-loss` 中预算复测与同口径诊断
+
+为直接检验“关键量监督”是否能够缓解当前的 model ranking bias，本轮没有再改动作语义，也没有再动 solver 主配置，而是只做两类最小变更：
+
+1. 在 `scripts/run_hopper_mcts.py` 中增加 `--eval_max_steps`，使中预算实验不会被 `500-step` 初始评估吞没；
+2. 新增 `scripts/diagnose_hopper_routeb_alignment.py`，将此前一次性的 on-policy 一步对齐分析固化为可重复脚本。
+
+#### 中预算训练命令
+
+`MUJOCO_GL=glfw python -u scripts/run_hopper_mcts.py --budget 2000 --seed_steps 1000 --eval_episodes 1 --eval_max_steps 200 --eval_freq 2000 --num_simulations 50 --rollout_depth 8 --train_updates 32 --train_batch 64 --device cuda --save_path results/hopper_mcts_2k_seed3_keyloss_eval200_gpu.pt`
+
+训练过程中的关键信号如下：
+
+- `eval step=0 = 0.0000`
+- `seed ep=0, steps=500, ep_reward=6.5659`
+- `seed ep=1, steps=1000, ep_reward=0.0000`
+- 首次在线更新后：
+  - `state_loss = 0.228978`
+  - `reward_loss = 0.000862`
+  - `key_state_loss = 0.015039`
+  - `key_delta_loss = 0.015039`
+- `train ep=2, steps=1500, ep_reward=0.0000`
+  - 动作分布：`drive=231, launch=228, absorb=41`
+  - 更新后：`state_loss = 0.201644`, `key_state_loss = key_delta_loss = 0.014476`
+- `train ep=3, steps=2000, ep_reward=0.0000`
+  - 动作分布：`compress=7, drive=210, launch=205, tuck=14, absorb=64`
+  - 更新后：`state_loss = 0.143473`, `key_state_loss = key_delta_loss = 0.012385`
+- 训练态记录的最终评估为：
+  - `eval step=2000 = 0.2602`
+
+这说明：
+
+- 关键量监督确实稳定参与了训练，且损失随训练推进持续下降；
+- 行为主吸引子仍然是 `drive + launch`，但与此前 smoke 相比，后段已出现少量 `compress / tuck` 回流；
+- 训练态出现了一个非零终点评估，但它仍只是单 episode 结果，尚不能单独视为“性能突破”。
+
+#### fresh reload 对照评估
+
+为避免把训练过程中的单次随机回报误判为稳定增益，又对两个 checkpoint 在同一 `1 episode × 200 step × 50 sims × depth 8` 协议下重新加载评估：
+
+- `results/hopper_mcts_5k_seed3_retorque_gpu.pt = 0.0`
+- `results/hopper_mcts_2k_seed3_keyloss_eval200_gpu.pt = 0.0`
+
+因此，`0.2602` 更稳妥的解释是：当前版本**可能出现了偶发的非零轨迹**，但尚未形成可复现的稳定收益改善。
+
+#### 同口径一步对齐诊断
+
+诊断命令统一为：
+
+`python scripts/diagnose_hopper_routeb_alignment.py --checkpoint <ckpt> --device cuda --episodes 2 --max_steps 200 --num_simulations 50 --rollout_depth 8 --limit_per_event 32`
+
+先给出新 `2k key-loss` checkpoint 的结果：
+
+1. `launch @ stance_release`
+   - 真实：`Δvx=-0.0153`, `Δvz=+0.0392`, `Δsupport=+0.0481`, `Δclearance=+0.0001`
+   - 预测：`Δvx=+0.0038`, `Δvz=+0.0093`, `Δsupport=+0.0033`, `Δclearance=+0.0239`
+2. `drive @ stance_release`
+   - 真实：`Δvx=+0.0072`, `Δvz=-0.0386`, `Δsupport=-0.0738`, `Δclearance=+0.0004`
+   - 预测：`Δvx=-0.0012`, `Δvz=+0.0064`, `Δsupport=-0.0141`, `Δclearance=+0.0296`
+3. `absorb @ landing_impact`
+   - 真实：`Δvx=-0.0400`, `Δvz=-0.0201`, `Δsupport=-0.0127`, `Δclearance=-0.0100`
+   - 预测：`Δvx=+0.0062`, `Δvz=-0.0777`, `Δsupport=+0.0007`, `Δclearance=+0.5136`
+
+在同一脚本、同一当前代码版本下，再给出 `retorque` 基线：
+
+1. `launch @ stance_release`
+   - 预测：`Δvx=+0.0037`, `Δvz=+0.0042`, `Δsupport=+0.0353`, `Δclearance=-0.0151`
+2. `drive @ stance_release`
+   - 预测：`Δvx=+0.0028`, `Δvz=+0.0040`, `Δsupport=+0.0144`, `Δclearance=-0.0065`
+3. `absorb @ landing_impact`
+   - 预测：`Δvx=+0.0007`, `Δvz=-0.0535`, `Δsupport=-0.0155`, `Δclearance=+0.4996`
+
+据此可以作出更严格的比较：
+
+1. `launch @ stance_release`
+   - 方向上仍然基本正确，但相对 retorque 只体现为非常有限的细节变化，没有出现决定性的对齐改善；
+2. `drive @ stance_release`
+   - `Δsupport` 的预测符号从 retorque 的错误正值改成了负值，这是一个局部进步；
+   - 但 `Δvz` 仍保持错误正号，说明“drive 不应被当成起跳增益”的关键排序偏差并未解决；
+3. `absorb @ landing_impact`
+   - `Δclearance` 仍被极大高估（`+0.5136` 对 `-0.0100`），这一块几乎没有被当前监督触及；
+   - landing 区域仍是最强的结构性误差源。
+
+#### 当前判断
+
+本轮 `2k key-loss` 结果可以收束为：
+
+1. 当前辅助监督**足以改变训练轨迹**，但尚不足以形成稳定、可复现的非零性能；
+2. 它对 `launch` 和 `drive` 的某些局部量有轻微校正，但整体对齐改善是混合且不稳定的；
+3. 对 `absorb / landing_impact` 的关键偏差几乎无效，因此当前 Route B 失败的核心瓶颈仍然存在；
+4. 以现有证据看，尚不适合直接按“日志中的 key-loss 版本已经可行”去实现完整路线；更稳妥的下一步应是继续重构监督形式本身，尤其要更直接地约束：
+   - `drive` 在 `stance_release` 中的 `Δvz` 符号；
+   - `absorb` 在 `landing_impact` 中的 `Δclearance / Δsupport` 排序。
+
+换言之，这轮结果支持“继续沿训练约束方向推进”，但**尚不支持**直接进入完整 `5k` 实装并把它当作已验证架构。
+
+### Hopper Route B：条件化符号监督的第一次实现与收缩
+
+在上述判断基础上，继续沿训练约束方向前推了一步，但本轮保持两个原则：
+
+1. 不再改离散语义与 solver；
+2. 只把监督直接加在已经反复暴露的排序偏差上。
+
+代码位于 `scripts/run_hopper_mcts.py`，初版实现做了两件事：
+
+- replay 额外记录离散 `intent`，从而在训练批次中直接按 `intent × subphase` 施加条件化损失；
+- 在 `train_sd_model()` 中新增三项符号约束：
+  - `drive@stance_release`: 惩罚正向 `Δvz`
+  - `absorb@landing_impact`: 惩罚正向 `Δclearance`
+  - `absorb@landing_impact`: 初版还尝试惩罚正向 `Δsupport`
+
+#### smoke 命令
+
+`MUJOCO_GL=glfw python -u scripts/run_hopper_mcts.py --budget 600 --seed_steps 300 --eval_episodes 1 --eval_max_steps 100 --eval_freq 600 --num_simulations 16 --rollout_depth 4 --train_updates 8 --train_batch 32 --device cuda --save_path /tmp/hopper_mcts_signloss_smoke.pt`
+
+关键日志如下：
+
+- 第一次更新：
+  - `state_loss = 0.095509`
+  - `key_state_loss = key_delta_loss = 0.011881`
+  - `drive_vz_sign_loss = 0.049440`
+  - `absorb_clearance_sign_loss = 0.195735`
+  - `absorb_support_sign_loss = 0.093900`
+  - `drive_release_ratio = 0.3477`
+  - `absorb_landing_ratio = 0.0820`
+- 第二次更新：
+  - `state_loss = 0.060869`
+  - `key_state_loss = key_delta_loss = 0.013542`
+  - `drive_vz_sign_loss = 0.036666`
+  - `absorb_clearance_sign_loss = 0.258875`
+  - `absorb_support_sign_loss = 0.054826`
+  - `drive_release_ratio = 0.3594`
+  - `absorb_landing_ratio = 0.1484`
+
+这说明新监督在工程上是可工作的：
+
+- 样本命中率足够，不是空损失；
+- 训练没有数值爆炸；
+- 但 `600` 预算下最终回报仍为 `0`，因此只能作为“监督已接通”的 smoke。
+
+#### smoke 对齐诊断与关键修正
+
+对 `/tmp/hopper_mcts_signloss_smoke.pt` 做 `1 episode × 80 step` 短诊断后，得到：
+
+- `drive @ stance_release`
+  - 真实：`Δvz = -0.0361`
+  - 预测：`Δvz = +0.0363`
+- `absorb @ landing_impact`
+  - 真实：`Δclearance = -0.0277`
+  - 预测：`Δclearance = +0.5371`
+  - 真实：`Δsupport = +0.0394`
+  - 预测：`Δsupport = -0.0076`
+
+这条结果有一个非常重要的含义：
+
+- `drive` 的竖直方向错误依旧存在，因此继续保留 `drive@stance_release` 的 `Δvz` 符号约束是合理的；
+- `absorb` 的 `Δclearance` 方向仍然明显错误，因此继续保留 `absorb@landing_impact` 的 `Δclearance` 符号约束也是合理的；
+- 但 `absorb` 的 `Δsupport` 在这条新轨迹上真实均值转成了正值，与上一轮 `2k` 诊断中的负值相矛盾。
+
+据此，原本对 `absorb@landing_impact` 加“固定负向 `Δsupport`”约束的想法并不稳固。若继续把它写成默认硬约束，反而可能把不稳定的经验模式误当成结构规律。
+
+因此，本轮代码立即收缩为：
+
+- `drive_vz_sign_coef`：默认保留为 `5.0`
+- `absorb_clearance_sign_coef`：默认保留为 `5.0`
+- `absorb_support_sign_coef`：参数保留，但默认值回退为 `0.0`
+
+#### 当前更新后的判断
+
+这轮实现说明：
+
+1. “按 `intent × subphase` 做条件化监督”在工程上是可行的；
+2. 其中可被当前数据较稳定支持的硬约束，至少有两条：
+   - `drive@stance_release` 不应被预测成正向起跳增益；
+   - `absorb@landing_impact` 不应被预测成继续抬高净空；
+3. `absorb@landing_impact` 的 `Δsupport` 符号目前缺乏稳定证据，不宜默认硬编码。
+
+这也意味着，下一轮若继续做中预算验证，应优先测试的是**收缩后的两项符号约束版本**，而不是包含 `support` 硬约束的更强版本。
+
+### Hopper Route B：收缩后两项符号约束版本的 `2k` 复测
+
+按上述收缩结论，继续做了一个与前一轮 `2k key-loss` 尽量同构的中预算实验。此次唯一实质差异是监督项默认值变为：
+
+- `drive_vz_sign_coef = 5.0`
+- `absorb_clearance_sign_coef = 5.0`
+- `absorb_support_sign_coef = 0.0`
+
+训练命令为：
+
+`MUJOCO_GL=glfw python -u scripts/run_hopper_mcts.py --budget 2000 --seed_steps 1000 --eval_episodes 1 --eval_max_steps 200 --eval_freq 2000 --num_simulations 50 --rollout_depth 8 --train_updates 32 --train_batch 64 --device cuda --save_path results/hopper_mcts_2k_seed3_signloss2_gpu.pt`
+
+#### 训练过程
+
+- `eval step=0 = 0.0000`
+- `seed ep=0, steps=500, ep_reward=6.5659`
+- `seed ep=1, steps=1000, ep_reward=0.0000`
+- 第一次在线更新：
+  - `state_loss = 0.229600`
+  - `reward_loss = 0.000858`
+  - `key_state_loss = key_delta_loss = 0.015545`
+  - `drive_vz_sign_loss = 0.041699`
+  - `absorb_clearance_sign_loss = 0.147061`
+  - `absorb_support_sign_loss = 0.101032`
+  - `drive_release_ratio = 0.3472`
+  - `absorb_landing_ratio = 0.0571`
+- `train ep=2, steps=1500, ep_reward=0.0000`
+  - 动作分布：`drive=231, launch=228, absorb=41`
+  - 更新后：
+    - `state_loss = 0.202909`
+    - `key_state_loss = key_delta_loss = 0.015120`
+    - `drive_vz_sign_loss = 0.014813`
+    - `absorb_clearance_sign_loss = 0.255706`
+- `train ep=3, steps=2000, ep_reward=0.0000`
+  - 动作分布：`compress=7, drive=210, launch=205, tuck=14, absorb=64`
+  - 更新后：
+    - `state_loss = 0.144595`
+    - `key_state_loss = key_delta_loss = 0.013251`
+    - `drive_vz_sign_loss = 0.015958`
+    - `absorb_clearance_sign_loss = 0.181757`
+- 训练态最终评估：
+  - `eval step=2000 = 0.2602`
+
+这里有两个直接观察：
+
+1. 行为分布与前一轮 `2k key-loss` 几乎同型，说明这次收缩没有改变 planner 的主吸引子；
+2. `drive_vz_sign_loss` 的数值确实被明显压低，说明新约束在训练目标上是有效工作的。
+
+#### fresh reload 对照评估
+
+仍按 `1 episode × 200 step × 50 sims × depth 8` 的 fresh reload 协议对比：
+
+- `results/hopper_mcts_2k_seed3_keyloss_eval200_gpu.pt = 0.0`
+- `results/hopper_mcts_2k_seed3_signloss2_gpu.pt = 0.0`
+
+因此，本轮与上一轮一样，训练态的 `0.2602` 不能视为稳定可复现的收益改善。
+
+#### 同口径一步对齐诊断
+
+诊断命令为：
+
+`python scripts/diagnose_hopper_routeb_alignment.py --checkpoint results/hopper_mcts_2k_seed3_signloss2_gpu.pt --device cuda --episodes 2 --max_steps 200 --num_simulations 50 --rollout_depth 8 --limit_per_event 32`
+
+结果如下：
+
+1. `launch @ stance_release`
+   - 真实：`Δvx=-0.0153`, `Δvz=+0.0392`, `Δsupport=+0.0481`, `Δclearance=+0.0001`
+   - 预测：`Δvx=+0.0061`, `Δvz=+0.0055`, `Δsupport=+0.0324`, `Δclearance=-0.0114`
+2. `drive @ stance_release`
+   - 真实：`Δvx=+0.0072`, `Δvz=-0.0386`, `Δsupport=-0.0738`, `Δclearance=+0.0004`
+   - 预测：`Δvx=+0.0008`, `Δvz=+0.0019`, `Δsupport=+0.0168`, `Δclearance=-0.0037`
+3. `absorb @ landing_impact`
+   - 真实：`Δvx=-0.0400`, `Δvz=-0.0201`, `Δsupport=-0.0127`, `Δclearance=-0.0100`
+   - 预测：`Δvx=+0.0035`, `Δvz=-0.0906`, `Δsupport=+0.1054`, `Δclearance=+0.4844`
+
+与上一轮 `2k key-loss` 相比，可以更具体地看出：
+
+1. `launch @ stance_release`
+   - `Δsupport` 从 `+0.0033` 提高到 `+0.0324`，更接近真实 `+0.0481`；
+   - `Δclearance` 从 `+0.0239` 拉到 `-0.0114`，绝对误差减小；
+   - 但 `Δvz` 只从 `+0.0093` 变到 `+0.0055`，并没有带来决定性改观。
+2. `drive @ stance_release`
+   - `Δvz` 从 `+0.0064` 降到 `+0.0019`，确实被压向了零附近；
+   - 但它仍然没有翻成真实所需的负号；
+   - `Δsupport` 反而从上一轮的负值 `-0.0141` 回退到错误正值 `+0.0168`。
+3. `absorb @ landing_impact`
+   - `Δclearance` 从 `+0.5136` 只降到 `+0.4844`，高估仍极严重；
+   - `Δsupport` 则从 `+0.0007` 进一步恶化到 `+0.1054`。
+
+#### 当前判断
+
+这轮复测进一步说明：
+
+1. 收缩后的两项符号约束，能够在训练目标上压低 `drive` 的错误竖直增益；
+2. 但这种压低目前主要体现在“把预测推向零附近”，尚不足以把 `drive` 的局部排序真正翻到正确侧；
+3. `absorb / landing_impact` 仍然几乎没有被解决，它依旧是当前 Route B 失败的主导误差源；
+4. 因此，这轮结果虽然比“无条件约束地继续调参”更有针对性，但仍不足以支持直接进入完整 `5k` 验证。
+
+更稳妥的下一步应是继续围绕 `landing_impact` 的监督形式本身做结构性改写，而不是简单继续提高当前损失权重。
+
+### 2026-04-18 Hopper Route A/B 调用链修订与最小验证
+
+针对当前 Hopper 训练调用链，已完成以下修订，并按最小可复现脚本逐项核验：
+
+1. `dmcontrol_hopper_sd_model.py` 中显式 `predict_reward()` 的尺度已与 DMControl 包装器中的 `action_repeat=2` 对齐，返回值改为 `2 * standing * hopping`；
+2. `tdmpc2.py`、`common/world_model.py`、`common/sd_world_model.py` 中 planner 的 imagined rollout 已消除重复 `next()`，单步只推进一次动力学，并将 `next_z` 直接传入 `reward()`；
+3. `common/buffer.py` 中 replay capacity 默认值已从 `min(buffer_size, steps)` 改为 `buffer_size`，并将当前缓冲区 episode 数与累计写入 episode 数分离维护，evict 时同步递减当前计数；
+4. `trainer/online_trainer.py` 中 `save_full_state()` / `load_full_state()` 已补充 `_target_Qs`、`_detach_Qs`、累计 buffer 计数的保存与恢复，加载时不再调用 `model.init()` 覆盖 target/detach Q 状态。
+
+最小验证脚本结果如下：
+
+- `reward_scale: PASS`
+- `double_next_removed: PASS`
+- `buffer_semantics: PASS`
+- `resume_state: PASS`
+
+其中 `resume_state` 额外确认：恢复后 `model.init()` 未被触发，`model`、`target_Qs`、`detach_Qs`、优化器状态、`prev_mean`、训练步数及 buffer 计数均与保存时一致。
+
+本轮未改动的事项仅有一项：`apply(init.weight_init)` 对 `_dynamics` 子 head 的递归覆盖。该行为此前已在工作记录中明确属于设计时有意保留，本次未纳入修订。

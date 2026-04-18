@@ -92,6 +92,7 @@ class DMControlHopperSDModel(nn.Module):
     IMPACT_IDX = 13
     CLEARANCE_IDX = 14
     RATE_LIKE_IDX = (VX_IDX, VZ_IDX, PITCH_RATE_IDX, COMP_RATE_IDX, SWING_RATE_IDX, FOOT_RATE_IDX, IMPACT_IDX)
+    ENV_ACTION_REPEAT = 2
 
     def __init__(
         self,
@@ -322,6 +323,7 @@ class DMControlHopperSDModel(nn.Module):
         swing_rate = state[:, self.SWING_RATE_IDX]
         foot = state[:, self.FOOT_IDX]
         foot_rate = state[:, self.FOOT_RATE_IDX]
+        clearance = state[:, self.CLEARANCE_IDX]
         support = torch.clamp(state[:, self.SUPPORT_IDX], min=0.0, max=1.0)
         stance_mix = torch.clamp(state[:, self.STANCE_IDX], min=-1.0, max=1.0)
         impact = torch.clamp(state[:, self.IMPACT_IDX], min=0.0)
@@ -330,11 +332,14 @@ class DMControlHopperSDModel(nn.Module):
         drive_action = 0.20 * scaled_action[:, 0] + 0.55 * scaled_action[:, 1] - 0.50 * scaled_action[:, 2] + 0.25 * scaled_action[:, 3]
         posture_action = 0.30 * scaled_action[:, 0] - 0.10 * scaled_action[:, 1] + 0.05 * scaled_action[:, 2] + 0.05 * scaled_action[:, 3]
         foot_action = 0.05 * scaled_action[:, 0] + 0.10 * scaled_action[:, 1] - 0.15 * scaled_action[:, 2] + 0.35 * scaled_action[:, 3]
+        contact_lock = support * torch.sigmoid((-clearance - 0.70) / 0.06)
+        # Only sufficiently strong positive release should become vertical liftoff.
+        release_lift = torch.relu(drive_action - 0.95) * (1.0 - 0.78 * contact_lock)
 
         x_acc = support * (0.90 * drive_action + 0.25 * swing_rate + 0.15 * stance_mix - 0.18 * vx) - 0.06 * air * vx
-        z_acc = -4.8 - 1.6 * air + support * (10.0 * compression + 1.8 * torch.relu(drive_action) + 1.2 * impact - 1.4 * torch.relu(vz))
+        z_acc = -4.8 - 1.6 * air + support * (10.0 * compression + 4.0 * release_lift + 1.2 * impact - 1.4 * torch.relu(vz))
         pitch_acc = -2.5 * pitch - 0.75 * pitch_rate - 0.35 * swing + support * (0.15 * posture_action + 0.08 * stance_mix)
-        compression_acc = support * (1.4 * torch.relu(-vz) + 0.8 * impact - 1.5 * torch.relu(drive_action)) - 0.90 * compression - 0.35 * compression_rate + 0.15 * air * compression
+        compression_acc = support * (1.4 * torch.relu(-vz) + 0.8 * impact - 3.2 * release_lift) - 0.90 * compression - 0.35 * compression_rate + 0.15 * air * compression
         swing_acc = 0.80 * drive_action - 1.10 * swing - 0.40 * swing_rate - 0.15 * stance_mix
         foot_acc = 0.90 * foot_action - 1.00 * foot - 0.35 * foot_rate + 0.10 * stance_mix
         impact_rate = -3.0 * impact + support * torch.relu(-vz)
@@ -412,14 +417,16 @@ class DMControlHopperSDModel(nn.Module):
         touch_residual = self.TOUCH_RESIDUAL_SCALE * torch.tanh(self.touch_head(state))
         contact_geom = torch.sigmoid((self.CONTACT_MARGIN - clearance_geom) / 0.04)
         impact_gate = torch.sigmoid((0.12 - next_vz) / 0.22)
+        support_hold = 0.14 * support * torch.sigmoid((next_vz + 0.02) / 0.08) * torch.sigmoid((-clearance_geom - 0.50) / 0.10)
         next_support = torch.clamp(
-            0.55 * support + 0.35 * contact_geom * impact_gate + 0.10 * torch.sigmoid(next_impact) + touch_residual[:, 0],
+            0.55 * support + 0.35 * contact_geom * impact_gate + 0.10 * torch.sigmoid(next_impact) + support_hold + touch_residual[:, 0],
             min=0.0,
             max=1.0,
         )
         next_stance = torch.tanh(0.55 * stance + 0.25 * next_swing - 0.08 * next_foot + touch_residual[:, 1])
         clearance_residual = self.HEIGHT_RESIDUAL_SCALE * torch.tanh(self.clearance_head(state).squeeze(-1))
-        next_clearance = clearance_geom + clearance_residual
+        clearance_contact_penalty = 0.12 * next_support + 0.06 * torch.sigmoid(next_impact)
+        next_clearance = clearance_geom - clearance_contact_penalty + clearance_residual
 
         return torch.stack(
             [
@@ -473,7 +480,12 @@ class DMControlHopperSDModel(nn.Module):
         action: torch.Tensor,
         next_state: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
-        """Environment-identical reward: standing * hopping."""
+        """Environment-aligned reward under the current DMControl wrapper.
+
+        The DMControl environment wrapper applies each action for two internal
+        simulator steps and accumulates both rewards into one environment step.
+        The explicit reward therefore needs to match that two-step scale.
+        """
         if next_state is None:
             next_state = self.forward(state, action)
         height = self.predict_height(next_state)
@@ -482,7 +494,7 @@ class DMControlHopperSDModel(nn.Module):
         standing = self._tolerance_interval(height, 0.6, 2.0)
         hopping = self._lower_tolerance(x_dot, lower=self.hop_speed, margin=self.hop_speed / 2.0, value_at_margin=0.5)
 
-        return standing * hopping
+        return self.ENV_ACTION_REPEAT * standing * hopping
 
     def predict_viable_reward(
         self,
