@@ -2677,3 +2677,39 @@ smoke 结果表明脚本可以完整运行，且 intent 分布已明显受支持
 其中 `resume_state` 额外确认：恢复后 `model.init()` 未被触发，`model`、`target_Qs`、`detach_Qs`、优化器状态、`prev_mean`、训练步数及 buffer 计数均与保存时一致。
 
 本轮未改动的事项仅有一项：`apply(init.weight_init)` 对 `_dynamics` 子 head 的递归覆盖。该行为此前已在工作记录中明确属于设计时有意保留，本次未纳入修订。
+
+---
+
+## 2026-04-18 去 submodule 化前归档：ablation 0 / ablation 1
+
+v4 主线即将建立，ablation0_transition2x 与 ablation1_no_struct_residual 两个分支的 git lineage 将在去 submodule 过程中断裂。本节归档其 diff 与 smoke 结果以保留实验证据。
+
+### Ablation 0 (transition 2×)
+
+- 分支：`ablation0_transition2x`（master 基础上的 commit `9699689`）
+- 改动：`src/world_model/dmcontrol_hopper_sd_model.py` +13/-1 行
+- 本质：`forward()` 循环 `ENV_ACTION_REPEAT=2` 次，使 SD transition 与 DMControl env 的 2 inner-step 对齐（reward ×2 修复的对称化）
+- 5k smoke (seed=3)：
+  - 0k=1.27, 1k=0.0008, 2k=1.65, 3k=0.003, 4k=0.0, 5k=0.30
+  - 训练稳定、plan_nonfinite_frac=0；速度慢 ~3×（transition 2× + planner 内嵌 next 调用复合）
+- 50k×3 未启动（后续若需可按归档 patch /tmp/ablation0.patch 单独 cherry-pick）
+
+### Ablation 1 (drop `_struct_residual`)
+
+- 分支：`ablation1_no_struct_residual`（ablation0 基础上的改动）
+- 改动：`external/tdmpc2/tdmpc2/common/sd_world_model.py` + `config.yaml`，新增 `sd_use_struct_residual` flag；`next()` 中 `_struct_residual is None` 时跳过 trend-protect + free-dim 修正路径
+- 5k smoke (seed=3, `sd_use_struct_residual=false`)：
+  - 0k=1.30, 1k=0.026, 2k=0.60, 3k=0.55, 4k=0.05, 5k=1.21
+  - 训练稳定、正常退出；与 ablation 0 smoke 0.30 同量级，无显著崩溃证据
+- 结论：去掉 `_struct_residual` 不会破坏训练稳定性，后续可作 "残差栈非必要" 的 appendix 证据点
+- 50k×3 未启动
+
+### 归档文件位置
+
+- `/tmp/ablation0.patch` — ablation 0 相对 master 的完整 unified diff
+- `/tmp/ablation1.patch` — ablation 1 相对 submodule df1b9d7 的完整 unified diff
+- smoke 日志：
+  - `/tmp/sdwm_ablation0_transition2x/sd_world_model_rl/logs/hopper-hop/3/sd_hopper_5k_ablation0_transition2x_smoke_20260418/`
+  - `/tmp/sdwm_ablation1_no_struct_residual/sd_world_model_rl/logs/hopper-hop/3/sd_hopper_5k_ablation1_no_struct_residual_smoke_20260418/`
+
+注：/tmp 不持久，正式归档应把 patch 复制到 docs/worklog/patches/ 下，下一步 v4 commit 前一起做。
