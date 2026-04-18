@@ -45,9 +45,9 @@ PHASE_NAMES = ("compression", "takeoff", "flight", "landing")
 # These are placeholders for the eventual state-dependent low-level mapping.
 INTENT_TORQUES = torch.tensor(
     [
-        [0.10,  0.70, -0.85, -0.50],  # compress: crouch and load the leg spring
-        [0.20, -0.55,  0.78,  0.55],  # drive: committed forward release, still weaker than launch
-        [0.00, -0.85,  1.00,  0.90],  # launch: aggressive release for takeoff
+        [-0.70,  0.70,  0.85, -0.75], # compress: oppose release and keep loading the stance leg
+        [0.35,  0.60, -0.70,  0.45],  # drive: moderate positive release for forward/upward push
+        [0.75,  0.95, -0.95,  0.70],  # launch: stronger positive release for takeoff commitment
         [-0.20, -0.45, -0.75, -0.30], # tuck: retract the leg in flight
         [0.05,  0.20, -0.45, -0.30],  # absorb: compliant landing / shock absorption
     ],
@@ -66,6 +66,7 @@ PHASE_INTENT_PRIORS = {
 SUBPHASE_INTENT_PRIORS = {
     "stance_load": np.array([0.74, 0.22, 0.04, 0.00, 0.00], dtype=np.float32),
     "stance_release": np.array([0.00, 0.58, 0.42, 0.00, 0.00], dtype=np.float32),
+    "stance_commit": np.array([0.00, 0.00, 1.00, 0.00, 0.00], dtype=np.float32),
     "takeoff": np.array([0.00, 0.60, 0.40, 0.00, 0.00], dtype=np.float32),
     "flight_rise": np.array([0.00, 0.00, 0.00, 1.00, 0.00], dtype=np.float32),
     "flight_fall": np.array([0.00, 0.00, 0.00, 0.78, 0.22], dtype=np.float32),
@@ -103,6 +104,11 @@ def infer_phase_context(state: torch.Tensor) -> Tuple[str, str]:
     if support >= 0.18 and (vz < -0.16 or impact > 0.10):
         return "landing", "landing_impact"
 
+    # Once the leg is loaded and begins to unload with partial support, commit
+    # the decision semantics to launch rather than lingering in drive forever.
+    if 0.22 <= support <= 0.55 and compression > 0.14 and vz > -0.02 and clearance > -0.08:
+        return "compression", "stance_commit"
+
     if support >= 0.28 and compression > 0.12 and vz > -0.04:
         return "compression", "stance_release"
 
@@ -120,7 +126,11 @@ def _normalize_probs(probs: np.ndarray) -> np.ndarray:
     return probs / probs.sum()
 
 
-def get_valid_intents(state: torch.Tensor, phase: Optional[str] = None) -> List[int]:
+def get_valid_intents(
+    state: torch.Tensor,
+    phase: Optional[str] = None,
+    prev_intent: int = -1,
+) -> List[int]:
     """Return the semantically admissible intents for the current phase."""
     if phase is None:
         phase, subphase = infer_phase_context(state)
@@ -128,7 +138,12 @@ def get_valid_intents(state: torch.Tensor, phase: Optional[str] = None) -> List[
         _, subphase = infer_phase_context(state)
 
     if subphase == "stance_release":
+        if prev_intent == INTENT_TO_IDX["drive"]:
+            return [INTENT_TO_IDX["launch"]]
         return [INTENT_TO_IDX["drive"], INTENT_TO_IDX["launch"]]
+
+    if subphase == "stance_commit":
+        return [INTENT_TO_IDX["launch"]]
 
     if subphase == "takeoff":
         return [INTENT_TO_IDX["drive"], INTENT_TO_IDX["launch"]]
@@ -154,8 +169,12 @@ def get_valid_intents(state: torch.Tensor, phase: Optional[str] = None) -> List[
 def get_intent_priors(state: torch.Tensor, prev_intent: int = -1) -> Tuple[str, np.ndarray]:
     """Subphase-aware prior over intents with hard semantic support."""
     phase, subphase = infer_phase_context(state)
-    priors = SUBPHASE_INTENT_PRIORS.get(subphase, PHASE_INTENT_PRIORS[phase]).copy()
-    valid_intents = get_valid_intents(state, phase)
+    if subphase == "stance_release" and prev_intent == INTENT_TO_IDX["drive"]:
+        priors = SUBPHASE_INTENT_PRIORS["stance_commit"].copy()
+        valid_intents = [INTENT_TO_IDX["launch"]]
+    else:
+        priors = SUBPHASE_INTENT_PRIORS.get(subphase, PHASE_INTENT_PRIORS[phase]).copy()
+        valid_intents = get_valid_intents(state, phase, prev_intent)
 
     masked_priors = np.zeros_like(priors)
     masked_priors[valid_intents] = priors[valid_intents]
@@ -261,19 +280,20 @@ def mcts_search(
     rollout_depth: int = 10,
     value_net: Optional[HopperValueNet] = None,
     vnet_mix: float = 0.5,
+    prev_intent: int = -1,
 ) -> Tuple[int, Dict]:
     """MCTS over single-step discrete control modes."""
-    root = MCTSNode(root_state)
-    root_phase, root_priors = get_intent_priors(root_state)
+    root = MCTSNode(root_state, intent=prev_intent)
+    root_phase, root_priors = get_intent_priors(root_state, prev_intent)
     _, root_subphase = infer_phase_context(root_state)
-    root_valid_intents = get_valid_intents(root_state, root_phase)
+    root_valid_intents = get_valid_intents(root_state, root_phase, prev_intent)
 
     for _ in range(num_simulations):
         node = root
         path = [node]
 
         # Selection
-        while node.children and len(node.children) == len(get_valid_intents(node.state)):
+        while node.children and len(node.children) == len(get_valid_intents(node.state, prev_intent=node.intent)):
             best, best_score = None, -float("inf")
             for child in node.children.values():
                 if child.N == 0:
@@ -288,7 +308,7 @@ def mcts_search(
             path.append(node)
 
         # Expansion: add one unexpanded intent
-        valid_intents = get_valid_intents(node.state)
+        valid_intents = get_valid_intents(node.state, prev_intent=node.intent)
         if len(node.children) < len(valid_intents):
             _, priors = get_intent_priors(node.state, node.intent)
             unexpanded = [idx for idx in valid_intents if idx not in node.children]
@@ -337,6 +357,7 @@ def mcts_search(
         "root_value": root.Q,
         "root_phase": root_phase,
         "root_subphase": root_subphase,
+        "root_prev_intent": INTENT_NAMES[prev_intent] if 0 <= prev_intent < N_INTENTS else None,
         "root_valid_intents": [INTENT_NAMES[i] for i in root_valid_intents],
         "root_priors": {INTENT_NAMES[i]: float(root_priors[i]) for i in range(N_INTENTS)},
     }
@@ -375,33 +396,62 @@ class SimpleReplay:
         self.capacity = capacity
         self.states: List[torch.Tensor] = []
         self.actions: List[torch.Tensor] = []
+        self.intents: List[int] = []
         self.next_states: List[torch.Tensor] = []
         self.rewards: List[float] = []
 
-    def add(self, state: torch.Tensor, action: torch.Tensor, next_state: torch.Tensor, reward: float):
+    def add(
+        self,
+        state: torch.Tensor,
+        action: torch.Tensor,
+        intent: int,
+        next_state: torch.Tensor,
+        reward: float,
+    ):
         if len(self.states) >= self.capacity:
             idx = np.random.randint(self.capacity)
             self.states[idx] = state
             self.actions[idx] = action
+            self.intents[idx] = intent
             self.next_states[idx] = next_state
             self.rewards[idx] = reward
         else:
             self.states.append(state)
             self.actions.append(action)
+            self.intents.append(intent)
             self.next_states.append(next_state)
             self.rewards.append(reward)
 
     def __len__(self):
         return len(self.states)
 
-    def sample(self, batch_size: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    def sample(self, batch_size: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         idx = np.random.randint(len(self), size=batch_size)
         return (
             torch.stack([self.states[i] for i in idx]),
             torch.stack([self.actions[i] for i in idx]),
+            torch.tensor([self.intents[i] for i in idx], dtype=torch.long),
             torch.stack([self.next_states[i] for i in idx]),
             torch.tensor([self.rewards[i] for i in idx], dtype=torch.float32),
         )
+
+
+KEY_STRUCT_IDX = [
+    DMControlHopperSDModel.VZ_IDX,
+    DMControlHopperSDModel.SUPPORT_IDX,
+    DMControlHopperSDModel.CLEARANCE_IDX,
+]
+
+
+def _infer_subphases_batch(states: torch.Tensor) -> List[str]:
+    cpu_states = states.detach().cpu()
+    return [infer_phase_context(cpu_states[i])[1] for i in range(cpu_states.shape[0])]
+
+
+def _masked_mean(loss_vec: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+    if bool(mask.any().item()):
+        return loss_vec[mask].mean()
+    return loss_vec.new_zeros(())
 
 
 def train_sd_model(
@@ -410,6 +460,11 @@ def train_sd_model(
     optimizer: torch.optim.Optimizer,
     num_updates: int = 64,
     batch_size: int = 64,
+    key_state_coef: float = 5.0,
+    key_delta_coef: float = 5.0,
+    drive_vz_sign_coef: float = 5.0,
+    absorb_clearance_sign_coef: float = 5.0,
+    absorb_support_sign_coef: float = 0.0,
     device: str = "cpu",
 ) -> Dict[str, float]:
     if len(replay) < batch_size:
@@ -417,25 +472,72 @@ def train_sd_model(
     model.train()
     total_state_loss = 0.0
     total_reward_loss = 0.0
+    total_key_state_loss = 0.0
+    total_key_delta_loss = 0.0
+    total_drive_vz_sign_loss = 0.0
+    total_absorb_clearance_sign_loss = 0.0
+    total_absorb_support_sign_loss = 0.0
+    total_drive_release_ratio = 0.0
+    total_absorb_landing_ratio = 0.0
     for _ in range(num_updates):
-        states, actions, next_states, rewards = replay.sample(batch_size)
+        states, actions, intents, next_states, rewards = replay.sample(batch_size)
         states, actions = states.to(device), actions.to(device)
+        intents = intents.to(device)
         next_states, rewards = next_states.to(device), rewards.to(device)
         pred_next = model(states, actions)
         state_loss = F.mse_loss(pred_next, next_states)
+        pred_key = pred_next[:, KEY_STRUCT_IDX]
+        true_key = next_states[:, KEY_STRUCT_IDX]
+        key_state_loss = F.smooth_l1_loss(pred_key, true_key)
+        pred_delta = pred_key - states[:, KEY_STRUCT_IDX]
+        true_delta = true_key - states[:, KEY_STRUCT_IDX]
+        key_delta_loss = F.smooth_l1_loss(pred_delta, true_delta)
+        subphases = _infer_subphases_batch(states)
+        stance_release_mask = torch.tensor([sp == "stance_release" for sp in subphases], device=device, dtype=torch.bool)
+        landing_impact_mask = torch.tensor([sp == "landing_impact" for sp in subphases], device=device, dtype=torch.bool)
+        drive_release_mask = (intents == INTENT_TO_IDX["drive"]) & stance_release_mask
+        absorb_landing_mask = (intents == INTENT_TO_IDX["absorb"]) & landing_impact_mask
+        pred_dvz = pred_next[:, DMControlHopperSDModel.VZ_IDX] - states[:, DMControlHopperSDModel.VZ_IDX]
+        pred_dsupport = pred_next[:, DMControlHopperSDModel.SUPPORT_IDX] - states[:, DMControlHopperSDModel.SUPPORT_IDX]
+        pred_dclearance = pred_next[:, DMControlHopperSDModel.CLEARANCE_IDX] - states[:, DMControlHopperSDModel.CLEARANCE_IDX]
+        drive_vz_sign_loss = _masked_mean(torch.relu(pred_dvz), drive_release_mask)
+        absorb_clearance_sign_loss = _masked_mean(torch.relu(pred_dclearance), absorb_landing_mask)
+        absorb_support_sign_loss = _masked_mean(torch.relu(pred_dsupport), absorb_landing_mask)
         pred_reward = model.predict_reward(states, actions, pred_next)
         reward_loss = F.mse_loss(pred_reward, rewards)
-        loss = state_loss + 0.1 * reward_loss
+        loss = (
+            state_loss
+            + key_state_coef * key_state_loss
+            + key_delta_coef * key_delta_loss
+            + drive_vz_sign_coef * drive_vz_sign_loss
+            + absorb_clearance_sign_coef * absorb_clearance_sign_loss
+            + absorb_support_sign_coef * absorb_support_sign_loss
+            + 0.1 * reward_loss
+        )
         optimizer.zero_grad()
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), 10.0)
         optimizer.step()
         total_state_loss += state_loss.item()
         total_reward_loss += reward_loss.item()
+        total_key_state_loss += key_state_loss.item()
+        total_key_delta_loss += key_delta_loss.item()
+        total_drive_vz_sign_loss += drive_vz_sign_loss.item()
+        total_absorb_clearance_sign_loss += absorb_clearance_sign_loss.item()
+        total_absorb_support_sign_loss += absorb_support_sign_loss.item()
+        total_drive_release_ratio += drive_release_mask.float().mean().item()
+        total_absorb_landing_ratio += absorb_landing_mask.float().mean().item()
     model.eval()
     return {
         "state_loss": total_state_loss / num_updates,
         "reward_loss": total_reward_loss / num_updates,
+        "key_state_loss": total_key_state_loss / num_updates,
+        "key_delta_loss": total_key_delta_loss / num_updates,
+        "drive_vz_sign_loss": total_drive_vz_sign_loss / num_updates,
+        "absorb_clearance_sign_loss": total_absorb_clearance_sign_loss / num_updates,
+        "absorb_support_sign_loss": total_absorb_support_sign_loss / num_updates,
+        "drive_release_ratio": total_drive_release_ratio / num_updates,
+        "absorb_landing_ratio": total_absorb_landing_ratio / num_updates,
     }
 
 
@@ -454,7 +556,7 @@ def train_value_net(
     vnet.train()
     total_loss = 0.0
     for _ in range(num_updates):
-        states, actions, next_states, rewards = replay.sample(batch_size)
+        states, actions, _, next_states, rewards = replay.sample(batch_size)
         states, actions = states.to(device), actions.to(device)
         next_states = next_states.to(device)
         with torch.no_grad():
@@ -495,6 +597,7 @@ def run_episode(
     ep_reward = 0.0
     ep_steps = 0
     intent_counts = np.zeros(N_INTENTS, dtype=int)
+    prev_intent = -1
     while ep_steps < max_steps:
         best_intent, info = mcts_search(
             struct_state,
@@ -504,6 +607,7 @@ def run_episode(
             rollout_depth=rollout_depth,
             value_net=value_net,
             vnet_mix=vnet_mix,
+            prev_intent=prev_intent,
         )
         intent_counts[best_intent] += 1
         action_4d = intent_to_action(best_intent).numpy()
@@ -520,11 +624,13 @@ def run_episode(
             replay.add(
                 struct_state.clone(),
                 torch.tensor(action_4d, dtype=torch.float32),
+                best_intent,
                 next_struct.clone(),
                 torch.tensor(step_reward, dtype=torch.float32),
             )
 
         struct_state = next_struct
+        prev_intent = best_intent
 
     intent_dist = {INTENT_NAMES[i]: int(intent_counts[i]) for i in range(N_INTENTS) if intent_counts[i] > 0}
     return ep_reward, ep_steps, {"intents": intent_dist, "last_mcts": info}
@@ -534,6 +640,7 @@ def evaluate(
     env,
     model: DMControlHopperSDModel,
     num_episodes: int,
+    max_steps: int,
     num_simulations: int,
     rollout_depth: int,
     gamma: float,
@@ -552,7 +659,7 @@ def evaluate(
             value_net=value_net,
             vnet_mix=vnet_mix,
             eval_mode=True,
-            max_steps=500,
+            max_steps=max_steps,
             device=device,
         )
         rewards.append(r)
@@ -572,10 +679,16 @@ def main():
     parser.add_argument("--gamma", type=float, default=0.99)
     parser.add_argument("--eval_episodes", type=int, default=3)
     parser.add_argument("--eval_freq", type=int, default=5000, help="Eval every N env steps")
+    parser.add_argument("--eval_max_steps", type=int, default=500, help="Max environment steps per eval episode")
     parser.add_argument("--train_updates", type=int, default=64)
     parser.add_argument("--train_batch", type=int, default=64)
     parser.add_argument("--seed_steps", type=int, default=2000, help="Random exploration before MCTS")
     parser.add_argument("--lr", type=float, default=3e-4)
+    parser.add_argument("--key_state_coef", type=float, default=5.0, help="Auxiliary loss weight on vz/support/clearance next-state targets")
+    parser.add_argument("--key_delta_coef", type=float, default=5.0, help="Auxiliary loss weight on vz/support/clearance one-step deltas")
+    parser.add_argument("--drive_vz_sign_coef", type=float, default=5.0, help="Penalty weight for positive predicted dvz under drive@stance_release")
+    parser.add_argument("--absorb_clearance_sign_coef", type=float, default=5.0, help="Penalty weight for positive predicted dclearance under absorb@landing_impact")
+    parser.add_argument("--absorb_support_sign_coef", type=float, default=0.0, help="Penalty weight for positive predicted dsupport under absorb@landing_impact")
     parser.add_argument("--vnet_mix", type=float, default=0.0, help="Value net mix (0=pure rollout)")
     parser.add_argument("--device", type=str, default="cpu")
     parser.add_argument("--save_path", type=str, default="")
@@ -600,10 +713,11 @@ def main():
     log(f"Starting Hopper-Hop Single-Step Discrete Intent SD-MCTS (seed={args.seed}, budget={args.budget})")
     log(f"Intents: {INTENT_NAMES}")
     log(f"Simulations={args.num_simulations}, rollout_depth={args.rollout_depth}")
+    log(f"Eval episodes={args.eval_episodes}, eval_max_steps={args.eval_max_steps}")
 
     # Initial eval
     eval_mean, eval_std = evaluate(
-        env, model, args.eval_episodes, args.num_simulations,
+        env, model, args.eval_episodes, args.eval_max_steps, args.num_simulations,
         args.rollout_depth, args.gamma,
         vnet, args.vnet_mix, args.device,
     )
@@ -638,6 +752,7 @@ def main():
                 replay.add(
                     struct_state.clone(),
                     torch.tensor(action_4d, dtype=torch.float32),
+                    intent,
                     next_struct.clone(),
                     torch.tensor(step_r, dtype=torch.float32),
                 )
@@ -669,10 +784,26 @@ def main():
                 model, replay, sd_optim,
                 num_updates=args.train_updates,
                 batch_size=args.train_batch,
+                key_state_coef=args.key_state_coef,
+                key_delta_coef=args.key_delta_coef,
+                drive_vz_sign_coef=args.drive_vz_sign_coef,
+                absorb_clearance_sign_coef=args.absorb_clearance_sign_coef,
+                absorb_support_sign_coef=args.absorb_support_sign_coef,
                 device=args.device,
             )
             if train_info:
-                log(f"  sd_train: state_loss={train_info['state_loss']:.6f} reward_loss={train_info['reward_loss']:.6f}")
+                log(
+                    "  sd_train: "
+                    f"state_loss={train_info['state_loss']:.6f} "
+                    f"reward_loss={train_info['reward_loss']:.6f} "
+                    f"key_state_loss={train_info['key_state_loss']:.6f} "
+                    f"key_delta_loss={train_info['key_delta_loss']:.6f} "
+                    f"drive_vz_sign_loss={train_info['drive_vz_sign_loss']:.6f} "
+                    f"absorb_clearance_sign_loss={train_info['absorb_clearance_sign_loss']:.6f} "
+                    f"absorb_support_sign_loss={train_info['absorb_support_sign_loss']:.6f} "
+                    f"drive_release_ratio={train_info['drive_release_ratio']:.4f} "
+                    f"absorb_landing_ratio={train_info['absorb_landing_ratio']:.4f}"
+                )
 
             if vnet and vnet_optim:
                 vnet_loss = train_value_net(
@@ -689,7 +820,7 @@ def main():
             or total_steps >= args.budget
         ):
             eval_mean, eval_std = evaluate(
-                env, model, args.eval_episodes, args.num_simulations,
+                env, model, args.eval_episodes, args.eval_max_steps, args.num_simulations,
                 args.rollout_depth, args.gamma,
                 vnet, args.vnet_mix, args.device,
             )
