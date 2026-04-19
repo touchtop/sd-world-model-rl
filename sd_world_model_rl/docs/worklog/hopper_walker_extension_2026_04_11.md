@@ -3171,3 +3171,191 @@ front_anchor = body_low * front_anchor_pitch * front_anchor_clearance
 - `overall_pass = true`
 
 由此可认为：新的“前撑后抬身”中间机制已被结构脚本显式打开，后续应优先用 `v4_v3bparams` 轻量 `5k smoke` 检查其是否能把 `3k` 的偶发正轨迹推进为更稳定的抬身/续航，而不是继续停留在低位爬行。
+
+
+### 2026-04-19 v4.6：快速结构检验升级为三层闸门，并据此修正 standup -> handoff 语义
+
+对 `v4.5` 的第一版快速结构检查复核后确认：原脚本虽然能验证编码语义与静态分类，但仍可能把“动力学方向错误、reward 排序错误”的版本误放行。因此，本轮将快速结构检验正式升级为三层闸门：
+
+1. `encoder sanity`：继续检查 `pitch` 编码与仿真器角度一致；
+2. `transition sanity`：对 `forward_anchor_like` 与 `rear_trap` 代表态做固定动作一跳 forward，检查状态是否沿正确方向推进；
+3. `reward ordering sanity`：检查 planner reward 是否将“正确 release / handoff 动作”排在“继续趴地维持前撑”之前。
+
+实现层面的主要变化如下。
+
+#### 一、`scripts/v4_structural_sanity_check.py`
+
+新增了两类快速诊断：
+
+- `transition_probe(...)`：给定结构态与动作，直接调用 SD 模型 forward，记录 `delta_rootz`、`delta_front_anchor`、`delta_handoff_window`、`delta_recovered_upright`、`plan_reward` 等；
+- `transition_and_reward_checks(...)`：
+  - 对 `recoverable_front_anchor`，比较 `hold_crawl`、`release_handoff`、`neutral`；
+  - 对 `rear_trap`，比较 `rear_worsen`、`rear_escape`、`neutral`；
+  - 若仿真器短 rollout 未覆盖对应代表态，则回落到固定 canonical struct，保证脚本稳定可复现。
+
+此外，`handoff_window` 不再等同于“几乎 fully upright”的严格定义，而改为更贴近过渡阶段的 `handoff_ready` 语义，用于检测“是否已进入交接窗口”，而非仅检测“是否已经完全恢复成功”。
+
+#### 二、`DMControlHopperSDModel` 的 standup -> handoff 修订
+
+快速检查第一次升级后，明确暴露出三个问题：
+
+1. `release` 动作虽然略有竖直收益，但 `front_anchor` 仍会被几何项重新锁回；
+2. `rootz` 与 `pitch` 的恢复在单步 forward 中过弱，导致 `handoff_window` 不增反降；
+3. `predict_plan_reward()` 中恢复序列奖励沿用 hopping 的 `height_gate`，在低位前撑阶段被提前压为 0，planner 无法正确偏好 release/handoff 动作。
+
+基于这些定量暴露，本轮做了以下修订：
+
+1. 在 `_explicit_rate_dynamics()` 中将 `release_lift` 从 `drive_action` 阈值中解耦，改为由 recovery-specific release pattern 驱动；
+2. 在 `_forward_one_substep()` 中加入离散的：
+   - `release_height_boost`
+   - `release_pitch_recovery`
+   用于表达“前撑压缩后释放”的瞬时抬身与回正；
+3. 在 `front_anchor` 更新中加入：
+   - `relock_gate`
+   - `next_handoff_ready`
+   以避免刚进入恢复时被几何项立即重新吸回前撑盆地；
+4. 在 `predict_plan_reward()` 中新增 `recovery_gate`，将“低位前撑 -> 抬身 -> handoff”序列从 hopping 高度门控中解耦；
+5. 对恢复阶段新增或强化：
+   - `handoff_progress`
+   - `recovery_handoff_progress`
+   - `transition_commitment`
+   其中 `transition_commitment` 直接奖励 `rootz` 上升、`handoff_ready` 增长与 `body_rise`。
+
+#### 三、升级后快速检查结果
+
+在 `4 episodes × 80 steps` 的快速检查上，最新结果为：
+
+- `pitch_abs_err_max = 1.17e-07`
+- `recoverable_front_anchor.release_beats_hold_on_vertical_progress = true`
+- `recoverable_front_anchor.release_advances_handoff_window = true`
+- `rear_trap.rear_worsen_stays_nonviable = true`
+- `overall_pass = true`
+
+其中，`forward_anchor_like` 代表态上一跳 forward 的关键差异已变为：
+
+- `hold_crawl`: `delta_rootz = +0.0339`, `delta_handoff_window = -0.0021`, `plan_reward = 0.0802`
+- `release_handoff`: `delta_rootz = +0.1554`, `delta_handoff_window = +0.0067`, `plan_reward = 0.1216`
+
+这说明本轮修订后，快速结构检验已不再只会检查“语义值像不像”，而是能真正检查：
+
+- 模型 forward 是否把状态推向正确的恢复方向；
+- planner reward 是否把正确的 release / handoff 动作排在前面。
+
+由此，后续再做 `5k smoke` 时，快速结构检验可以作为有效前置闸门，而不再只是形式性检查。
+
+### 2026-04-19 v4.6 后续修订：将 `recovery_support` 补成真正的交接走廊语义
+
+在继续用 `v4_structural_sanity_check.py` 复核 `v4.6` 未提交代码时，发现两步 continuity 仍未通过，但失败模式已经非常集中：
+
+- `release_then_follow` 的两步真实推进优于 `hold_then_hold`；
+- `delta_rootz` 与 `delta_handoff_window` 均更好；
+- 但 `recovery_support` 在 release 第一步后掉得过狠，导致第二步的 `handoff / transition_commitment` 被系统性压低。
+
+进一步拆分 `predict_plan_reward()` 的第二步贡献后可见，问题不在于“release 后没有继续进展”，而在于当前 `recovery_support` 仍只把“前撑”或“低系数 ordinary support”视为合法支撑来源。这样会把已经抬身、正在交接的状态误判成“支撑走廊断裂”。
+
+本轮因此不再继续直接加 reward，而是先补结构语义本身：
+
+- `DMControlHopperSDModel._recovery_support_from_state(...)` 新增 `rootz` 输入；
+- 当 `body_high` 增大时，ordinary support 的计入系数随之上升；
+- 语义含义从“前撑或弱 support”修订为“前撑，或抬身后的合法交接支撑”。
+
+该修订的目的不是提高任意低位接触态的分数，而是避免 **正确的 release -> followthrough 序列** 因主动释放 `front_anchor` 而在下一步被自身语义门控误杀。快速结构检验脚本中的 `semantic_features()` 已同步采用同一公式，以保证离线检查与训练中 planner 语义一致。
+
+### 2026-04-19 v4.7：将“阶段依赖”提升为一等约束，禁止未捕获前撑时提前进入后续引导
+
+对 `sd_hopper_5k_v4p6corridor_v3bparams_smoke_20260419_160820` 的 `final.pt` 闭环轨迹复核后，发现新的主导失败模式已经不是“前撑后交接不上”本身，而是更早的一层：
+
+- 一部分失败 episode 虽然初始 `pitch > 0`，属于轻前倾或中等前倾；
+- 但在 `front_anchor` 仍接近 0、尚未形成稳定前撑时，`recovery_support` 已可通过 ordinary support 被提前抬高；
+- 随后 `standup_window / recovery_release / release_pitch_recovery` 被过早打开，导致 `pitch` 在前撑未捕获前就被回正；
+- 一旦错过前撑窗口，`rootz` 继续下沉，轨迹便自然滑入 `rear_trap` 盆地。
+
+由此可见，当前主矛盾不是“后段引导不够强”，而是**状态链顺序没有被严格约束**。如果尚未达到前置状态，就贸然向后续状态引导，大概率只会把本应继续建立前撑的轨迹提前推离正确通道。
+
+本轮据此做了三项同步修订：
+
+1. 在 `DMControlHopperSDModel` 中新增显式 `front_capture_commitment`，将“前撑已捕获”单独从 `front_anchor` 中提炼为阶段门；
+2. `_recovery_support_from_state(...)` 不再允许 ordinary support 在低位、未捕获前撑时直接构成 recovery corridor，而必须同时满足：
+   - 前撑已被捕获；
+   - torso 已有一定抬升，进入 handoff unlock 区域；
+3. `predict_plan_reward()` 中将：
+   - `crawl_progress`
+   - `standup_progress`
+   - `arming_progress`
+   - `release_progress`
+   - `handoff_progress`
+   - `transition_commitment`
+   改为按阶段依赖门控，只在前置阶段已满足时才给予后续阶段奖励；同时对“未捕获前撑却提前 release”的动作加入显式惩罚。
+
+为了让快速检验与训练语义保持一致，`scripts/v4_structural_sanity_check.py` 与 `scripts/v4_hopper_closed_loop.py` 也同步引入了相同的阶段量：
+
+- `front_capture_commitment`
+- `handoff_unlock`
+- `crawl_ready`
+- `standup_window`
+- `arm_ready`
+- `release_ready`
+
+其中，快速结构检验新增 `phase_dependency` 闸门，专门检查：
+
+- 在 canonical 的 `uncaptured_forward_lean` 状态上；
+- `release_handoff` 不应优于 `hold_crawl`；
+- 且不应在单步内把 `standup_window / release_ready` 非法抬高。
+
+该轮修订的目标非常明确：先确保模型遵守“前撑捕获 -> 抬身恢复 -> 蓄力 -> 释放”的顺序性，再讨论后段引导是否足够强。后续若继续优化奖励或动力机制，均应在这一阶段框架内推进，而不再允许后段 shaping 反向污染前段捕获过程。
+
+### 2026-04-19 v4.8：补入弱 `pre-capture` 渐进奖励，避免把谨慎爬行误当成“无效阶段”
+
+在 `v4.7` 之后复核当前奖励结构时，发现虽然“前置状态未成立不得提前 release”已经被较好约束，但另一个风险也随之出现：`predict_plan_reward()` 对前撑尚弱阶段的显式正反馈偏少。这样虽然能阻止越级推进，却可能让“方向正确、动作保守”的低位爬行仅被视为等待区，而不是学习链条中的有效前段。
+
+这一点与 Hopper 的自然学习过程并不一致。若智能体能够在低位前倾支撑中逐渐稳定鼻/脚接触、缓慢增强前撑、并在保持前倾的同时获得少量水平推进，那么完全可能沿着“谨慎爬行 -> 前撑变稳 -> 抬身更高 -> 最终 release”自然演化到目标行为，而不需要一开始就跨过较强的前撑门。
+
+因此，本轮不放松阶段顺序约束，但补入一条**弱的前撑渐进奖励**：
+
+- 仅在 `prev_front_capture` 仍较低时激活；
+- 只奖励：
+  - `front_capture` 的上升；
+  - `front_anchor` 的上升；
+  - 保持前倾下的少量稳定前进；
+- 不提前奖励 `standup`、`release` 或 `handoff`。
+
+该设计的目的不是重新把模型推回“趴地爬行就是高分”的方向，而是让“尚未 fully capture 的正确前段行为”获得适度正反馈，从而更符合渐进学习的本质。阶段链仍保持为：
+
+- `pre-capture`：允许低位、前倾、谨慎推进；
+- `capture`：前撑逐步稳固；
+- `standup / arming / release`：仍需在前置状态满足后才逐步打开。
+
+由此，`v4` 的状态依赖仍是柔性连续门，而不是刚性硬切状态机；只是在奖励排序上从“只认后段”修订为“既不允许越级，也不过度压制前段的渐进学习”。
+
+### 2026-04-19 v4.9：增强 `pre-capture -> front_capture` 建立通道，优先修复“前倾可救态仍滑入 rear_trap”
+
+对 `sd_hopper_5k_v4p8_precapture_v3bparams_finaleval_20260419_202341` 的 5k 闭环轨迹复核后可见，当前正分轨迹已经能稳定进入低位前撑爬行，但大量零分 episode 仍呈现两类问题：
+
+- 初始后仰或轻微后仰时，迅速滑入 `rear_trap`；
+- 更关键的是，一部分 **初始前倾、理论上可恢复** 的轨迹，虽然短暂保持正 `pitch`，却迟迟无法把 `front_anchor` 建立到足以跨过 `front_capture` 的水平，随后仍回落进 `rear_trap`。
+
+这说明当前主矛盾进一步收敛到更前一环：不是 `standup` 或 `release` 奖励不够，而是 **`pre-capture -> front_capture` 的建立仍太慢、太依赖“身体已经充分压低”**。原有 `front_anchor_geom` 通过 `body_low` 强门控生成，导致“前倾、低 clearance、已有支撑，但 rootz 尚未进入深低位”的可救状态难以及时积累前撑。
+
+本轮因此做了最小化修订：
+
+1. 新增 `_precapture_corridor_from_state(...)`，显式表示：
+   - 已前倾；
+   - 低 clearance；
+   - 仍有 grounded/support；
+   - 但身体只需进入“软低位”，不再要求完全落入旧的 `body_low` 强门控。
+2. 在 `next_front_anchor` 更新中加入 `precapture_build`：
+   - 当 `front_capture` 尚低时，允许该 corridor 直接推动 `front_anchor` 上升；
+   - 同时把 `next_recovered_upright` / `next_handoff_ready` 对 `front_anchor` 的抑制改为仅在已有 capture 或已进入 release 后才明显生效，避免“尚未捕获前撑就被 upright 语义提前冲掉”。
+3. 在 `predict_plan_reward()` 的 `precapture_progress` 中，不再只奖励 `front_capture_gain`，还额外奖励：
+   - 当前 `front_capture` 水平本身；
+   - `precapture_corridor` 的成立；
+   使“正在接近 capture 但尚未跨过门槛”的轨迹也能得到连续正反馈。
+
+快速结构检验结果表明：
+
+- `capture_state_prefers_hold_over_release = true`
+- `uncaptured_state_does_not_prefer_release = true`
+
+说明阶段顺序约束仍然成立，没有因增强 precapture 而重新放开越级 release。同时，在 canonical 的浅前倾未捕获状态上，单步前向已经可把 `front_anchor` 与 `front_capture` 明显抬升，符合本轮修订目标。
+
+本轮结论是：后续若继续优化，应先观察这条更强的 `pre-capture -> capture` 通道能否把“前倾可救态”稳定送入前撑链，再决定是否继续加强 `arm/release` 端，而不宜过早把主要精力转回后仰死态恢复。

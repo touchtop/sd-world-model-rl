@@ -212,6 +212,7 @@ def v4_state_features(model, snap: Dict[str, float], struct: np.ndarray) -> Dict
     body_high = 1.0 - body_low
     forward_lean = sigmoid((pitch - model.V4_PITCH_FWD_CENTER) / model.V4_PITCH_FWD_SCALE)
     recovered_upright = body_high * sigmoid((1.0 - abs(pitch)) / model.V4_PITCH_NEUTRAL_SPREAD)
+    handoff_ready = body_high * sigmoid((1.8 - abs(pitch)) / 0.45)
     rear_trap = body_low * sigmoid(-(pitch - model.V4_PITCH_BACK_CENTER) / model.V4_PITCH_BACK_SCALE)
     crawl_lane = body_low * forward_lean
     support = float(struct[model.SUPPORT_IDX])
@@ -226,6 +227,20 @@ def v4_state_features(model, snap: Dict[str, float], struct: np.ndarray) -> Dict
         front_anchor = float(struct[model.FRONT_ANCHOR_IDX])
     else:
         front_anchor = front_anchor_geom
+    front_capture_commitment = sigmoid((front_anchor - model.V4_FRONT_CAPTURE_CENTER) / model.V4_FRONT_CAPTURE_SCALE)
+    handoff_unlock = front_capture_commitment * sigmoid((body_high - model.V4_HANDOFF_BODY_HIGH_CENTER) / model.V4_HANDOFF_BODY_HIGH_SCALE)
+    recovery_support_gate = sigmoid((pitch - model.V4_RECOVERY_SUPPORT_PITCH_CENTER) / model.V4_RECOVERY_SUPPORT_PITCH_SCALE)
+    support_corridor_scale = handoff_unlock * min(1.0, 0.20 + 0.80 * body_high)
+    recovery_support = max(front_anchor, support_corridor_scale * support * recovery_support_gate)
+    compression = float(struct[model.COMP_IDX])
+    compression_level = min(max(compression / 0.35, 0.0), 1.0)
+    grounded = min(max((support - 0.12) / 0.40, 0.0), 1.0)
+    recovery_pitch = sigmoid((pitch - model.V4_RECOVERY_PITCH_CENTER) / model.V4_RECOVERY_PITCH_SCALE)
+    compression_arm = sigmoid((compression - model.V4_RECOVERY_COMP_CENTER) / model.V4_RECOVERY_COMP_SCALE)
+    crawl_ready = front_capture_commitment * body_low * grounded
+    standup_window = front_capture_commitment * recovery_support * body_low * recovery_pitch * compression_arm
+    arm_ready = front_capture_commitment * recovery_support * grounded * max(recovered_upright, 0.5 * handoff_ready)
+    release_ready = arm_ready * compression_level
     unsupported_low = body_low * (1.0 - front_anchor) * sigmoid((model.V4_FRONT_ANCHOR_PITCH_CENTER - pitch) / model.V4_FRONT_ANCHOR_PITCH_SCALE)
     foot_low = 1.0 if snap["foot_z"] < 0.08 else 0.0
     nose_low = 1.0 if snap["nose_z"] < 0.08 else 0.0
@@ -238,12 +253,20 @@ def v4_state_features(model, snap: Dict[str, float], struct: np.ndarray) -> Dict
         "body_high": body_high,
         "forward_lean": forward_lean,
         "recovered_upright": recovered_upright,
+        "handoff_ready": handoff_ready,
         "rear_trap": rear_trap,
         "crawl_lane": crawl_lane,
         "front_anchor_pitch": front_anchor_pitch,
         "front_anchor_clearance": front_anchor_clearance,
         "front_anchor_geom": front_anchor_geom,
         "front_anchor": front_anchor,
+        "front_capture_commitment": front_capture_commitment,
+        "handoff_unlock": handoff_unlock,
+        "recovery_support": recovery_support,
+        "crawl_ready": crawl_ready,
+        "standup_window": standup_window,
+        "arm_ready": arm_ready,
+        "release_ready": release_ready,
         "unsupported_low": unsupported_low,
         "support": support,
         "clearance": clearance,
@@ -304,6 +327,10 @@ def summarize_episode(ep_idx: int, rows: List[Dict[str, float]], total_reward: f
         "crawl_frac": mean_of(rows, "crawl_gt_05"),
         "upright_frac": mean_of(rows, "upright_gt_05"),
         "front_anchor_frac": mean_of(rows, "front_anchor_gt_05"),
+        "front_capture_frac": mean_of(rows, "front_capture_gt_05"),
+        "standup_frac": mean_of(rows, "standup_gt_05"),
+        "arm_ready_frac": mean_of(rows, "arm_ready_gt_05"),
+        "release_ready_frac": mean_of(rows, "release_ready_gt_05"),
         "unsupported_low_frac": mean_of(rows, "unsupported_low_gt_05"),
         "front_support_frac": mean_of(rows, "front_support"),
         "nose_low_frac": mean_of(rows, "nose_low"),
@@ -362,6 +389,10 @@ def rollout_pass(env, agent, args, out_dir: Path, render_episode_ids: set[int]) 
             row["crawl_gt_05"] = 1.0 if features["crawl_lane"] >= 0.5 else 0.0
             row["upright_gt_05"] = 1.0 if features["recovered_upright"] >= 0.5 else 0.0
             row["front_anchor_gt_05"] = 1.0 if features["front_anchor"] >= 0.5 else 0.0
+            row["front_capture_gt_05"] = 1.0 if features["front_capture_commitment"] >= 0.5 else 0.0
+            row["standup_gt_05"] = 1.0 if features["standup_window"] >= 0.5 else 0.0
+            row["arm_ready_gt_05"] = 1.0 if features["arm_ready"] >= 0.5 else 0.0
+            row["release_ready_gt_05"] = 1.0 if features["release_ready"] >= 0.5 else 0.0
             row["unsupported_low_gt_05"] = 1.0 if features["unsupported_low"] >= 0.5 else 0.0
             for i in range(action_np.size):
                 row[f"action_{i}"] = float(action_np[i])
