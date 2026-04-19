@@ -109,6 +109,10 @@ class DMControlHopperSDModel(nn.Module):
     V4_FRONT_ANCHOR_PITCH_SCALE = 0.35
     V4_FRONT_ANCHOR_CLEARANCE_CENTER = 0.74
     V4_FRONT_ANCHOR_CLEARANCE_SCALE = 0.06
+    V4_RECOVERY_PITCH_CENTER = 0.45
+    V4_RECOVERY_PITCH_SCALE = 0.20
+    V4_RECOVERY_COMP_CENTER = 0.18
+    V4_RECOVERY_COMP_SCALE = 0.08
 
     def _front_anchor_from_geom(
         self,
@@ -362,22 +366,36 @@ class DMControlHopperSDModel(nn.Module):
         stance_mix = torch.clamp(state[:, self.STANCE_IDX], min=-1.0, max=1.0)
         impact = torch.clamp(state[:, self.IMPACT_IDX], min=0.0)
         front_anchor = torch.clamp(state[:, self.FRONT_ANCHOR_IDX], min=0.0, max=1.0)
+        rootz = state[:, self.ROOTZ_IDX]
         drive_support = torch.maximum(support, 0.75 * front_anchor)
         posture_support = torch.maximum(support, 0.90 * front_anchor)
         lift_support = torch.maximum(support, 0.35 * front_anchor)
         air = 1.0 - torch.maximum(support, 0.60 * front_anchor)
+        body_low = torch.sigmoid((self.V4_ROOTZ_LOW_CENTER - rootz) / self.V4_ROOTZ_LOW_SCALE)
+        body_high = 1.0 - body_low
+        compression_level = torch.clamp(compression / 0.35, min=0.0, max=1.0)
+        recovery_pitch = torch.sigmoid((pitch - self.V4_RECOVERY_PITCH_CENTER) / self.V4_RECOVERY_PITCH_SCALE)
+        recovery_window = front_anchor * body_low * recovery_pitch
+        standup_window = recovery_window * compression_level
 
         drive_action = 0.20 * scaled_action[:, 0] + 0.55 * scaled_action[:, 1] - 0.50 * scaled_action[:, 2] + 0.25 * scaled_action[:, 3]
         posture_action = 0.30 * scaled_action[:, 0] - 0.10 * scaled_action[:, 1] + 0.05 * scaled_action[:, 2] + 0.05 * scaled_action[:, 3]
         foot_action = 0.05 * scaled_action[:, 0] + 0.10 * scaled_action[:, 1] - 0.15 * scaled_action[:, 2] + 0.35 * scaled_action[:, 3]
+        release_score = (
+            torch.clamp(-scaled_action[:, 1], min=0.0, max=1.0)
+            + torch.clamp(scaled_action[:, 2], min=0.0, max=1.0)
+            + torch.clamp(scaled_action[:, 3], min=0.0, max=1.0)
+        ) / 3.0
         contact_lock = torch.maximum(support, 0.70 * front_anchor) * torch.sigmoid((-clearance - 0.70) / 0.06)
         # Only sufficiently strong positive release should become vertical liftoff.
         release_lift = torch.relu(drive_action - 0.95) * (1.0 - 0.78 * contact_lock)
+        recovery_release = standup_window * (0.45 + 0.55 * release_score)
+        upright_window = front_anchor * body_high * torch.sigmoid((1.0 - torch.abs(pitch)) / self.V4_PITCH_NEUTRAL_SPREAD)
 
         x_acc = drive_support * (0.90 * drive_action + 0.25 * swing_rate + 0.15 * stance_mix - 0.18 * vx) + 0.35 * front_anchor * torch.relu(pitch) - 0.06 * air * vx
-        z_acc = -4.8 - 1.6 * air + lift_support * (10.0 * compression + 4.0 * release_lift + 1.2 * impact - 1.4 * torch.relu(vz))
-        pitch_acc = -2.5 * pitch - 0.75 * pitch_rate - 0.35 * swing + posture_support * (0.15 * posture_action + 0.08 * stance_mix) + 0.40 * front_anchor * torch.relu(pitch)
-        compression_acc = lift_support * (1.4 * torch.relu(-vz) + 0.8 * impact - 3.2 * release_lift) - 0.90 * compression - 0.35 * compression_rate + 0.15 * air * compression + 0.20 * front_anchor * compression
+        z_acc = -4.8 - 1.6 * air + lift_support * (10.0 * compression + 4.0 * release_lift + 1.2 * impact - 1.4 * torch.relu(vz)) + 2.0 * recovery_release + 1.0 * upright_window
+        pitch_acc = -2.5 * pitch - 0.75 * pitch_rate - 0.35 * swing + posture_support * (0.15 * posture_action + 0.08 * stance_mix) + 0.40 * front_anchor * torch.relu(pitch) - 1.10 * recovery_release * torch.clamp(pitch, min=0.0, max=2.5) - 0.45 * upright_window * pitch
+        compression_acc = lift_support * (1.4 * torch.relu(-vz) + 0.8 * impact - 3.2 * release_lift) - 0.90 * compression - 0.35 * compression_rate + 0.15 * air * compression + 0.20 * front_anchor * compression - 0.55 * recovery_release * compression
         swing_acc = 0.80 * drive_action - 1.10 * swing - 0.40 * swing_rate - 0.15 * stance_mix + 0.10 * front_anchor * torch.relu(pitch)
         foot_acc = 0.90 * foot_action - 1.00 * foot - 0.35 * foot_rate + 0.10 * stance_mix
         impact_rate = -3.0 * impact + lift_support * torch.relu(-vz)
@@ -472,11 +490,20 @@ class DMControlHopperSDModel(nn.Module):
         rootz = state[:, self.ROOTZ_IDX]
         next_rootz = torch.clamp(rootz + self.dt * next_vz, min=-1.5, max=1.5)
         next_front_anchor_geom = self._front_anchor_from_geom(next_pitch, next_clearance, next_rootz)
+        next_body_low = torch.sigmoid((self.V4_ROOTZ_LOW_CENTER - next_rootz) / self.V4_ROOTZ_LOW_SCALE)
+        next_body_high = 1.0 - next_body_low
+        next_recovered_upright = next_body_high * torch.sigmoid((1.0 - torch.abs(next_pitch)) / self.V4_PITCH_NEUTRAL_SPREAD)
+        next_rootz_gain = torch.clamp(next_rootz - rootz, min=0.0, max=0.20) / 0.20
         next_rear_trap = torch.sigmoid((self.V4_ROOTZ_LOW_CENTER - next_rootz) / self.V4_ROOTZ_LOW_SCALE) * torch.sigmoid(
             -(next_pitch - self.V4_PITCH_BACK_CENTER) / self.V4_PITCH_BACK_SCALE
         )
         next_front_anchor = torch.clamp(
-            0.55 * front_anchor + 0.45 * next_front_anchor_geom + 0.08 * support * torch.sigmoid((next_pitch - self.V4_FRONT_ANCHOR_PITCH_CENTER) / self.V4_FRONT_ANCHOR_PITCH_SCALE) - 0.10 * next_rear_trap,
+            0.55 * front_anchor
+            + 0.45 * next_front_anchor_geom
+            + 0.08 * support * torch.sigmoid((next_pitch - self.V4_FRONT_ANCHOR_PITCH_CENTER) / self.V4_FRONT_ANCHOR_PITCH_SCALE)
+            - 0.10 * next_rear_trap
+            - 0.22 * next_recovered_upright
+            - 0.08 * next_rootz_gain,
             min=0.0,
             max=1.0,
         )
@@ -622,6 +649,7 @@ class DMControlHopperSDModel(nn.Module):
         prev_support = torch.clamp(state[:, self.SUPPORT_IDX], min=0.0, max=1.0)
         clearance = next_state[:, self.CLEARANCE_IDX]
         prev_clearance = state[:, self.CLEARANCE_IDX]
+        prev_rootz = state[:, self.ROOTZ_IDX]
         next_rootz = next_state[:, self.ROOTZ_IDX]
         front_anchor = torch.clamp(next_state[:, self.FRONT_ANCHOR_IDX], min=0.0, max=1.0)
         prev_front_anchor = torch.clamp(state[:, self.FRONT_ANCHOR_IDX], min=0.0, max=1.0)
@@ -635,9 +663,12 @@ class DMControlHopperSDModel(nn.Module):
         # recovered_upright, taking their elementwise max, then subtracts
         # rear-trap probability multiplicatively and via an explicit penalty.
         height_gate = self._lower_tolerance(height, lower=0.45, margin=0.15, value_at_margin=0.0)
+        prev_body_low = torch.sigmoid((self.V4_ROOTZ_LOW_CENTER - prev_rootz) / self.V4_ROOTZ_LOW_SCALE)
+        prev_body_high = 1.0 - prev_body_low
         body_low = torch.sigmoid((self.V4_ROOTZ_LOW_CENTER - next_rootz) / self.V4_ROOTZ_LOW_SCALE)
         body_high = 1.0 - body_low
         forward_lean = torch.sigmoid((pitch - self.V4_PITCH_FWD_CENTER) / self.V4_PITCH_FWD_SCALE)
+        prev_recovered_upright = prev_body_high * torch.sigmoid((1.0 - torch.abs(prev_pitch)) / self.V4_PITCH_NEUTRAL_SPREAD)
         recovered_upright = body_high * torch.sigmoid((1.0 - torch.abs(pitch)) / self.V4_PITCH_NEUTRAL_SPREAD)
         viable_lane = torch.maximum(forward_lean, recovered_upright)
         rear_trap = body_low * torch.sigmoid(-(pitch - self.V4_PITCH_BACK_CENTER) / self.V4_PITCH_BACK_SCALE)
@@ -666,6 +697,9 @@ class DMControlHopperSDModel(nn.Module):
         release_liftoff = torch.maximum(upward_progress, liftoff_progress)
         pitch_gain = torch.clamp(pitch - prev_pitch, min=0.0, max=0.45) / 0.45
         front_anchor_gain = torch.clamp(front_anchor - prev_front_anchor, min=0.0, max=0.35) / 0.35
+        body_rise = torch.clamp(prev_body_low - body_low, min=0.0, max=0.45) / 0.45
+        upright_gain = torch.clamp(recovered_upright - prev_recovered_upright, min=0.0, max=0.45) / 0.45
+        anchor_release = torch.clamp(prev_front_anchor - front_anchor, min=0.0, max=0.35) / 0.35
         unsupported_low = body_low * (1.0 - front_anchor) * torch.sigmoid((self.V4_FRONT_ANCHOR_PITCH_CENTER - pitch) / self.V4_FRONT_ANCHOR_PITCH_SCALE)
 
         positive = viability * (
@@ -683,6 +717,12 @@ class DMControlHopperSDModel(nn.Module):
         arming_progress = safe_gate * front_anchor * grounded * compression_level * compression_drive
         release_progress = safe_gate * front_anchor * compression_level * release_score * release_liftoff
         rear_escape_progress = height_gate * (0.7 * front_anchor + 0.3 * front_anchor_gain) * pitch_gain
+        standup_progress = height_gate * prev_front_anchor * prev_body_low * (
+            0.40 * body_rise + 0.35 * upright_gain + 0.25 * upward_progress
+        )
+        handoff_progress = height_gate * prev_front_anchor * recovered_upright * (
+            0.45 * release_liftoff + 0.35 * speed_progress + 0.20 * anchor_release
+        )
         # v4: add an explicit penalty for entering the rear-trap basin so that the
         # planner actively avoids it, not only dampens reward there.
         penalty = 0.10 * sticky_contact + 0.20 * rear_trap + 0.12 * unsupported_low + 0.06 * crawl_lane * (1.0 - front_anchor)
@@ -694,6 +734,8 @@ class DMControlHopperSDModel(nn.Module):
             + 0.08 * arming_progress
             + 0.12 * release_progress
             + 0.10 * rear_escape_progress
+            + 0.14 * standup_progress
+            + 0.10 * handoff_progress
             - penalty
         )
 

@@ -3134,3 +3134,40 @@ front_anchor = body_low * front_anchor_pitch * front_anchor_clearance
 3. 若快速检查已暴露语义错误，则优先修结构，不直接开训练。
 
 这一更新的目的，是把“结构是否符合物理直觉”的验证前置到仿真器层，而不是继续把训练本身当作调试器。
+
+### 2026-04-19 v4.5：补强 `front_anchor -> standup -> handoff` 后半段
+
+对 `sd_hopper_5k_v4_v3bparams_unwrapped_pitch_20260419` 的 `3000.pt` 闭环诊断表明：
+
+- 正例 episode 已能稳定进入 `front_anchor` 高、`rear_trap=0` 的低位前撑爬行通道；
+- 但奖励主要集中在前十几步，后续长期停留在 `rootz≈-0.87`、`pitch≈1.2` 的低位前撑推进；
+- 即，当前结构已经学会“前撑爬行”，但尚未学会“前撑后抬身变直，再交接到起跳/续航”。
+
+因此，本轮不再优先补“后翻死态恢复”，而是先补强已经出现雏形的成功通道后半段。具体修订如下：
+
+1. 在 `_explicit_rate_dynamics()` 中新增恢复相关导出量：
+   - `recovery_window`
+   - `standup_window`
+   - `upright_window`
+2. 在低位前撑且有压缩储能时，为 `z_acc` 增加显式抬身驱动，为 `pitch_acc` 增加显式向直立回拉项，并对 `compression_acc` 增加释放项；
+3. 在 `_forward_one_substep()` 中，当 `recovered_upright` 或 `rootz` 上升时，显式衰减 `front_anchor`，避免前撑模式无限粘滞；
+4. 在 `predict_plan_reward()` 中新增：
+   - `standup_progress`
+   - `handoff_progress`
+   用于奖励“低位前撑 -> 抬身 -> 脱离前撑并交接到立起/续航”的中间过程。
+
+同时，`scripts/v4_structural_sanity_check.py` 也同步加入：
+
+- `standup_window`
+- `handoff_window`
+
+并要求 `forward_anchor_like` 样例上 `mean_standup_window` 达到非零有效水平，而不再只检查 `front_anchor` 与 `rear_trap`。
+
+本轮快速检查结果：
+
+- `pitch_abs_err_max = 2.38e-07`
+- `forward_anchor_like.mean_front_anchor = 0.650`
+- `forward_anchor_like.mean_standup_window = 0.620`
+- `overall_pass = true`
+
+由此可认为：新的“前撑后抬身”中间机制已被结构脚本显式打开，后续应优先用 `v4_v3bparams` 轻量 `5k smoke` 检查其是否能把 `3k` 的偶发正轨迹推进为更稳定的抬身/续航，而不是继续停留在低位爬行。

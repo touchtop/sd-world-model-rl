@@ -115,6 +115,7 @@ def semantic_features(model: DMControlHopperSDModel, struct: np.ndarray, snap: d
     height = float(struct[model.HEIGHT_IDX])
     vx = float(struct[model.VX_IDX])
     vz = float(struct[model.VZ_IDX])
+    compression = float(struct[model.COMP_IDX])
     support = float(struct[model.SUPPORT_IDX])
     clearance = float(struct[model.CLEARANCE_IDX])
     front_anchor = float(struct[model.FRONT_ANCHOR_IDX])
@@ -123,6 +124,10 @@ def semantic_features(model: DMControlHopperSDModel, struct: np.ndarray, snap: d
     forward_lean = sigmoid((pitch - model.V4_PITCH_FWD_CENTER) / model.V4_PITCH_FWD_SCALE)
     recovered_upright = body_high * sigmoid((1.0 - abs(pitch)) / model.V4_PITCH_NEUTRAL_SPREAD)
     rear_trap = body_low * sigmoid(-(pitch - model.V4_PITCH_BACK_CENTER) / model.V4_PITCH_BACK_SCALE)
+    compression_level = min(max(compression / 0.35, 0.0), 1.0)
+    recovery_pitch = sigmoid((pitch - model.V4_RECOVERY_PITCH_CENTER) / model.V4_RECOVERY_PITCH_SCALE)
+    standup_window = front_anchor * body_low * recovery_pitch * compression_level
+    handoff_window = front_anchor * recovered_upright
     unsupported_low = body_low * (1.0 - front_anchor) * sigmoid((model.V4_FRONT_ANCHOR_PITCH_CENTER - pitch) / model.V4_FRONT_ANCHOR_PITCH_SCALE)
     nose_low = 1.0 if snap['nose_z'] < 0.08 else 0.0
     foot_low = 1.0 if snap['foot_z'] < 0.08 else 0.0
@@ -132,12 +137,15 @@ def semantic_features(model: DMControlHopperSDModel, struct: np.ndarray, snap: d
         'height': height,
         'vx': vx,
         'vz': vz,
+        'compression': compression,
         'support': support,
         'clearance': clearance,
         'front_anchor': front_anchor,
         'body_low': body_low,
         'recovered_upright': recovered_upright,
         'rear_trap': rear_trap,
+        'standup_window': standup_window,
+        'handoff_window': handoff_window,
         'unsupported_low': unsupported_low,
         'nose_low': nose_low,
         'foot_low': foot_low,
@@ -238,7 +246,12 @@ def main():
             'count': len(forward_rows),
             'mean_front_anchor': float(np.mean([r['front_anchor'] for r in forward_rows])),
             'mean_rear_trap': float(np.mean([r['rear_trap'] for r in forward_rows])),
-            'pass': bool(np.mean([r['front_anchor'] for r in forward_rows]) >= 0.3 and np.mean([r['rear_trap'] for r in forward_rows]) <= 0.2),
+            'mean_standup_window': float(np.mean([r['standup_window'] for r in forward_rows])),
+            'pass': bool(
+                np.mean([r['front_anchor'] for r in forward_rows]) >= 0.3
+                and np.mean([r['rear_trap'] for r in forward_rows]) <= 0.2
+                and np.mean([r['standup_window'] for r in forward_rows]) >= 0.08
+            ),
         }
     else:
         checks['forward_anchor_like'] = {'covered': False, 'count': 0, 'pass': True}
