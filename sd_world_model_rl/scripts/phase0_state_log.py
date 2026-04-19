@@ -46,7 +46,7 @@ STRUCT_FIELD_NAMES = [
     "compression", "compression_rate",
     "swing", "swing_rate", "foot_angle", "foot_rate",
     "support", "stance_mix", "impact", "clearance",
-    "rootz",
+    "rootz", "front_anchor",
 ]
 
 

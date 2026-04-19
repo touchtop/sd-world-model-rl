@@ -2920,3 +2920,217 @@ V4_PITCH_NEUTRAL_SPREAD = 0.3  # recovered_upright 允许 |pitch| ~1 rad 内平�
 
 - **v4 structural smoke 尚未启动**（之前 GPU 1 smoke 命令被用户中断）。修订 commit 完成后应启动新 smoke 并与 v4 baseline smoke 5k=1.21 对比
 - **论文叙事**里，v4 设计的"1 dim rootz + derived gates"比立项的"3 dim"更简洁；应在论文方法节用当前最终版本
+
+## 2026-04-18 v4 structural smoke 结果与 v4.1 最小修订
+
+### structural smoke 结果归档
+
+`sd_hopper_5k_v4_structural_smoke_20260418` 已完成，最终 `5k eval = 1.1843`。对照 `v4 baseline smoke`（`5k eval = 1.2060`），结论不是"显著更差"，而是**末点近似持平，但中段没有改善，且 3k 更弱**：
+
+| step | v4 baseline smoke | v4 structural smoke |
+|---|---:|---:|
+| 1k | 0.0265 | 0.0272 |
+| 2k | 0.6016 | 0.5947 |
+| 3k | 1.6806 | 0.8120 |
+| 4k | 0.0208 | 0.0615 |
+| 5k | 1.2060 | 1.1843 |
+
+`eval_full.csv` 进一步表明：structural 版本并未明显减少零回报轨迹，只是把少数高值轨迹的强度压弱了。由此不宜直接放大到 `50k × 3 seed`。
+
+### 诊断更新
+
+结合源码、Phase 0 状态日志与 smoke 曲线，当前问题不再主要是 "rear_trap 识别错误"，而是：
+
+1. `two-lane viability` 已经允许低位前倾爬行通过，但 **planner shaping 仍主要奖励 airborne / relief / clearance**；
+2. 成功轨迹经常要先经历 **低位前倾 crawl → compression arming → release/takeoff** 的中间阶段；
+3. 这些中间阶段在现有 `predict_plan_reward()` 里没有被显式奖励，导致 planner 更像是在等待"已经起跳"的状态，而不是主动组织这条恢复链。
+
+### v4.1 最小修订原则
+
+为避免再次把问题与新增 latent 维度耦合，先采用 **不扩维、只改 planning reward** 的最小方案：
+
+- 保持 `STATE_DIM = 16`
+- 保留 `rootz + two-lane viability`
+- 在 `predict_plan_reward()` 中新增三段显式 shaping：
+  - `crawl_progress`：奖励低位前倾且保持前向推进
+  - `arming_progress`：奖励低位前倾状态下的压缩蓄力
+  - `release_progress`：奖励低位前倾、已有压缩后向释放/离地过渡
+
+这些项直接使用现有结构量 `rootz / pitch / support / compression / vz` 与动作上的 release/compression 方向，不引入新的 latent 维度，也不改训练口径。
+
+### 预期
+
+若该最小修订有效，首先应在 `5k smoke` 的 **3k 与 5k** 两个点表现为：
+
+- 不弱于 `v4 baseline smoke`
+- 零回报轨迹数下降
+- 高值轨迹不再只靠偶发单条支撑
+
+若仍无改善，再进入下一阶段：把前端支撑或前端 clearance 显式纳入结构状态。
+
+### 辅助脚本同步
+
+为支持对 `v4` / `v4.1` checkpoint 直接做真实评估轨迹回放，本分支补回了：
+
+- `scripts/make_hopper_checkpoint_eval_mp4.py`
+
+该脚本源自主仓库同名脚本，但在 `v4` worktree 中额外补入了 `--sd_use_struct_residual` 参数。原因是当前 `v4` 线存在 `sd_use_struct_residual=false` 的实验；若沿用旧脚本默认值，会因模型结构不匹配导致 checkpoint 无法 `strict=True` 加载。
+
+## 2026-04-18 v4 闭环诊断自动化
+
+新增脚本：
+
+- `scripts/v4_hopper_closed_loop.py`
+
+目标不是再做一个通用框架，而是把当前 `v4` Hopper 研究里最常用、也最容易反复手工操作的闭环固定下来：
+
+1. 给定 checkpoint 或实验目录，自动选择可重放 checkpoint；
+2. 在 eval policy 下重放固定数量 episode；
+3. 记录逐步 physics / struct / action / reward 到 `episode_csv/`；
+4. 用当前 v4 的 `body_low / forward_lean / recovered_upright / rear_trap` 定义，对 episode 自动归因为：
+   - `rear_trap_zero`
+   - `crawl_stall_zero`
+   - `upright_no_drive_zero`
+   - `flat_zero`
+   - 以及对应 low-score 变体
+5. 只渲染最有信息量的 failure / success episode，避免每次等待 10 条完整 mp4；
+6. 输出：
+   - `episode_summary.csv`
+   - `diagnosis.json`
+   - `report.md`
+   - `next_smoke.sh`
+
+这样后续每做一次结构修改，都能沿同一入口拿到“零分 episode 主要卡在哪个盆地、下一轮优先补哪类机制”的证据，而不是继续只看均值曲线猜原因。
+
+补充：脚本支持 `--single_pass=true`。该模式用于快速迭代时的 `1~3 episode` 小闭环，直接单遍回放并渲染全部 episode，避免为了挑选渲染对象再额外付出一整遍 eval 成本。
+
+### v4.2：从宽泛 crawl 奖励切到 front-anchor 恢复
+
+在 `v4.1 final.pt` 上运行闭环快环（`3 episode`）后，得到一致结论：
+
+- `episode 00`、`episode 02` 均被判为 `rear_trap_zero`
+- `episode 01` 为正例，且长期表现为低位前倾的前支撑推进
+
+更重要的是，`crawl_lane = body_low * forward_lean` 仍然过宽。它确实能识别“低位前倾”，但不能区分：
+
+1. 已形成前端支撑、能够继续恢复推进的低位 crawl
+2. 只是低位前倾、但没有形成前锚点，随后继续塌进 rear-trap 的失败态
+
+基于闭环 CSV 中的真实统计，前支撑正例更接近如下组合：
+
+- `pitch` 显著为正
+- `clearance` 极低（前端贴地）
+
+据此，在 `predict_plan_reward()` 中加入 `front_anchor` 几何代理：
+
+```python
+front_anchor_pitch = sigmoid((pitch - 0.8) / 0.35)
+front_anchor_clearance = sigmoid(((-clearance) - 0.74) / 0.06)
+front_anchor = body_low * front_anchor_pitch * front_anchor_clearance
+```
+
+并据此做两类修订：
+
+1. 原先 `crawl_progress / arming_progress / release_progress` 的主要 gating，从宽泛 `crawl_lane` 改为 `front_anchor`
+2. 新增：
+   - `rear_escape_progress`：奖励形成前锚点后继续把姿态往前拉回
+   - `unsupported_low`：惩罚“低位、未形成前锚点、且姿态不够前”的塌陷态
+
+这一步仍然不扩 latent，也不改训练口径；它只是把 v4.1 已经暴露出来的“成功 crawl”和“失败前倾塌陷”进一步分开。
+
+### v4.3：`front_anchor` 提升为显式结构态
+
+`v4.2` 的 quick3 诊断已经给出足够强的方向性证据：
+
+- `front_anchor` / `unsupported_low` 对成功与失败有明显判别力；
+- 但主导失败模式仍是 `rear_trap_zero`；
+- 这说明问题不再是“reward 是否能看见前锚点”，而是“world model 的 transition 本身还不会进入并维持前锚点模式”。
+
+因此，`v4.3` 不再继续调 shaping，而是做结构性改动：
+
+1. `STATE_DIM` 从 `16 -> 17`
+2. 新增显式结构维：
+   - `FRONT_ANCHOR_IDX = 16`
+3. `encode_observation()` 直接把 `front_anchor` 编进 latent
+4. `_explicit_rate_dynamics()` 不再只依赖脚部 `support`，而是引入：
+   - `drive_support`
+   - `posture_support`
+   - `lift_support`
+   这些量都允许 `front_anchor` 对水平推进、姿态恢复、低位支撑产生显式影响
+5. `_forward_one_substep()` 中显式传播 `next_front_anchor`
+6. `predict_plan_reward()` 改为直接使用显式 `front_anchor` 状态，而不是每次临时从 `(pitch, clearance, rootz)` 现算
+
+### 2026-04-19 v4.3 后续修订：取消 `pitch` 包裹以清除假 `front_anchor`
+
+在 `v4_v3bparams` 5k smoke 的闭环诊断中，发现一个新的结构性问题：
+
+- `2500.pt` 的代表性失败轨迹存在 `rear_trap≈0.93`、`front_support≈0.82`、`front_anchor≈0.68`、`max_rootx≈0` 的组合；
+- 该轨迹并未形成有效前爬，而是长期鼻撑原地僵死；
+- 根因不是 `front_anchor` 逻辑本身完全错误，而是 `encode_observation()` 与动力学积分把 torso `pitch` 当作周期角做了 wrap，导致真实 `raw pitch=-4.36` 的后翻态在模型内部等价为 `wrapped pitch≈+1.92`，被误判成“正向前撑候选”。
+
+因此，本轮修订不再继续对 `front_anchor` 奖励做局部调参，而是直接修改状态语义：
+
+1. `encode_observation()` 中保留 raw torso pitch，不再对 `qpos_rooty` 做角度包裹；
+2. `_forward_one_substep()` 中 `next_pitch` 改为宽范围 clamp，而不再 wrap 回 `[-pi, pi]`；
+3. `_clamp_state()` 中 `PITCH_IDX` 同样保持宽范围 clamp；
+4. 其余关节角（waist/hip/knee/ankle、swing、foot）仍保持 wrap，避免无界漂移。
+
+这一步的目的，是让 `rear_trap` 与 `front_anchor` 重新获得“后翻鼻撑”与“真实前撑”之间最基本的可辨识性。若修订后 `rear_trap_zero` 仍为主导失败模式，再考虑继续细化 `front_anchor` 的前向推进约束。
+
+这一步的研究含义是：
+
+- `front_anchor` 不再只是“诊断时看见、reward 时打分”的影子变量；
+- 它第一次进入世界模型状态本体，并被转移方程消费；
+- 若这一版仍无法改变 `rear_trap_zero` 的主导地位，则下一步应怀疑的不再是“缺少前锚点状态”，而是更深的接触相位动力学刻画。
+
+
+### 2026-04-19 v4.4 执行口径更新：后续训练默认切换至 `v4_v3bparams` 轻量组合
+
+为避免继续在重规划预算上消耗大量时间，而结构问题本身尚未厘清，后续 `v4` 线训练与闭环诊断统一改用 `v4_v3bparams` 轻量组合，作为新的默认执行口径：
+
+- `mlp_dim=256`
+- `sd_latent_dim=32`
+- `num_q=3`
+- `batch_size=128`
+- `lr=3e-4`
+- `dropout=0.01`
+- `num_samples=128`
+- `num_elites=16`
+- `num_pi_trajs=16`
+- `horizon=3`
+- `iterations=3`
+- `sd_use_struct_residual=false`
+
+对应更新已同步落实到：
+
+- `scripts/run_v4_cycle.sh`
+- `scripts/v4_hopper_closed_loop.py`
+
+这样处理的理由是：当前阶段的主矛盾已从“是否还能榨出更高规划强度”转为“结构信号是否表达正确、是否会把失败盆地误判为可行通道”。在这一阶段继续沿用重预算，不利于快速迭代结构语义。
+
+### 2026-04-19 v4.4 新增仿真器快速结构检查脚本
+
+为避免每次结构改动都依赖 `3k/5k` 训练才能判断方向，本轮新增 `scripts/v4_structural_sanity_check.py`，作为结构语义修改后的第一道快速验收。
+
+该脚本直接调用 DMControl Hopper 仿真器，在短程固定预算 rollouts 上检查：
+
+1. 编码后的 `pitch` 是否与仿真器原始 `qpos_rooty` 保持一致；
+2. 已恢复直立态是否被识别为 `upright_recovered`，且不会被误判为高 `rear_trap`；
+3. 前撑爬行态是否能被识别为 `forward_anchor_like`；
+4. `rear_nose_support` 若在短程脚本动作下未覆盖，则记录为 `coverage_warnings`，不再直接判定整体失败。
+
+在 `8 episodes × 120 steps` 的快速检查中，当前结果为：
+
+- `pitch_abs_err_max = 2.38e-07`，表明取消 `pitch` 包裹后的编码语义保持正确；
+- `upright_recovered` 已覆盖且通过；
+- `forward_anchor_like` 已覆盖且通过；
+- `rear_nose_support` 仍未在快速脚本动作下覆盖，因此记为覆盖警告；
+- `overall_pass = true`。
+
+由此确定新的执行顺序：
+
+1. 结构逻辑修改后，先运行 `v4_structural_sanity_check.py`；
+2. 仅当已覆盖语义项通过后，才进入 `v4_v3bparams` 轻量 smoke 或更长训练；
+3. 若快速检查已暴露语义错误，则优先修结构，不直接开训练。
+
+这一更新的目的，是把“结构是否符合物理直觉”的验证前置到仿真器层，而不是继续把训练本身当作调试器。
