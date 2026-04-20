@@ -11,8 +11,8 @@ sd_dt: 0.02
 sd_hop_speed: 2.0
 sd_residual_scale: 5.0
 sd_passive_scale: 10.0
-sd_struct_dim: 17
-sd_latent_dim: 32
+sd_struct_dim: 9
+sd_latent_dim: 9
 sd_reward_mode: learned
 sd_reward_hybrid_alpha: 0.5
 sd_reward_curriculum_start: 10000
@@ -20,8 +20,10 @@ sd_reward_curriculum_end: 30000
 sd_reward_curriculum_alpha: 0.5
 sd_reward_curriculum_alpha_min: 0.1
 sd_max_resid_scale: 5.0
-sd_height_loss_coef: 0.05
-sd_use_struct_residual: true
+sd_height_loss_coef: 0.0
+sd_use_struct_residual: false
+sd_use_local_residual: true
+sd_local_residual_scale: 0.20
 init_from: null
 resume_from: null
 save_full_state: false

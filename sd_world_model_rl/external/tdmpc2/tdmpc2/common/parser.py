@@ -60,8 +60,8 @@ def parse_cfg(cfg: OmegaConf) -> OmegaConf:
 
 	# Model size
 	if cfg.get('world_model_kind', 'tdmpc2') == 'sd_hopper':
-		cfg.sd_struct_dim = int(cfg.get('sd_struct_dim', 15))
-		cfg.sd_latent_dim = int(cfg.get('sd_latent_dim', max(cfg.sd_struct_dim, 32)))
+		cfg.sd_struct_dim = int(cfg.get('sd_struct_dim', 9))
+		cfg.sd_latent_dim = int(cfg.get('sd_latent_dim', cfg.sd_struct_dim))
 		cfg.latent_dim = cfg.sd_latent_dim
 	elif cfg.get('model_size', None) is not None:
 		assert cfg.model_size in MODEL_SIZE.keys(), \

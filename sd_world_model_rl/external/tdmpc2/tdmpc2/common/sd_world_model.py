@@ -22,9 +22,10 @@ class SDWorldModel(nn.Module):
 	TD-MPC2-compatible wrapper that keeps the TD-MPC2 solver stack
 	while replacing the latent transition / reward core with an SD model.
 
-	Current implementation targets Hopper-Hop and uses a hybrid latent:
-	structured state for explicit mechanics plus a learned residual subspace
-	for value/planning-relevant factors that are hard to encode manually.
+	Current Hopper-Hop implementation uses a compact explicit state with one
+	hidden memory stock (`capture_memory`). Observable stocks are supervised by
+	observation consistency; the hidden memory is intentionally excluded from
+	one-frame consistency targets.
 	"""
 
 	def __init__(self, cfg):
@@ -37,10 +38,12 @@ class SDWorldModel(nn.Module):
 		assert cfg.action_dim == DMControlHopperSDModel.ACTION_DIM
 
 		self.struct_dim = int(getattr(cfg, 'sd_struct_dim', DMControlHopperSDModel.STATE_DIM))
-		self.latent_dim = int(getattr(cfg, 'sd_latent_dim', max(self.struct_dim, 32)))
+		self.latent_dim = int(getattr(cfg, 'sd_latent_dim', self.struct_dim))
 		assert self.struct_dim == DMControlHopperSDModel.STATE_DIM, \
 			f'sd_hopper expects struct_dim={DMControlHopperSDModel.STATE_DIM}, got {self.struct_dim}.'
 		assert self.latent_dim >= self.struct_dim, 'sd_latent_dim must be >= sd_struct_dim.'
+		assert self.latent_dim == self.struct_dim, \
+			'v4.13 core expects sd_latent_dim == sd_struct_dim; residual latent is intentionally disabled.'
 		self.resid_dim = self.latent_dim - self.struct_dim
 		self.reward_mode = getattr(cfg, 'sd_reward_mode', 'learned')
 		self.reward_hybrid_alpha = float(getattr(cfg, 'sd_reward_hybrid_alpha', 0.1))
@@ -57,7 +60,14 @@ class SDWorldModel(nn.Module):
 			residual_scale=getattr(cfg, 'sd_residual_scale', 5.0),
 			passive_scale=getattr(cfg, 'sd_passive_scale', 10.0),
 		)
-		self.use_struct_residual = bool(getattr(cfg, 'sd_use_struct_residual', True))
+		self.use_struct_residual = bool(getattr(cfg, 'sd_use_struct_residual', False))
+		self.use_local_residual = bool(getattr(cfg, 'sd_use_local_residual', True))
+		self.local_residual_scale = float(getattr(cfg, 'sd_local_residual_scale', 0.20))
+		self._local_residual_dims = (
+			DMControlHopperSDModel.PITCH_RATE_IDX,
+			DMControlHopperSDModel.SUPPORT_IDX,
+		)
+		self.observable_struct_dim = int(getattr(self._dynamics, 'OBSERVABLE_DIM', self.struct_dim))
 		if self.resid_dim > 0:
 			self._residual_encoder = layers.mlp(cfg.obs_shape['state'][0], 2*[cfg.mlp_dim], self.resid_dim)
 			self._residual_dynamics = layers.mlp(self.latent_dim + cfg.action_dim, 2*[cfg.mlp_dim], self.resid_dim)
@@ -67,6 +77,10 @@ class SDWorldModel(nn.Module):
 			self._residual_encoder = None
 			self._residual_dynamics = None
 			self._struct_residual = None
+		if self.use_local_residual:
+			self._local_residual = layers.mlp(self.struct_dim + cfg.action_dim, 2*[cfg.mlp_dim], len(self._local_residual_dims))
+		else:
+			self._local_residual = None
 		self._reward = layers.mlp(self.latent_dim + cfg.action_dim, 2*[cfg.mlp_dim], max(cfg.num_bins, 1))
 		self._termination = layers.mlp(self.latent_dim, 2*[cfg.mlp_dim], 1) if cfg.episodic else None
 		self._pi = layers.mlp(self.latent_dim, 2*[cfg.mlp_dim], 2*cfg.action_dim)
@@ -75,7 +89,10 @@ class SDWorldModel(nn.Module):
 			for _ in range(cfg.num_q)
 		])
 		self.apply(init.weight_init)
-		init.zero_([self._reward[-1].weight] + [q[-1].weight for q in self._Qs.modules_list])
+		zero_params = [self._reward[-1].weight] + [q[-1].weight for q in self._Qs.modules_list]
+		if self._local_residual is not None:
+			zero_params.append(self._local_residual[-1].weight)
+		init.zero_(zero_params)
 
 		self.register_buffer('log_std_min', torch.tensor(cfg.log_std_min))
 		self.register_buffer('log_std_dif', torch.tensor(cfg.log_std_max) - self.log_std_min)
@@ -84,22 +101,19 @@ class SDWorldModel(nn.Module):
 		self.trend_protect_max_scale = 0.20
 		self.trend_protect_min_correction = 0.02
 		self._trend_protected_idx = (
-			DMControlHopperSDModel.HEIGHT_IDX,
+			DMControlHopperSDModel.VX_IDX,
+			DMControlHopperSDModel.VZ_IDX,
+			DMControlHopperSDModel.PITCH_IDX,
 			DMControlHopperSDModel.COMP_IDX,
 			DMControlHopperSDModel.SUPPORT_IDX,
-			DMControlHopperSDModel.STANCE_IDX,
-			DMControlHopperSDModel.IMPACT_IDX,
-			DMControlHopperSDModel.CLEARANCE_IDX,
+			DMControlHopperSDModel.ROOTZ_IDX,
 		)
 		self._coupling_bridge_idx = (
 			DMControlHopperSDModel.VZ_IDX,
 			DMControlHopperSDModel.PITCH_IDX,
 			DMControlHopperSDModel.PITCH_RATE_IDX,
 			DMControlHopperSDModel.COMP_RATE_IDX,
-			DMControlHopperSDModel.SWING_IDX,
-			DMControlHopperSDModel.SWING_RATE_IDX,
-			DMControlHopperSDModel.FOOT_IDX,
-			DMControlHopperSDModel.FOOT_RATE_IDX,
+			DMControlHopperSDModel.CAPTURE_IDX,
 		)
 		self.init()
 
@@ -153,6 +167,19 @@ class SDWorldModel(nn.Module):
 			return z_struct
 		return torch.cat([z_struct, z_resid], dim=-1)
 
+	def consistency_loss(self, pred_z, target_z):
+		pred_flat, _ = self._flatten_batch(pred_z)
+		target_flat, _ = self._flatten_batch(target_z)
+		pred_struct, pred_resid = self._split_latent(pred_flat)
+		target_struct, target_resid = self._split_latent(target_flat)
+		loss = F.mse_loss(
+			pred_struct[:, :self.observable_struct_dim],
+			target_struct[:, :self.observable_struct_dim],
+		)
+		if self.resid_dim > 0:
+			loss = loss + F.mse_loss(pred_resid, target_resid)
+		return loss
+
 
 	def encode(self, obs, task):
 		assert task is None
@@ -170,6 +197,14 @@ class SDWorldModel(nn.Module):
 		a_flat, _ = self._flatten_batch(a)
 		z_struct, z_resid = self._split_latent(z_flat)
 		next_struct_base = self._dynamics(z_struct, a_flat)
+		if self._local_residual is not None:
+			local_hybrid = torch.cat([z_struct, a_flat], dim=-1)
+			local_delta = self.local_residual_scale * torch.tanh(self._local_residual(local_hybrid))
+			next_struct_base = next_struct_base.clone()
+			next_struct_base[:, list(self._local_residual_dims)] = (
+				next_struct_base[:, list(self._local_residual_dims)] + local_delta
+			)
+			next_struct_base = self._dynamics.project_state(next_struct_base)
 		if self.resid_dim > 0:
 			hybrid = torch.cat([z_flat, a_flat], dim=-1)
 			if self._struct_residual is not None:
@@ -308,3 +343,15 @@ class SDWorldModel(nn.Module):
 		if return_type == 'min':
 			return Q.min(0).values
 		return Q.sum(0) / 2
+
+	def get_learned_params(self):
+		params = self._dynamics.get_learned_params()
+		params.update({
+			"struct_dim": self.struct_dim,
+			"latent_dim": self.latent_dim,
+			"reward_mode": self.reward_mode,
+			"use_local_residual": self.use_local_residual,
+			"local_residual_scale": self.local_residual_scale,
+			"local_residual_dims": [int(i) for i in self._local_residual_dims],
+		})
+		return params

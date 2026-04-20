@@ -42,11 +42,9 @@ NUM_EPISODES = 10
 GEOM_NAMES = ["torso", "nose", "pelvis", "thigh", "calf", "foot"]
 QPOS_NAMES = ["rootx", "rootz", "rooty", "waist", "hip", "knee", "ankle"]
 STRUCT_FIELD_NAMES = [
-    "height", "vx", "vz", "pitch", "pitch_rate",
+    "vx", "vz", "pitch", "pitch_rate",
     "compression", "compression_rate",
-    "swing", "swing_rate", "foot_angle", "foot_rate",
-    "support", "stance_mix", "impact", "clearance",
-    "rootz", "front_anchor",
+    "support", "rootz", "capture_memory",
 ]
 
 
@@ -72,7 +70,8 @@ def build_cfg(struct_dim_override: int | None = None):
         "sd_reward_curriculum_start": 10000,
         "sd_reward_curriculum_end": 30000,
         "sd_max_resid_scale": 5.0,
-        "sd_height_loss_coef": 0.05,
+        "sd_height_loss_coef": 0.0,
+        "sd_use_local_residual": True,
         "eval_episodes": NUM_EPISODES,
     }
     if struct_dim_override is not None:

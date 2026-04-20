@@ -15,7 +15,8 @@ STEPS="${STEPS:-3000}"
 EVAL_FREQ="${EVAL_FREQ:-1000}"
 EVAL_EPISODES="${EVAL_EPISODES:-10}"
 MLP_DIM="${MLP_DIM:-256}"
-SD_LATENT_DIM="${SD_LATENT_DIM:-32}"
+SD_LATENT_DIM="${SD_LATENT_DIM:-9}"
+SD_LOCAL_RESIDUAL_SCALE="${SD_LOCAL_RESIDUAL_SCALE:-0.20}"
 NUM_Q="${NUM_Q:-3}"
 BATCH_SIZE="${BATCH_SIZE:-128}"
 LR="${LR:-3e-4}"
@@ -33,6 +34,11 @@ DIAG_OUT_DIR="results/closed_loop/${EXP_NAME}_quick3"
 
 mkdir -p "$TRAIN_LOG_DIR"
 
+if [[ "$SD_LATENT_DIM" != "9" ]]; then
+  echo "v4.13 core requires SD_LATENT_DIM=9; got ${SD_LATENT_DIM}" >&2
+  exit 2
+fi
+
 env MUJOCO_GL=glfw CUDA_VISIBLE_DEVICES="$GPU_ID" \
   /home/anaconda3/envs/sdmcts_p100/bin/python -u external/tdmpc2/tdmpc2/train.py \
   task=hopper-hop world_model_kind=sd_hopper model_size=null obs=state \
@@ -40,13 +46,14 @@ env MUJOCO_GL=glfw CUDA_VISIBLE_DEVICES="$GPU_ID" \
   enable_wandb=false save_video=false save_agent=true save_csv=true \
   eval_episodes="$EVAL_EPISODES" eval_freq="$EVAL_FREQ" compile=false \
   batch_size="$BATCH_SIZE" lr="$LR" dropout="$DROPOUT" \
-  mlp_dim="$MLP_DIM" sd_latent_dim="$SD_LATENT_DIM" num_q="$NUM_Q" \
+  mlp_dim="$MLP_DIM" sd_struct_dim=9 sd_latent_dim="$SD_LATENT_DIM" num_q="$NUM_Q" \
   num_samples="$NUM_SAMPLES" num_elites="$NUM_ELITES" num_pi_trajs="$NUM_PI_TRAJS" \
   horizon="$HORIZON" iterations="$ITERATIONS" \
   sd_reward_mode=curriculum sd_reward_curriculum_alpha=0.5 \
   sd_reward_curriculum_alpha_min=0.25 sd_reward_curriculum_start=10000 \
   sd_reward_curriculum_end=30000 sd_max_resid_scale=5.0 \
-  sd_height_loss_coef=0.05 sd_use_struct_residual=false \
+  sd_height_loss_coef=0.0 sd_use_struct_residual=false \
+  sd_use_local_residual=true sd_local_residual_scale="$SD_LOCAL_RESIDUAL_SCALE" \
   > "$TRAIN_STDOUT" 2>&1
 
 xvfb-run -a -s "-screen 0 1400x900x24" \
@@ -61,7 +68,8 @@ xvfb-run -a -s "-screen 0 1400x900x24" \
   --sd_reward_mode curriculum --sd_reward_curriculum_alpha 0.5 \
   --sd_reward_curriculum_alpha_min 0.25 --sd_reward_curriculum_start 10000 \
   --sd_reward_curriculum_end 30000 --sd_max_resid_scale 5.0 \
-  --sd_height_loss_coef 0.05 --sd_use_struct_residual false
+  --sd_height_loss_coef 0.0 --sd_use_struct_residual false \
+  --sd_use_local_residual true --sd_local_residual_scale "$SD_LOCAL_RESIDUAL_SCALE"
 
 echo "train_log=${TRAIN_STDOUT}"
 echo "diag_dir=${DIAG_OUT_DIR}"

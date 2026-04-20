@@ -89,9 +89,11 @@ def infer_phase_context(state: torch.Tensor) -> Tuple[str, str]:
     """Infer both a coarse phase and a control-relevant subphase."""
     support = float(state[DMControlHopperSDModel.SUPPORT_IDX].item())
     vz = float(state[DMControlHopperSDModel.VZ_IDX].item())
-    clearance = float(state[DMControlHopperSDModel.CLEARANCE_IDX].item())
+    pitch = float(state[DMControlHopperSDModel.PITCH_IDX].item())
     compression = float(state[DMControlHopperSDModel.COMP_IDX].item())
-    impact = float(state[DMControlHopperSDModel.IMPACT_IDX].item())
+    height = max(0.0, DMControlHopperSDModel.TARGET_STAND_HEIGHT - compression)
+    clearance = float(height - 0.58 - 0.22 * compression - 0.08 * abs(pitch) - 0.06 * support)
+    impact = float(max(-vz, 0.0) * support)
 
     if support < 0.10 and clearance > -0.02:
         if vz >= -0.02:
@@ -439,7 +441,7 @@ class SimpleReplay:
 KEY_STRUCT_IDX = [
     DMControlHopperSDModel.VZ_IDX,
     DMControlHopperSDModel.SUPPORT_IDX,
-    DMControlHopperSDModel.CLEARANCE_IDX,
+    DMControlHopperSDModel.COMP_IDX,
 ]
 
 
@@ -499,7 +501,17 @@ def train_sd_model(
         absorb_landing_mask = (intents == INTENT_TO_IDX["absorb"]) & landing_impact_mask
         pred_dvz = pred_next[:, DMControlHopperSDModel.VZ_IDX] - states[:, DMControlHopperSDModel.VZ_IDX]
         pred_dsupport = pred_next[:, DMControlHopperSDModel.SUPPORT_IDX] - states[:, DMControlHopperSDModel.SUPPORT_IDX]
-        pred_dclearance = pred_next[:, DMControlHopperSDModel.CLEARANCE_IDX] - states[:, DMControlHopperSDModel.CLEARANCE_IDX]
+        pred_clearance = model._clearance_from_state(
+            pred_next[:, DMControlHopperSDModel.COMP_IDX],
+            pred_next[:, DMControlHopperSDModel.PITCH_IDX],
+            pred_next[:, DMControlHopperSDModel.SUPPORT_IDX],
+        )
+        state_clearance = model._clearance_from_state(
+            states[:, DMControlHopperSDModel.COMP_IDX],
+            states[:, DMControlHopperSDModel.PITCH_IDX],
+            states[:, DMControlHopperSDModel.SUPPORT_IDX],
+        )
+        pred_dclearance = pred_clearance - state_clearance
         drive_vz_sign_loss = _masked_mean(torch.relu(pred_dvz), drive_release_mask)
         absorb_clearance_sign_loss = _masked_mean(torch.relu(pred_dclearance), absorb_landing_mask)
         absorb_support_sign_loss = _masked_mean(torch.relu(pred_dsupport), absorb_landing_mask)

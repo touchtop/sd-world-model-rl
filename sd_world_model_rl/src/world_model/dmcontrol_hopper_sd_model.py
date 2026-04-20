@@ -1,4 +1,4 @@
-"""Structured-hybrid world model for DMControl Hopper-Hop."""
+"""Structured world model for DMControl Hopper-Hop with explicit core stocks."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ def _wrap_angle_np(x: np.ndarray) -> np.ndarray:
 
 def _wrap_angle_torch(x: torch.Tensor) -> torch.Tensor:
     two_pi = 2.0 * torch.pi
-    return torch.remainder(x + torch.pi, two_pi) - np.pi
+    return torch.remainder(x + torch.pi, two_pi) - torch.pi
 
 
 def _touch_raw_to_contact_np(x: np.ndarray) -> np.ndarray:
@@ -30,39 +30,42 @@ def _inv_softplus_torch(x: torch.Tensor) -> torch.Tensor:
     return torch.log(torch.expm1(x))
 
 
-def _mlp(in_dim: int, out_dim: int, hidden: int) -> nn.Sequential:
-    return nn.Sequential(
-        nn.Linear(in_dim, hidden),
-        nn.SiLU(),
-        nn.Linear(hidden, hidden),
-        nn.SiLU(),
-        nn.Linear(hidden, out_dim),
-    )
-
-
 class DMControlHopperSDModel(nn.Module):
-    """Structured world model for ``dm_control.suite.hopper.hop``.
+    """Explicit SD model built around a small set of core feedback stocks.
 
-    Two representations are used:
+    Raw observation layout (15 dims), matching dm_control state observations:
+    [rootz, rooty, waist, hip, knee, ankle, x_dot, z_dot,
+     rooty_dot, waist_dot, hip_dot, knee_dot, ankle_dot, touch_toe, touch_heel]
 
-    1. Raw observation layout (15 dims), matching dm_control state observations:
-       [rootz, rooty, waist, hip, knee, ankle, x_dot, z_dot,
-        rooty_dot, waist_dot, hip_dot, knee_dot, ankle_dot, touch_toe, touch_heel]
+    Structured latent layout (9 dims):
+    [vx, vz, pitch, pitch_rate, compression, compression_rate, support, rootz, capture_memory]
 
-    2. Structured latent layout (17 dims), used by TD-MPC2 planning:
-       [height, vx, vz, pitch, pitch_rate, compression, compression_rate,
-        swing, swing_rate, foot_angle, foot_rate, support, stance_mix,
-        impact, clearance, rootz, front_anchor]
+    The first 8 dims are observable-state stocks that can be reconstructed from
+    the current simulator observation. The final dim `capture_memory` is a true
+    hidden stock: it stores whether fore-body capture has been established and
+    should therefore not be supervised by one-frame observation matching.
     """
 
     POSITION_DIM = 6
     VELOCITY_DIM = 7
     TOUCH_DIM = 2
     RAW_OBS_DIM = 15
-    STATE_DIM = 17
+    STATE_DIM = 9
+    OBSERVABLE_DIM = 8
     ACTION_DIM = 4
+
+    VX_IDX = 0
+    VZ_IDX = 1
+    PITCH_IDX = 2
+    PITCH_RATE_IDX = 3
+    COMP_IDX = 4
+    COMP_RATE_IDX = 5
+    SUPPORT_IDX = 6
+    ROOTZ_IDX = 7
+    CAPTURE_IDX = 8
+    RATE_LIKE_IDX = (VX_IDX, VZ_IDX, PITCH_RATE_IDX, COMP_RATE_IDX)
+
     ANGLE_SLICE = slice(1, 6)
-    STOCK_RATE_IDX = (1, 2, 3, 4, 5, 6)
     TORSO_TO_PELVIS_Z = -0.05
     PELVIS_TO_THIGH_Z = -0.20
     THIGH_TO_CALF_Z = -0.33
@@ -71,113 +74,49 @@ class DMControlHopperSDModel(nn.Module):
     HEEL_OFFSET_X = -0.08
     CONTACT_MARGIN = 0.02
     CONTACT_SCALE = 0.02
-    HEIGHT_RESIDUAL_SCALE = 0.05
-    TOUCH_RESIDUAL_SCALE = 0.10
-    TARGET_STAND_HEIGHT = 0.90
     CONTACT_VEL_SCALE = 0.35
-    SUPPORT_BLEND_SCALE = 0.08
-    HEIGHT_IDX = 0
-    VX_IDX = 1
-    VZ_IDX = 2
-    PITCH_IDX = 3
-    PITCH_RATE_IDX = 4
-    COMP_IDX = 5
-    COMP_RATE_IDX = 6
-    SWING_IDX = 7
-    SWING_RATE_IDX = 8
-    FOOT_IDX = 9
-    FOOT_RATE_IDX = 10
-    SUPPORT_IDX = 11
-    STANCE_IDX = 12
-    IMPACT_IDX = 13
-    CLEARANCE_IDX = 14
-    ROOTZ_IDX = 15  # v4: raw rootz (slide joint) for asymmetric contact viability
-    FRONT_ANCHOR_IDX = 16  # v4.3: explicit fore-body anchor mode for crawl/recovery
-    RATE_LIKE_IDX = (VX_IDX, VZ_IDX, PITCH_RATE_IDX, COMP_RATE_IDX, SWING_RATE_IDX, FOOT_RATE_IDX, IMPACT_IDX)
+    TARGET_STAND_HEIGHT = 0.90
     ENV_ACTION_REPEAT = 2
 
-    # v4 asymmetric-contact viability thresholds (derived from Phase 0 diagnostic,
-    # see docs/worklog/hopper_walker_extension_2026_04_11.md for data support).
-    V4_ROOTZ_LOW_CENTER = -0.5     # sigmoid center for "body is down"
+    V4_ROOTZ_LOW_CENTER = -0.5
     V4_ROOTZ_LOW_SCALE = 0.1
-    V4_PITCH_BACK_CENTER = -0.3    # pitch below this is "tilted backward"
+    V4_PITCH_BACK_CENTER = -0.3
     V4_PITCH_BACK_SCALE = 0.1
-    V4_PITCH_FWD_CENTER = 0.0      # forward_lean admits any positive pitch smoothly
+    V4_PITCH_FWD_CENTER = 0.0
     V4_PITCH_FWD_SCALE = 0.15
-    V4_PITCH_NEUTRAL_SPREAD = 0.3  # recovered_upright admits |pitch| up to ~1 rad
-    V4_FRONT_ANCHOR_PITCH_CENTER = 0.8
-    V4_FRONT_ANCHOR_PITCH_SCALE = 0.35
-    V4_FRONT_ANCHOR_CLEARANCE_CENTER = 0.74
-    V4_FRONT_ANCHOR_CLEARANCE_SCALE = 0.06
-    V4_FRONT_CAPTURE_CENTER = 0.30
-    V4_FRONT_CAPTURE_SCALE = 0.08
-    V4_HANDOFF_BODY_HIGH_CENTER = 0.18
-    V4_HANDOFF_BODY_HIGH_SCALE = 0.08
+    V4_PITCH_NEUTRAL_SPREAD = 0.3
+    V4_CAPTURE_PITCH_CENTER = 0.8
+    V4_CAPTURE_PITCH_SCALE = 0.35
+    V4_CAPTURE_CLEARANCE_CENTER = 0.70
+    V4_CAPTURE_CLEARANCE_SCALE = 0.08
+    V4_CAPTURE_CENTER = 0.35
+    V4_CAPTURE_SCALE = 0.08
+    V4_HANDOFF_BODY_HIGH_CENTER = 0.10
+    V4_HANDOFF_BODY_HIGH_SCALE = 0.10
     V4_PRECAPTURE_ROOTZ_CENTER = -0.32
     V4_PRECAPTURE_ROOTZ_SCALE = 0.18
-    V4_PRECAPTURE_PITCH_CENTER = 0.20
-    V4_PRECAPTURE_PITCH_SCALE = 0.20
-    V4_PRECAPTURE_CLEARANCE_CENTER = 0.58
-    V4_PRECAPTURE_CLEARANCE_SCALE = 0.10
+    V4_PRECAPTURE_PITCH_CENTER = 0.10
+    V4_PRECAPTURE_PITCH_SCALE = 0.25
     V4_RECOVERY_PITCH_CENTER = 0.45
     V4_RECOVERY_PITCH_SCALE = 0.20
     V4_RECOVERY_COMP_CENTER = 0.18
     V4_RECOVERY_COMP_SCALE = 0.08
     V4_RECOVERY_SUPPORT_PITCH_CENTER = 0.25
     V4_RECOVERY_SUPPORT_PITCH_SCALE = 0.30
-
-    def _front_anchor_from_geom(
-        self,
-        pitch: torch.Tensor,
-        clearance: torch.Tensor,
-        rootz: torch.Tensor,
-    ) -> torch.Tensor:
-        body_low = torch.sigmoid((self.V4_ROOTZ_LOW_CENTER - rootz) / self.V4_ROOTZ_LOW_SCALE)
-        front_anchor_pitch = torch.sigmoid((pitch - self.V4_FRONT_ANCHOR_PITCH_CENTER) / self.V4_FRONT_ANCHOR_PITCH_SCALE)
-        front_anchor_clearance = torch.sigmoid(((-clearance) - self.V4_FRONT_ANCHOR_CLEARANCE_CENTER) / self.V4_FRONT_ANCHOR_CLEARANCE_SCALE)
-        return body_low * front_anchor_pitch * front_anchor_clearance
-
-    def _front_capture_commitment(self, front_anchor: torch.Tensor) -> torch.Tensor:
-        return torch.sigmoid((front_anchor - self.V4_FRONT_CAPTURE_CENTER) / self.V4_FRONT_CAPTURE_SCALE)
-
-    def _precapture_corridor_from_state(
-        self,
-        pitch: torch.Tensor,
-        support: torch.Tensor,
-        clearance: torch.Tensor,
-        rootz: torch.Tensor,
-    ) -> torch.Tensor:
-        # Allow front-capture to start building slightly before the body is fully
-        # collapsed. This is the corridor that episode_03-like trajectories were
-        # missing: forward-leaning, low-clearance, still-grounded states that are
-        # recoverable but not yet deep enough in the old body_low gate.
-        soft_body_low = torch.sigmoid((self.V4_PRECAPTURE_ROOTZ_CENTER - rootz) / self.V4_PRECAPTURE_ROOTZ_SCALE)
-        forward_gate = torch.sigmoid((pitch - self.V4_PRECAPTURE_PITCH_CENTER) / self.V4_PRECAPTURE_PITCH_SCALE)
-        grounded = torch.clamp((support - 0.10) / 0.35, min=0.0, max=1.0)
-        low_clearance = torch.sigmoid(((-clearance) - self.V4_PRECAPTURE_CLEARANCE_CENTER) / self.V4_PRECAPTURE_CLEARANCE_SCALE)
-        return soft_body_low * forward_gate * torch.maximum(grounded, low_clearance)
-
-    def _recovery_support_from_state(
-        self,
-        pitch: torch.Tensor,
-        support: torch.Tensor,
-        front_anchor: torch.Tensor,
-        rootz: torch.Tensor,
-    ) -> torch.Tensor:
-        recovery_support_gate = torch.sigmoid(
-            (pitch - self.V4_RECOVERY_SUPPORT_PITCH_CENTER) / self.V4_RECOVERY_SUPPORT_PITCH_SCALE
-        )
-        body_low = torch.sigmoid((self.V4_ROOTZ_LOW_CENTER - rootz) / self.V4_ROOTZ_LOW_SCALE)
-        body_high = 1.0 - body_low
-        front_capture = self._front_capture_commitment(front_anchor)
-        handoff_unlock = front_capture * torch.sigmoid(
-            (body_high - self.V4_HANDOFF_BODY_HIGH_CENTER) / self.V4_HANDOFF_BODY_HIGH_SCALE
-        )
-        # Ordinary support becomes a legal corridor only after front-anchor has
-        # already been captured and the torso has started to rise.
-        support_corridor_scale = handoff_unlock * torch.clamp(0.20 + 0.80 * body_high, min=0.0, max=1.0)
-        handoff_support = support_corridor_scale * support * recovery_support_gate
-        return torch.maximum(front_anchor, handoff_support)
+    V4_NONCOLLAPSED_ROOTZ_CENTER = -0.70
+    V4_NONCOLLAPSED_ROOTZ_SCALE = 0.08
+    V4_NONCOLLAPSED_HEIGHT_CENTER = 0.14
+    V4_NONCOLLAPSED_HEIGHT_SCALE = 0.06
+    V4_STANDUP_PITCH_LOW_CENTER = 0.35
+    V4_STANDUP_PITCH_LOW_SCALE = 0.18
+    V4_STANDUP_PITCH_HIGH_CENTER = 1.70
+    V4_STANDUP_PITCH_HIGH_SCALE = 0.28
+    V4_RELEASE_PITCH_LOW_CENTER = 0.55
+    V4_RELEASE_PITCH_LOW_SCALE = 0.18
+    V4_RELEASE_PITCH_HIGH_CENTER = 1.55
+    V4_RELEASE_PITCH_HIGH_SCALE = 0.24
+    V4_ARM_CORRIDOR_GAIN = 0.50
+    V4_ARM_BODY_HIGH_GAIN = 0.20
 
     def __init__(
         self,
@@ -188,30 +127,13 @@ class DMControlHopperSDModel(nn.Module):
         passive_scale: float = 10.0,
     ):
         super().__init__()
+        del hidden, residual_scale, passive_scale
         self.dt = dt
         self.hop_speed = hop_speed
-        self.residual_scale = residual_scale
-        self.passive_scale = passive_scale
-        self.learned_passive_weight = 0.20
-        self.learned_residual_weight = 0.15
 
-        self.passive_flow = _mlp(self.STATE_DIM, len(self.RATE_LIKE_IDX), hidden)
-        self.residual_flow = _mlp(self.STATE_DIM + self.ACTION_DIM, len(self.RATE_LIKE_IDX), hidden)
-        self.touch_head = _mlp(self.STATE_DIM, 2, hidden)
-        self.height_head = _mlp(self.STATE_DIM, 1, hidden)
-        self.clearance_head = _mlp(self.STATE_DIM, 1, hidden)
-
-        self.register_buffer(
-            "base_control_gears",
-            torch.tensor([30.0, 40.0, 30.0, 10.0], dtype=torch.float32) / 40.0,
-        )
-        self.register_buffer(
-            "joint_neutral_pose",
-            torch.tensor([0.0, -1.20, 1.20, 0.0], dtype=torch.float32),
-        )
         self.register_buffer(
             "base_rate_damping",
-            torch.tensor([0.05, 0.10, 0.08, 0.06, 0.06, 0.07, 0.05], dtype=torch.float32),
+            torch.tensor([0.10, 0.12, 0.10, 0.10], dtype=torch.float32),
         )
         self.control_scale = nn.Parameter(torch.ones(self.ACTION_DIM, dtype=torch.float32))
         self.rate_damping_raw = nn.Parameter(_inv_softplus_torch(self.base_rate_damping.clone()))
@@ -230,15 +152,14 @@ class DMControlHopperSDModel(nn.Module):
 
     @classmethod
     def obs_to_state(cls, obs: Union[Mapping[str, np.ndarray], np.ndarray, Sequence[float]]) -> np.ndarray:
-        """Compatibility helper for legacy scripts: normalized raw observation."""
         if isinstance(obs, Mapping):
             pos = np.asarray(obs["position"], dtype=np.float32).reshape(6)
             vel = np.asarray(obs["velocity"], dtype=np.float32).reshape(7)
             touch = np.asarray(obs["touch"], dtype=np.float32).reshape(2)
         else:
             flat = np.asarray(obs, dtype=np.float32).reshape(-1)
-            if flat.shape[0] != 15:
-                raise ValueError(f"Expected hopper flat observation of size 15, got {flat.shape[0]}")
+            if flat.shape[0] != cls.RAW_OBS_DIM:
+                raise ValueError(f"Expected hopper flat observation of size {cls.RAW_OBS_DIM}, got {flat.shape[0]}")
             pos = flat[:6]
             vel = flat[6:13]
             touch = flat[13:]
@@ -306,7 +227,6 @@ class DMControlHopperSDModel(nn.Module):
             "foot_body_z": foot_body_z,
             "toe_z": foot_body_z + toe_dz,
             "heel_z": foot_body_z + heel_dz,
-            "foot_angle": foot,
         }
 
     def _explicit_height_from_pos(self, pos: torch.Tensor) -> torch.Tensor:
@@ -330,16 +250,233 @@ class DMControlHopperSDModel(nn.Module):
         toe_support = torch.maximum(touch[:, 0], toe_geom * toe_impact)
         heel_support = torch.maximum(touch[:, 1], heel_geom * heel_impact)
         support = torch.clamp(0.65 * torch.maximum(toe_support, heel_support) + 0.35 * touch.max(dim=-1).values, 0.0, 1.0)
-        stance_mix = torch.tanh((toe_support - heel_support) / self.SUPPORT_BLEND_SCALE)
+        clearance = torch.minimum(kin["toe_z"], kin["heel_z"])
         return {
             "support": support,
-            "toe_support": toe_support,
-            "heel_support": heel_support,
-            "stance_mix": stance_mix,
+            "clearance": clearance,
             "toe_vz": toe_vz,
             "heel_vz": heel_vz,
-            "kin": kin,
         }
+
+    def _height_from_compression(self, compression: torch.Tensor) -> torch.Tensor:
+        return torch.clamp(self.TARGET_STAND_HEIGHT - compression, min=0.0, max=2.5)
+
+    def _body_low_from_rootz(self, rootz: torch.Tensor) -> torch.Tensor:
+        return torch.sigmoid((self.V4_ROOTZ_LOW_CENTER - rootz) / self.V4_ROOTZ_LOW_SCALE)
+
+    def _body_high_from_rootz(self, rootz: torch.Tensor) -> torch.Tensor:
+        return 1.0 - self._body_low_from_rootz(rootz)
+
+    def _clearance_from_state(
+        self,
+        compression: torch.Tensor,
+        pitch: torch.Tensor,
+        support: torch.Tensor,
+    ) -> torch.Tensor:
+        height = self._height_from_compression(compression)
+        return height - 0.58 - 0.22 * compression - 0.08 * torch.abs(pitch) - 0.06 * support
+
+    def _front_contact_geom_from_state(
+        self,
+        pitch: torch.Tensor,
+        compression: torch.Tensor,
+        rootz: torch.Tensor,
+        support: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        body_low = self._body_low_from_rootz(rootz)
+        clearance = self._clearance_from_state(
+            compression,
+            pitch,
+            support if support is not None else torch.zeros_like(pitch),
+        )
+        capture_pitch = torch.sigmoid((pitch - self.V4_CAPTURE_PITCH_CENTER) / self.V4_CAPTURE_PITCH_SCALE)
+        capture_clearance = torch.sigmoid(((-clearance) - self.V4_CAPTURE_CLEARANCE_CENTER) / self.V4_CAPTURE_CLEARANCE_SCALE)
+        return body_low * capture_pitch * capture_clearance
+
+    def _capture_commitment(self, capture_memory: torch.Tensor) -> torch.Tensor:
+        return torch.sigmoid((capture_memory - self.V4_CAPTURE_CENTER) / self.V4_CAPTURE_SCALE)
+
+    def _recovered_upright_from_state(self, pitch: torch.Tensor, rootz: torch.Tensor) -> torch.Tensor:
+        body_high = self._body_high_from_rootz(rootz)
+        return body_high * torch.sigmoid((1.0 - torch.abs(pitch)) / self.V4_PITCH_NEUTRAL_SPREAD)
+
+    def _handoff_ready_from_state(self, pitch: torch.Tensor, rootz: torch.Tensor) -> torch.Tensor:
+        body_high = self._body_high_from_rootz(rootz)
+        return body_high * torch.sigmoid((1.8 - torch.abs(pitch)) / 0.45)
+
+    def _noncollapsed_posture_from_state(self, compression: torch.Tensor, rootz: torch.Tensor) -> torch.Tensor:
+        height = self._height_from_compression(compression)
+        rootz_gate = torch.sigmoid((rootz - self.V4_NONCOLLAPSED_ROOTZ_CENTER) / self.V4_NONCOLLAPSED_ROOTZ_SCALE)
+        height_gate = torch.sigmoid((height - self.V4_NONCOLLAPSED_HEIGHT_CENTER) / self.V4_NONCOLLAPSED_HEIGHT_SCALE)
+        return rootz_gate * height_gate
+
+    def _standup_pitch_corridor_from_state(self, pitch: torch.Tensor) -> torch.Tensor:
+        lower_gate = torch.sigmoid((pitch - self.V4_STANDUP_PITCH_LOW_CENTER) / self.V4_STANDUP_PITCH_LOW_SCALE)
+        upper_gate = torch.sigmoid((self.V4_STANDUP_PITCH_HIGH_CENTER - pitch) / self.V4_STANDUP_PITCH_HIGH_SCALE)
+        return lower_gate * upper_gate
+
+    def _release_pitch_corridor_from_state(self, pitch: torch.Tensor) -> torch.Tensor:
+        lower_gate = torch.sigmoid((pitch - self.V4_RELEASE_PITCH_LOW_CENTER) / self.V4_RELEASE_PITCH_LOW_SCALE)
+        upper_gate = torch.sigmoid((self.V4_RELEASE_PITCH_HIGH_CENTER - pitch) / self.V4_RELEASE_PITCH_HIGH_SCALE)
+        return lower_gate * upper_gate
+
+    def _recovery_support_from_state(
+        self,
+        pitch: torch.Tensor,
+        support: torch.Tensor,
+        capture_memory: torch.Tensor,
+        rootz: torch.Tensor,
+    ) -> torch.Tensor:
+        recovery_support_gate = torch.sigmoid(
+            (pitch - self.V4_RECOVERY_SUPPORT_PITCH_CENTER) / self.V4_RECOVERY_SUPPORT_PITCH_SCALE
+        )
+        grounded = torch.clamp((support - 0.12) / 0.40, min=0.0, max=1.0)
+        body_high = self._body_high_from_rootz(rootz)
+        capture_commitment = self._capture_commitment(capture_memory)
+        handoff_unlock = capture_commitment * torch.sigmoid(
+            (body_high - self.V4_HANDOFF_BODY_HIGH_CENTER) / self.V4_HANDOFF_BODY_HIGH_SCALE
+        )
+        support_corridor = torch.maximum(
+            grounded,
+            0.45 * handoff_unlock * torch.clamp(0.25 + 0.75 * body_high, min=0.0, max=1.0),
+        )
+        return capture_commitment * recovery_support_gate * torch.clamp(0.45 + 0.55 * support_corridor, min=0.0, max=1.0)
+
+    def _standup_window_from_state(
+        self,
+        pitch: torch.Tensor,
+        support: torch.Tensor,
+        compression: torch.Tensor,
+        capture_memory: torch.Tensor,
+        rootz: torch.Tensor,
+    ) -> torch.Tensor:
+        capture_commitment = self._capture_commitment(capture_memory)
+        recovery_support = self._recovery_support_from_state(pitch, support, capture_memory, rootz)
+        body_low = self._body_low_from_rootz(rootz)
+        recovery_pitch = torch.sigmoid((pitch - self.V4_RECOVERY_PITCH_CENTER) / self.V4_RECOVERY_PITCH_SCALE)
+        compression_arm = torch.sigmoid((compression - self.V4_RECOVERY_COMP_CENTER) / self.V4_RECOVERY_COMP_SCALE)
+        noncollapsed = self._noncollapsed_posture_from_state(compression, rootz)
+        pitch_corridor = self._standup_pitch_corridor_from_state(pitch)
+        return capture_commitment * recovery_support * body_low * recovery_pitch * compression_arm * noncollapsed * pitch_corridor
+
+    def _arm_ready_from_state(
+        self,
+        pitch: torch.Tensor,
+        support: torch.Tensor,
+        compression: torch.Tensor,
+        capture_memory: torch.Tensor,
+        rootz: torch.Tensor,
+    ) -> torch.Tensor:
+        capture_commitment = self._capture_commitment(capture_memory)
+        recovery_support = self._recovery_support_from_state(pitch, support, capture_memory, rootz)
+        grounded = torch.clamp((support - 0.12) / 0.40, min=0.0, max=1.0)
+        body_high = self._body_high_from_rootz(rootz)
+        recovered_upright = self._recovered_upright_from_state(pitch, rootz)
+        handoff_ready = self._handoff_ready_from_state(pitch, rootz)
+        recovery_pitch = torch.sigmoid((pitch - self.V4_RECOVERY_PITCH_CENTER) / self.V4_RECOVERY_PITCH_SCALE)
+        compression_arm = torch.sigmoid((compression - self.V4_RECOVERY_COMP_CENTER) / self.V4_RECOVERY_COMP_SCALE)
+        noncollapsed = self._noncollapsed_posture_from_state(compression, rootz)
+        standup_corridor = self._standup_pitch_corridor_from_state(pitch)
+        arm_corridor = torch.maximum(
+            torch.maximum(recovered_upright, 0.5 * handoff_ready),
+            self.V4_ARM_CORRIDOR_GAIN * recovery_pitch * compression_arm * standup_corridor
+            + self.V4_ARM_BODY_HIGH_GAIN * body_high,
+        )
+        support_lane = torch.clamp(grounded + 0.45 * handoff_ready, min=0.0, max=1.0)
+        return capture_commitment * recovery_support * support_lane * noncollapsed * torch.clamp(arm_corridor, min=0.0, max=1.0)
+
+    def _rear_recovery_phase_from_state(self, pitch: torch.Tensor, rootz: torch.Tensor) -> torch.Tensor:
+        body_low = self._body_low_from_rootz(rootz)
+        backward_tilt = torch.sigmoid(-(pitch - self.V4_PITCH_BACK_CENTER) / self.V4_PITCH_BACK_SCALE)
+        return body_low * backward_tilt
+
+    def _precapture_phase_from_state(
+        self,
+        pitch: torch.Tensor,
+        support: torch.Tensor,
+        compression: torch.Tensor,
+        rootz: torch.Tensor,
+        capture_memory: torch.Tensor,
+    ) -> torch.Tensor:
+        capture_commitment = self._capture_commitment(capture_memory)
+        soft_body_low = torch.sigmoid((self.V4_PRECAPTURE_ROOTZ_CENTER - rootz) / self.V4_PRECAPTURE_ROOTZ_SCALE)
+        forward_gate = torch.sigmoid((pitch - self.V4_PRECAPTURE_PITCH_CENTER) / self.V4_PRECAPTURE_PITCH_SCALE)
+        grounded = torch.clamp((support - 0.12) / 0.40, min=0.0, max=1.0)
+        contact_geom = self._front_contact_geom_from_state(pitch, compression, rootz, support)
+        rear_recovery = self._rear_recovery_phase_from_state(pitch, rootz)
+        return grounded * soft_body_low * forward_gate * torch.maximum(grounded, contact_geom) * (1.0 - capture_commitment) * (1.0 - 0.75 * rear_recovery)
+
+    def _capture_crawl_phase_from_state(
+        self,
+        pitch: torch.Tensor,
+        support: torch.Tensor,
+        rootz: torch.Tensor,
+        capture_memory: torch.Tensor,
+    ) -> torch.Tensor:
+        capture_commitment = self._capture_commitment(capture_memory)
+        grounded = torch.clamp((support - 0.12) / 0.40, min=0.0, max=1.0)
+        body_low = self._body_low_from_rootz(rootz)
+        rear_recovery = self._rear_recovery_phase_from_state(pitch, rootz)
+        return grounded * body_low * capture_commitment * (1.0 - 0.75 * rear_recovery)
+
+    def _standup_phase_from_state(
+        self,
+        pitch: torch.Tensor,
+        support: torch.Tensor,
+        compression: torch.Tensor,
+        rootz: torch.Tensor,
+        capture_memory: torch.Tensor,
+    ) -> torch.Tensor:
+        standup_window = self._standup_window_from_state(pitch, support, compression, capture_memory, rootz)
+        arm_ready = self._arm_ready_from_state(pitch, support, compression, capture_memory, rootz)
+        standup_corridor = self._standup_pitch_corridor_from_state(pitch)
+        rise_gate = torch.clamp((arm_ready - 0.04) / 0.20, min=0.0, max=1.0)
+        return standup_window * torch.maximum(0.25 * standup_corridor, rise_gate)
+
+    def _crawl_to_standup_bias_from_state(
+        self,
+        pitch: torch.Tensor,
+        support: torch.Tensor,
+        compression: torch.Tensor,
+        rootz: torch.Tensor,
+        capture_memory: torch.Tensor,
+    ) -> torch.Tensor:
+        capture_phase = self._capture_crawl_phase_from_state(pitch, support, rootz, capture_memory)
+        recovery_support = self._recovery_support_from_state(pitch, support, capture_memory, rootz)
+        noncollapsed = self._noncollapsed_posture_from_state(compression, rootz)
+        standup_corridor = self._standup_pitch_corridor_from_state(pitch)
+        compression_arm = torch.sigmoid((compression - self.V4_RECOVERY_COMP_CENTER) / self.V4_RECOVERY_COMP_SCALE)
+        return capture_phase * recovery_support * noncollapsed * standup_corridor * torch.clamp(0.30 + 0.70 * compression_arm, min=0.0, max=1.0)
+
+    def _release_phase_from_state(
+        self,
+        pitch: torch.Tensor,
+        support: torch.Tensor,
+        compression: torch.Tensor,
+        rootz: torch.Tensor,
+        capture_memory: torch.Tensor,
+    ) -> torch.Tensor:
+        arm_ready = self._arm_ready_from_state(pitch, support, compression, capture_memory, rootz)
+        handoff_ready = self._handoff_ready_from_state(pitch, rootz)
+        noncollapsed = self._noncollapsed_posture_from_state(compression, rootz)
+        compression_gate = torch.sigmoid((compression - (self.V4_RECOVERY_COMP_CENTER + 0.08)) / 0.06)
+        pitch_gate = self._release_pitch_corridor_from_state(pitch)
+        release_corridor = torch.maximum(arm_ready, 0.60 * handoff_ready)
+        return release_corridor * compression_gate * pitch_gate * noncollapsed
+
+    def _handoff_phase_from_state(
+        self,
+        pitch: torch.Tensor,
+        support: torch.Tensor,
+        compression: torch.Tensor,
+        rootz: torch.Tensor,
+        capture_memory: torch.Tensor,
+    ) -> torch.Tensor:
+        release_phase = self._release_phase_from_state(pitch, support, compression, rootz, capture_memory)
+        handoff_ready = self._handoff_ready_from_state(pitch, rootz)
+        body_high = self._body_high_from_rootz(rootz)
+        release_bridge = torch.maximum(handoff_ready, 0.35 * release_phase)
+        return body_high * release_bridge
 
     def encode_observation(self, obs: torch.Tensor) -> torch.Tensor:
         if obs.dim() == 1:
@@ -354,7 +491,6 @@ class DMControlHopperSDModel(nn.Module):
         vel = obs_flat[:, 6:13]
         touch = _touch_raw_to_contact_torch(obs_flat[:, 13:15])
         contact = self._contact_features(pos, vel, touch)
-        kin = contact["kin"]
 
         height = self._explicit_height_from_pos(pos)
         vx = vel[:, 0]
@@ -363,39 +499,26 @@ class DMControlHopperSDModel(nn.Module):
         pitch_rate = vel[:, 2]
         compression = torch.relu(self.TARGET_STAND_HEIGHT - height)
         compression_rate = -vz
-        swing = 0.15 * pos[:, 2] + 0.55 * pos[:, 3] - 0.35 * pos[:, 4] + 0.10 * pos[:, 5]
-        swing_rate = 0.15 * vel[:, 3] + 0.55 * vel[:, 4] - 0.35 * vel[:, 5] + 0.10 * vel[:, 6]
-        foot_angle = kin["foot_angle"]
-        foot_rate = vel[:, 2] + vel[:, 3] + vel[:, 4] + vel[:, 5] + vel[:, 6]
         support = contact["support"]
-        stance_mix = contact["stance_mix"]
-        impact = torch.relu(-(contact["toe_vz"] + contact["heel_vz"]) * 0.5) * support
-        clearance = torch.minimum(kin["toe_z"], kin["heel_z"])
-        # v4 new structural dim: raw rootz (slide joint position).
-        # Empirically separates success (rootz > -0.3) from failure basin (rootz < -0.8)
-        # when combined with the unwrapped torso pitch in predict_plan_reward.
         rootz = pos[:, 0]
-        front_anchor = self._front_anchor_from_geom(pitch, clearance, rootz)
+        capture_seed = torch.clamp(
+            0.65 * self._front_contact_geom_from_state(pitch, compression, rootz, support)
+            + 0.35 * torch.clamp((support - 0.10) / 0.35, min=0.0, max=1.0) * torch.sigmoid((pitch - 0.05) / 0.20),
+            min=0.0,
+            max=1.0,
+        )
 
         latent = torch.stack(
             [
-                height,
                 vx,
                 vz,
                 pitch,
                 pitch_rate,
                 compression,
                 compression_rate,
-                swing,
-                swing_rate,
-                foot_angle,
-                foot_rate,
                 support,
-                stance_mix,
-                impact,
-                clearance,
                 rootz,
-                front_anchor,
+                capture_seed,
             ],
             dim=-1,
         )
@@ -404,40 +527,20 @@ class DMControlHopperSDModel(nn.Module):
     def _explicit_rate_dynamics(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
         scaled_action = action * self.control_scale.unsqueeze(0)
 
-        height = state[:, self.HEIGHT_IDX]
         vx = state[:, self.VX_IDX]
         vz = state[:, self.VZ_IDX]
         pitch = state[:, self.PITCH_IDX]
         pitch_rate = state[:, self.PITCH_RATE_IDX]
         compression = state[:, self.COMP_IDX]
         compression_rate = state[:, self.COMP_RATE_IDX]
-        swing = state[:, self.SWING_IDX]
-        swing_rate = state[:, self.SWING_RATE_IDX]
-        foot = state[:, self.FOOT_IDX]
-        foot_rate = state[:, self.FOOT_RATE_IDX]
-        clearance = state[:, self.CLEARANCE_IDX]
         support = torch.clamp(state[:, self.SUPPORT_IDX], min=0.0, max=1.0)
-        stance_mix = torch.clamp(state[:, self.STANCE_IDX], min=-1.0, max=1.0)
-        impact = torch.clamp(state[:, self.IMPACT_IDX], min=0.0)
-        front_anchor = torch.clamp(state[:, self.FRONT_ANCHOR_IDX], min=0.0, max=1.0)
         rootz = state[:, self.ROOTZ_IDX]
-        recovery_support = self._recovery_support_from_state(pitch, support, front_anchor, rootz)
-        drive_support = torch.maximum(support, 0.75 * front_anchor)
-        posture_support = torch.maximum(support, 0.90 * front_anchor)
-        lift_support = torch.maximum(support, 0.35 * front_anchor)
-        air = 1.0 - torch.maximum(support, 0.60 * front_anchor)
-        body_low = torch.sigmoid((self.V4_ROOTZ_LOW_CENTER - rootz) / self.V4_ROOTZ_LOW_SCALE)
-        body_high = 1.0 - body_low
-        front_capture = self._front_capture_commitment(front_anchor)
-        compression_level = torch.clamp(compression / 0.35, min=0.0, max=1.0)
-        compression_arm = torch.sigmoid((compression - self.V4_RECOVERY_COMP_CENTER) / self.V4_RECOVERY_COMP_SCALE)
-        recovery_pitch = torch.sigmoid((pitch - self.V4_RECOVERY_PITCH_CENTER) / self.V4_RECOVERY_PITCH_SCALE)
-        recovery_window = front_capture * recovery_support * body_low * recovery_pitch
-        standup_window = recovery_window * compression_arm
+        capture_memory = torch.clamp(state[:, self.CAPTURE_IDX], min=0.0, max=1.0)
 
-        drive_action = 0.20 * scaled_action[:, 0] + 0.55 * scaled_action[:, 1] - 0.50 * scaled_action[:, 2] + 0.25 * scaled_action[:, 3]
-        posture_action = 0.30 * scaled_action[:, 0] - 0.10 * scaled_action[:, 1] + 0.05 * scaled_action[:, 2] + 0.05 * scaled_action[:, 3]
-        foot_action = 0.05 * scaled_action[:, 0] + 0.10 * scaled_action[:, 1] - 0.15 * scaled_action[:, 2] + 0.35 * scaled_action[:, 3]
+        # Action sign convention follows the validated v3/v4 hopper control prior:
+        # negative hip with positive knee/ankle corresponds to a release/liftoff push.
+        drive_action = 0.35 * scaled_action[:, 0] + 0.30 * scaled_action[:, 1] - 0.20 * scaled_action[:, 2] + 0.15 * scaled_action[:, 3]
+        posture_action = 0.45 * scaled_action[:, 0] - 0.20 * scaled_action[:, 1] + 0.20 * scaled_action[:, 2] + 0.15 * scaled_action[:, 3]
         release_score = (
             torch.clamp(-scaled_action[:, 1], min=0.0, max=1.0)
             + torch.clamp(scaled_action[:, 2], min=0.0, max=1.0)
@@ -449,20 +552,53 @@ class DMControlHopperSDModel(nn.Module):
             + 0.25 * torch.clamp(scaled_action[:, 2], min=0.0, max=1.0)
             + 0.15 * torch.clamp(scaled_action[:, 3], min=0.0, max=1.0)
         )
-        contact_lock = torch.maximum(support, 0.70 * front_anchor) * torch.sigmoid((-clearance - 0.70) / 0.06)
-        # Release should be driven by the recovery-specific action pattern, not by forward drive.
-        release_lift = standup_window * torch.relu(release_drive - 0.35) * (1.0 - 0.55 * contact_lock)
-        recovery_release = standup_window * (0.35 + 0.65 * release_score)
-        upright_window = recovery_support * body_high * torch.sigmoid((1.0 - torch.abs(pitch)) / self.V4_PITCH_NEUTRAL_SPREAD)
-        anchor_pitch_drive = 0.40 * recovery_support * torch.relu(pitch) * (1.0 - 0.70 * recovery_release)
+        rear_escape_drive = (
+            torch.clamp(scaled_action[:, 0], min=0.0, max=1.0)
+            + torch.clamp(-scaled_action[:, 1], min=0.0, max=1.0)
+            + torch.clamp(scaled_action[:, 2], min=0.0, max=1.0)
+            + torch.clamp(scaled_action[:, 3], min=0.0, max=1.0)
+        ) / 4.0
+        rear_collapse_drive = (
+            torch.clamp(-scaled_action[:, 0], min=0.0, max=1.0)
+            + torch.clamp(scaled_action[:, 1], min=0.0, max=1.0)
+            + torch.clamp(-scaled_action[:, 2], min=0.0, max=1.0)
+            + torch.clamp(-scaled_action[:, 3], min=0.0, max=1.0)
+        ) / 4.0
 
-        x_acc = drive_support * (0.90 * drive_action + 0.25 * swing_rate + 0.15 * stance_mix - 0.18 * vx) + 0.35 * front_anchor * torch.relu(pitch) - 0.06 * air * vx
-        z_acc = -4.8 - 1.6 * air + lift_support * (10.0 * compression + 4.5 * release_lift + 1.2 * impact - 1.4 * torch.relu(vz)) + 4.0 * recovery_release + 1.8 * upright_window
-        pitch_acc = -2.5 * pitch - 0.75 * pitch_rate - 0.35 * swing + posture_support * (0.15 * posture_action + 0.08 * stance_mix) + anchor_pitch_drive - 1.85 * recovery_release * torch.clamp(pitch, min=0.0, max=2.5) - 1.20 * release_lift * torch.clamp(pitch, min=0.0, max=2.5) - 0.70 * upright_window * pitch
-        compression_acc = lift_support * (1.4 * torch.relu(-vz) + 0.8 * impact - 3.2 * release_lift) - 0.90 * compression - 0.35 * compression_rate + 0.15 * air * compression + 0.20 * front_anchor * compression - 0.75 * recovery_release * compression - 0.45 * release_lift * compression
-        swing_acc = 0.80 * drive_action - 1.10 * swing - 0.40 * swing_rate - 0.15 * stance_mix + 0.10 * front_anchor * torch.relu(pitch)
-        foot_acc = 0.90 * foot_action - 1.00 * foot - 0.35 * foot_rate + 0.10 * stance_mix
-        impact_rate = -3.0 * impact + lift_support * torch.relu(-vz)
+        body_low = self._body_low_from_rootz(rootz)
+        body_high = 1.0 - body_low
+        rear_phase = self._rear_recovery_phase_from_state(pitch, rootz)
+        capture_commitment = self._capture_commitment(capture_memory)
+        recovery_support = self._recovery_support_from_state(pitch, support, capture_memory, rootz)
+        standup_window = self._standup_window_from_state(pitch, support, compression, capture_memory, rootz)
+        arm_ready = self._arm_ready_from_state(pitch, support, compression, capture_memory, rootz)
+        release_phase = self._release_phase_from_state(pitch, support, compression, rootz, capture_memory)
+        release_window = torch.maximum(standup_window, 0.60 * release_phase)
+        clearance = self._clearance_from_state(compression, pitch, support)
+        contact_geom = self._front_contact_geom_from_state(pitch, compression, rootz, support)
+        grounded = torch.maximum(support, 0.30 * contact_geom)
+        contact_lock = grounded * torch.sigmoid((-clearance - 0.70) / 0.06)
+        release_lift = release_window * torch.relu(release_drive - 0.35) * (1.0 - 0.60 * contact_lock)
+        recovery_release = release_window * (0.35 + 0.65 * release_score)
+
+        drive_support = torch.clamp(0.80 * grounded + 0.20 * recovery_support, min=0.0, max=1.0)
+        lift_support = grounded
+        posture_support = torch.maximum(grounded, 0.20 * recovery_support)
+        air = 1.0 - grounded
+        impact = lift_support * torch.relu(-vz)
+        upright_window = recovery_support * body_high * torch.sigmoid((1.0 - torch.abs(pitch)) / self.V4_PITCH_NEUTRAL_SPREAD)
+        anchor_pitch_drive = 0.35 * recovery_support * torch.relu(pitch) * (1.0 - 0.70 * recovery_release)
+        stance_impact_pitch = -2.8 * grounded * torch.relu(-vz) * torch.clamp(1.0 - 0.85 * contact_geom, min=0.0, max=1.0)
+        front_capture_pitch = 3.4 * contact_geom * torch.relu(-vz) * torch.clamp(1.0 - support, min=0.0, max=1.0)
+        pitch_turnover = 3.2 * torch.maximum(
+            grounded * torch.relu(-vz),
+            release_lift + 0.50 * recovery_release,
+        ) * (-torch.tanh(pitch_rate / 4.0))
+
+        x_acc = drive_support * (0.95 * drive_action + 0.20 * torch.relu(pitch) - 0.20 * vx) + 0.25 * release_window * release_score - 0.06 * air * vx
+        z_acc = -4.8 - 1.4 * air + lift_support * (9.5 * compression + 1.1 * impact - 1.3 * torch.relu(vz)) + 4.2 * recovery_release + 4.8 * release_lift + 1.4 * upright_window + 1.8 * rear_phase * rear_escape_drive - 1.2 * rear_phase * rear_collapse_drive
+        pitch_acc = -1.8 * pitch - 0.65 * pitch_rate + posture_support * (0.22 * posture_action) + anchor_pitch_drive + stance_impact_pitch + front_capture_pitch + pitch_turnover - 0.60 * recovery_release * torch.clamp(pitch, min=0.0, max=2.5) - 0.45 * upright_window * pitch + 2.2 * rear_phase * rear_escape_drive - 1.6 * rear_phase * rear_collapse_drive
+        compression_acc = lift_support * (1.25 * torch.relu(-vz) + 0.55 * impact - 2.4 * release_lift) - 0.90 * compression - 0.35 * compression_rate + 0.12 * air * compression + 0.10 * grounded * compression - 0.55 * recovery_release * compression
 
         return torch.cat(
             [
@@ -470,36 +606,24 @@ class DMControlHopperSDModel(nn.Module):
                 z_acc.unsqueeze(-1),
                 pitch_acc.unsqueeze(-1),
                 compression_acc.unsqueeze(-1),
-                swing_acc.unsqueeze(-1),
-                foot_acc.unsqueeze(-1),
-                impact_rate.unsqueeze(-1),
             ],
             dim=-1,
         )
 
     def _rate_dynamics(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
         explicit = self._explicit_rate_dynamics(state, action)
-        passive = self.learned_passive_weight * torch.tanh(self.passive_flow(state)) * self.passive_scale
-        residual = self.learned_residual_weight * torch.tanh(
-            self.residual_flow(torch.cat([state, action], dim=-1))
-        ) * self.residual_scale
         damping = self.rate_damping.unsqueeze(0) * state[:, list(self.RATE_LIKE_IDX)]
-        return explicit + passive + residual - damping
+        return explicit - damping
 
     def project_state(self, state: torch.Tensor) -> torch.Tensor:
         if state.dim() == 1:
             state = state.unsqueeze(0)
         cols = [state[:, i] for i in range(self.STATE_DIM)]
-        cols[self.HEIGHT_IDX] = torch.clamp(cols[self.HEIGHT_IDX], min=0.0, max=2.5)
         cols[self.PITCH_IDX] = torch.clamp(cols[self.PITCH_IDX], min=-6.5, max=6.5)
         cols[self.COMP_IDX] = torch.clamp(cols[self.COMP_IDX], min=0.0, max=1.5)
-        cols[self.SWING_IDX] = _wrap_angle_torch(cols[self.SWING_IDX])
-        cols[self.FOOT_IDX] = _wrap_angle_torch(cols[self.FOOT_IDX])
         cols[self.SUPPORT_IDX] = torch.clamp(cols[self.SUPPORT_IDX], min=0.0, max=1.0)
-        cols[self.STANCE_IDX] = torch.clamp(cols[self.STANCE_IDX], min=-1.0, max=1.0)
-        cols[self.IMPACT_IDX] = torch.clamp(cols[self.IMPACT_IDX], min=0.0, max=2.0)
         cols[self.ROOTZ_IDX] = torch.clamp(cols[self.ROOTZ_IDX], min=-1.5, max=1.5)
-        cols[self.FRONT_ANCHOR_IDX] = torch.clamp(cols[self.FRONT_ANCHOR_IDX], min=0.0, max=1.0)
+        cols[self.CAPTURE_IDX] = torch.clamp(cols[self.CAPTURE_IDX], min=0.0, max=1.0)
         return torch.stack(cols, dim=-1)
 
     def _forward_one_substep(self, state: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
@@ -515,25 +639,16 @@ class DMControlHopperSDModel(nn.Module):
         next_vz = next_rate_like[:, 1]
         next_pitch_rate = next_rate_like[:, 2]
         next_comp_rate = next_rate_like[:, 3]
-        next_swing_rate = next_rate_like[:, 4]
-        next_foot_rate = next_rate_like[:, 5]
-        next_impact = torch.clamp(next_rate_like[:, 6], min=0.0, max=2.0)
 
-        height = state[:, self.HEIGHT_IDX]
         pitch = state[:, self.PITCH_IDX]
+        pitch_rate = state[:, self.PITCH_RATE_IDX]
         compression = state[:, self.COMP_IDX]
-        swing = state[:, self.SWING_IDX]
-        foot = state[:, self.FOOT_IDX]
         support = torch.clamp(state[:, self.SUPPORT_IDX], min=0.0, max=1.0)
-        stance = torch.clamp(state[:, self.STANCE_IDX], min=-1.0, max=1.0)
-        front_anchor = torch.clamp(state[:, self.FRONT_ANCHOR_IDX], min=0.0, max=1.0)
-        clearance = state[:, self.CLEARANCE_IDX]
         rootz = state[:, self.ROOTZ_IDX]
-        current_front_capture = self._front_capture_commitment(front_anchor)
-        current_recovery_support = self._recovery_support_from_state(pitch, support, front_anchor, rootz)
-        current_body_low = torch.sigmoid((self.V4_ROOTZ_LOW_CENTER - rootz) / self.V4_ROOTZ_LOW_SCALE)
-        current_recovery_pitch = torch.sigmoid((pitch - self.V4_RECOVERY_PITCH_CENTER) / self.V4_RECOVERY_PITCH_SCALE)
-        current_compression_arm = torch.sigmoid((compression - self.V4_RECOVERY_COMP_CENTER) / self.V4_RECOVERY_COMP_SCALE)
+        capture_memory = torch.clamp(state[:, self.CAPTURE_IDX], min=0.0, max=1.0)
+        vz = state[:, self.VZ_IDX]
+        capture_commitment = self._capture_commitment(capture_memory)
+
         release_score = (
             torch.clamp(-action[:, 1], min=0.0, max=1.0)
             + torch.clamp(action[:, 2], min=0.0, max=1.0)
@@ -545,92 +660,65 @@ class DMControlHopperSDModel(nn.Module):
             + 0.25 * torch.clamp(action[:, 2], min=0.0, max=1.0)
             + 0.15 * torch.clamp(action[:, 3], min=0.0, max=1.0)
         )
-        standup_window = current_front_capture * current_recovery_support * current_body_low * current_recovery_pitch * current_compression_arm
-        recovery_release = standup_window * (0.35 + 0.65 * release_score)
-        release_lift = standup_window * torch.relu(release_drive - 0.35)
-        release_height_boost = 0.08 * recovery_release + 0.12 * release_lift
-        release_pitch_recovery = (0.06 * recovery_release + 0.08 * release_lift) * torch.clamp(pitch / 2.5, min=0.0, max=1.0)
 
-        next_height = torch.clamp(height + self.dt * next_vz + release_height_boost, min=0.0, max=2.5)
-        next_pitch = torch.clamp(pitch + self.dt * next_pitch_rate - release_pitch_recovery, min=-6.5, max=6.5)
-        integrated_comp = torch.clamp(compression + self.dt * next_comp_rate, min=0.0, max=1.5)
-        target_comp = torch.relu(self.TARGET_STAND_HEIGHT - next_height)
-        next_comp = 0.65 * integrated_comp + 0.35 * target_comp
-        next_swing = _wrap_angle_torch(swing + self.dt * next_swing_rate)
-        next_foot = _wrap_angle_torch(foot + self.dt * next_foot_rate)
+        standup_window = self._standup_window_from_state(pitch, support, compression, capture_memory, rootz)
+        release_phase = self._release_phase_from_state(pitch, support, compression, rootz, capture_memory)
+        release_window = torch.maximum(standup_window, 0.60 * release_phase)
+        recovery_release = release_window * (0.35 + 0.65 * release_score)
+        release_lift = release_window * torch.relu(release_drive - 0.35)
 
-        clearance_geom = next_height - 0.58 - 0.18 * next_comp - 0.05 * torch.abs(next_pitch) - 0.06 * torch.cos(next_foot)
-        touch_residual = self.TOUCH_RESIDUAL_SCALE * torch.tanh(self.touch_head(state))
-        contact_geom = torch.sigmoid((self.CONTACT_MARGIN - clearance_geom) / 0.04)
+        next_pitch = torch.clamp(pitch + self.dt * next_pitch_rate, min=-6.5, max=6.5)
+        next_rootz = torch.clamp(rootz + self.dt * next_vz, min=-1.5, max=1.5)
+        next_comp_rate = 0.60 * next_comp_rate + 0.40 * (-next_vz)
+        next_comp = torch.clamp(compression + self.dt * next_comp_rate, min=0.0, max=1.5)
+
+        next_clearance = self._clearance_from_state(next_comp, next_pitch, support)
+        contact_geom = torch.sigmoid((self.CONTACT_MARGIN - next_clearance) / 0.04)
         impact_gate = torch.sigmoid((0.12 - next_vz) / 0.22)
-        support_hold = 0.14 * support * torch.sigmoid((next_vz + 0.02) / 0.08) * torch.sigmoid((-clearance_geom - 0.50) / 0.10)
+        contact_stick = torch.sigmoid((0.02 - next_vz) / 0.10) * torch.sigmoid((0.02 - next_clearance) / 0.08)
+        support_hold = 0.18 * capture_commitment * support * contact_stick * torch.sigmoid((-next_clearance - 0.10) / 0.10)
+        attach_rate = 0.55 * torch.maximum(contact_geom * impact_gate, contact_geom * contact_stick)
+        liftoff_release = recovery_release * torch.sigmoid((next_vz - 0.04) / 0.10)
+        detach_rate = 0.45 * torch.maximum(
+            liftoff_release,
+            (1.0 - contact_geom) * torch.sigmoid((next_vz - 0.04) / 0.10),
+        )
         next_support = torch.clamp(
-            0.55 * support + 0.35 * contact_geom * impact_gate + 0.10 * torch.sigmoid(next_impact) + support_hold + touch_residual[:, 0],
+            support
+            + attach_rate * (1.0 - support)
+            + support_hold * (1.0 - support)
+            - detach_rate * support,
             min=0.0,
             max=1.0,
         )
-        next_stance = torch.tanh(0.55 * stance + 0.25 * next_swing - 0.08 * next_foot + touch_residual[:, 1])
-        clearance_residual = self.HEIGHT_RESIDUAL_SCALE * torch.tanh(self.clearance_head(state).squeeze(-1))
-        clearance_contact_penalty = 0.12 * next_support + 0.06 * torch.sigmoid(next_impact)
-        next_clearance = clearance_geom - clearance_contact_penalty + clearance_residual
-        # v4: propagate rootz via vertical velocity plus release-induced torso lift.
-        next_rootz = torch.clamp(rootz + self.dt * next_vz + release_height_boost, min=-1.5, max=1.5)
-        next_front_anchor_geom = self._front_anchor_from_geom(next_pitch, next_clearance, next_rootz)
-        next_recovery_support_hint = self._recovery_support_from_state(next_pitch, next_support, next_front_anchor_geom, next_rootz)
-        next_precapture_corridor = self._precapture_corridor_from_state(next_pitch, next_support, next_clearance, next_rootz)
-        next_body_low = torch.sigmoid((self.V4_ROOTZ_LOW_CENTER - next_rootz) / self.V4_ROOTZ_LOW_SCALE)
-        next_body_high = 1.0 - next_body_low
-        next_recovered_upright = next_body_high * torch.sigmoid((1.0 - torch.abs(next_pitch)) / self.V4_PITCH_NEUTRAL_SPREAD)
-        next_handoff_ready = next_body_high * torch.sigmoid((1.8 - torch.abs(next_pitch)) / 0.45)
-        next_rootz_gain = torch.clamp(next_rootz - rootz, min=0.0, max=0.20) / 0.20
-        release_score = (
-            torch.clamp(-action[:, 1], min=0.0, max=1.0)
-            + torch.clamp(action[:, 2], min=0.0, max=1.0)
-            + torch.clamp(action[:, 3], min=0.0, max=1.0)
-        ) / 3.0
-        compression_arm = torch.sigmoid((compression - self.V4_RECOVERY_COMP_CENTER) / self.V4_RECOVERY_COMP_SCALE)
-        recovery_pitch = torch.sigmoid((pitch - self.V4_RECOVERY_PITCH_CENTER) / self.V4_RECOVERY_PITCH_SCALE)
-        recovery_release = current_front_capture * current_recovery_support * torch.sigmoid((self.V4_ROOTZ_LOW_CENTER - rootz) / self.V4_ROOTZ_LOW_SCALE) * recovery_pitch * compression_arm * (0.35 + 0.65 * release_score)
-        next_rear_trap = torch.sigmoid((self.V4_ROOTZ_LOW_CENTER - next_rootz) / self.V4_ROOTZ_LOW_SCALE) * torch.sigmoid(
-            -(next_pitch - self.V4_PITCH_BACK_CENTER) / self.V4_PITCH_BACK_SCALE
-        )
-        relock_gate = 1.0 - 0.75 * recovery_release
-        precapture_build = next_precapture_corridor * (1.0 - current_front_capture) * (1.0 - 0.50 * next_rear_trap)
-        handoff_suppress = torch.maximum(current_front_capture, 0.5 * recovery_release)
-        next_front_anchor = torch.clamp(
-            0.50 * front_anchor
-            + 0.40 * next_front_anchor_geom * relock_gate
-            + 0.18 * precapture_build
-            + 0.15 * next_recovery_support_hint * (1.0 - relock_gate)
-            + 0.08 * support * torch.sigmoid((next_pitch - self.V4_FRONT_ANCHOR_PITCH_CENTER) / self.V4_FRONT_ANCHOR_PITCH_SCALE) * relock_gate
-            - 0.10 * next_rear_trap
-            - 0.14 * next_handoff_ready * handoff_suppress
-            - 0.22 * next_recovered_upright * handoff_suppress
-            - 0.08 * next_rootz_gain
-            - 0.25 * recovery_release,
+
+        next_front_contact = self._front_contact_geom_from_state(next_pitch, next_comp, next_rootz, next_support)
+        next_rear_trap = self._rear_recovery_phase_from_state(next_pitch, next_rootz)
+        next_precapture = self._precapture_phase_from_state(next_pitch, next_support, next_comp, next_rootz, capture_memory)
+        release_decay = (1.0 - self._body_low_from_rootz(next_rootz)) * recovery_release
+        support_commit = next_support * torch.sigmoid((next_pitch - self.V4_CAPTURE_PITCH_CENTER) / self.V4_CAPTURE_PITCH_SCALE)
+        next_capture = torch.clamp(
+            0.72 * capture_memory
+            + 0.28 * next_front_contact
+            + 0.22 * next_precapture * (1.0 - capture_commitment)
+            + 0.14 * support_commit
+            - 0.18 * next_rear_trap
+            - 0.10 * release_decay,
             min=0.0,
             max=1.0,
         )
 
         return torch.stack(
             [
-                next_height,
                 next_vx,
                 next_vz,
                 next_pitch,
                 next_pitch_rate,
                 next_comp,
                 next_comp_rate,
-                next_swing,
-                next_swing_rate,
-                next_foot,
-                next_foot_rate,
                 next_support,
-                next_stance,
-                next_impact,
-                next_clearance,
                 next_rootz,
-                next_front_anchor,
+                next_capture,
             ],
             dim=-1,
         )
@@ -641,7 +729,6 @@ class DMControlHopperSDModel(nn.Module):
         if action.dim() == 1:
             action = action.unsqueeze(0)
 
-        # Match the DMControl wrapper, which advances the simulator twice per environment step.
         next_state = state
         for _ in range(self.ENV_ACTION_REPEAT):
             next_state = self._forward_one_substep(next_state, action)
@@ -669,8 +756,7 @@ class DMControlHopperSDModel(nn.Module):
     def predict_height(self, state: torch.Tensor) -> torch.Tensor:
         if state.dim() == 1:
             state = state.unsqueeze(0)
-        height_residual = 0.02 * torch.tanh(self.height_head(state).squeeze(-1))
-        return state[:, self.HEIGHT_IDX] + height_residual
+        return self._height_from_compression(torch.clamp(state[:, self.COMP_IDX], min=0.0))
 
     def predict_reward(
         self,
@@ -678,20 +764,12 @@ class DMControlHopperSDModel(nn.Module):
         action: torch.Tensor,
         next_state: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
-        """Environment-aligned reward under the current DMControl wrapper.
-
-        The DMControl environment wrapper applies each action for two internal
-        simulator steps and accumulates both rewards into one environment step.
-        The explicit reward therefore needs to match that two-step scale.
-        """
         if next_state is None:
             next_state = self.forward(state, action)
         height = self.predict_height(next_state)
         x_dot = next_state[:, self.VX_IDX]
-
         standing = self._tolerance_interval(height, 0.6, 2.0)
         hopping = self._lower_tolerance(x_dot, lower=self.hop_speed, margin=self.hop_speed / 2.0, value_at_margin=0.5)
-
         return self.ENV_ACTION_REPEAT * standing * hopping
 
     def predict_viable_reward(
@@ -700,29 +778,20 @@ class DMControlHopperSDModel(nn.Module):
         action: torch.Tensor,
         next_state: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
-        """Viability-aware reward for hybrid/explicit/planning use.
-
-        Multiplies the true reward by a stability gate that approximates
-        the probability of surviving beyond the current step.  This
-        compensates for short planning horizons that cannot foresee falls.
-        """
         if next_state is None:
             next_state = self.forward(state, action)
         true_reward = self.predict_reward(state, action, next_state)
         height = self.predict_height(next_state)
         pitch = next_state[:, self.PITCH_IDX]
-        support = next_state[:, self.SUPPORT_IDX]
-        clearance = next_state[:, self.CLEARANCE_IDX]
+        rootz = next_state[:, self.ROOTZ_IDX]
+        capture = next_state[:, self.CAPTURE_IDX]
 
         height_gate = self._lower_tolerance(height, lower=0.45, margin=0.15, value_at_margin=0.0)
-        upright = 0.5 * (1.0 + torch.cos(pitch))
-        pitch_gate = torch.clamp((upright - 0.35) / 0.45, min=0.0, max=1.0)
-        support_gate = torch.clamp((support - 0.08) / 0.22, min=0.0, max=1.0)
-        clearance_gate = torch.clamp((clearance + 0.02) / 0.10, min=0.0, max=1.0)
-        contact_gate = torch.maximum(support_gate, clearance_gate)
-        viability = height_gate * pitch_gate * contact_gate
-
-        return viability * true_reward
+        forward_lean = torch.sigmoid((pitch - self.V4_PITCH_FWD_CENTER) / self.V4_PITCH_FWD_SCALE)
+        recovered_upright = self._recovered_upright_from_state(pitch, rootz)
+        rear_trap = self._rear_recovery_phase_from_state(pitch, rootz)
+        viable_lane = torch.maximum(forward_lean * self._capture_commitment(capture), recovered_upright)
+        return height_gate * viable_lane * (1.0 - rear_trap) * true_reward
 
     def predict_plan_reward(
         self,
@@ -730,139 +799,169 @@ class DMControlHopperSDModel(nn.Module):
         action: torch.Tensor,
         next_state: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
-        """Planning reward that prefers hop-relevant transitions.
-
-        The earlier shaping over-rewarded safe, high-contact states with small
-        forward drift. This version keeps a viability gate, but now also
-        distinguishes three sub-regimes that Phase 0 exposed as behaviorally
-        important: low-body forward crawl, compression arming, and release into
-        takeoff. The intent is to reward the recovery sequence, not only the
-        final airborne state.
-        """
         if next_state is None:
             next_state = self.forward(state, action)
 
         true_reward = self.predict_reward(state, action, next_state)
-        height = self.predict_height(next_state)
         x_dot = next_state[:, self.VX_IDX]
         z_dot = next_state[:, self.VZ_IDX]
         pitch = next_state[:, self.PITCH_IDX]
         prev_pitch = state[:, self.PITCH_IDX]
         compression = torch.clamp(next_state[:, self.COMP_IDX], min=0.0)
+        prev_compression = torch.clamp(state[:, self.COMP_IDX], min=0.0)
         support = torch.clamp(next_state[:, self.SUPPORT_IDX], min=0.0, max=1.0)
         prev_support = torch.clamp(state[:, self.SUPPORT_IDX], min=0.0, max=1.0)
-        clearance = next_state[:, self.CLEARANCE_IDX]
         prev_rootz = state[:, self.ROOTZ_IDX]
         next_rootz = next_state[:, self.ROOTZ_IDX]
-        front_anchor = torch.clamp(next_state[:, self.FRONT_ANCHOR_IDX], min=0.0, max=1.0)
-        prev_front_anchor = torch.clamp(state[:, self.FRONT_ANCHOR_IDX], min=0.0, max=1.0)
-        prev_front_capture = self._front_capture_commitment(prev_front_anchor)
-        front_capture = self._front_capture_commitment(front_anchor)
-        recovery_support = self._recovery_support_from_state(pitch, support, front_anchor, next_rootz)
-        prev_recovery_support = self._recovery_support_from_state(prev_pitch, prev_support, prev_front_anchor, prev_rootz)
-        precapture_corridor = self._precapture_corridor_from_state(pitch, support, clearance, next_rootz)
+        capture = torch.clamp(next_state[:, self.CAPTURE_IDX], min=0.0, max=1.0)
+        prev_capture = torch.clamp(state[:, self.CAPTURE_IDX], min=0.0, max=1.0)
 
-        # v4 asymmetric-contact viability: replace symmetric cos(pitch) gate with a
-        # two-lane signed composition. Phase 0 showed that successful trajectories
-        # occupy either (a) forward-leaning crawl (pitch > 0, body low) or (b)
-        # recovered upright hopping (body high, |pitch| small). Failure is
-        # unambiguously "body low AND pitch negative" (rear-trap). The gate
-        # therefore admits lane (a) via forward_lean and lane (b) via
-        # recovered_upright, taking their elementwise max, then subtracts
-        # rear-trap probability multiplicatively and via an explicit penalty.
-        height_gate = self._lower_tolerance(height, lower=0.45, margin=0.15, value_at_margin=0.0)
-        prev_body_low = torch.sigmoid((self.V4_ROOTZ_LOW_CENTER - prev_rootz) / self.V4_ROOTZ_LOW_SCALE)
-        prev_body_high = 1.0 - prev_body_low
-        body_low = torch.sigmoid((self.V4_ROOTZ_LOW_CENTER - next_rootz) / self.V4_ROOTZ_LOW_SCALE)
-        body_high = 1.0 - body_low
+        capture_commitment = self._capture_commitment(capture)
+        prev_capture_commitment = self._capture_commitment(prev_capture)
+        recovery_support = self._recovery_support_from_state(pitch, support, capture, next_rootz)
+        prev_recovery_support = self._recovery_support_from_state(prev_pitch, prev_support, prev_capture, prev_rootz)
+        front_contact = self._front_contact_geom_from_state(pitch, compression, next_rootz, support)
+        prev_front_contact = self._front_contact_geom_from_state(prev_pitch, prev_compression, prev_rootz, prev_support)
+        height = self.predict_height(next_state)
+
+        prev_body_low = self._body_low_from_rootz(prev_rootz)
+        body_low = self._body_low_from_rootz(next_rootz)
         prev_forward_lean = torch.sigmoid((prev_pitch - self.V4_PITCH_FWD_CENTER) / self.V4_PITCH_FWD_SCALE)
         forward_lean = torch.sigmoid((pitch - self.V4_PITCH_FWD_CENTER) / self.V4_PITCH_FWD_SCALE)
-        prev_recovered_upright = prev_body_high * torch.sigmoid((1.0 - torch.abs(prev_pitch)) / self.V4_PITCH_NEUTRAL_SPREAD)
-        prev_handoff_ready = prev_body_high * torch.sigmoid((1.8 - torch.abs(prev_pitch)) / 0.45)
-        recovered_upright = body_high * torch.sigmoid((1.0 - torch.abs(pitch)) / self.V4_PITCH_NEUTRAL_SPREAD)
-        handoff_ready = body_high * torch.sigmoid((1.8 - torch.abs(pitch)) / 0.45)
-        viable_lane = torch.maximum(forward_lean, recovered_upright)
-        rear_trap = body_low * torch.sigmoid(-(pitch - self.V4_PITCH_BACK_CENTER) / self.V4_PITCH_BACK_SCALE)
+        prev_recovered_upright = self._recovered_upright_from_state(prev_pitch, prev_rootz)
+        prev_handoff_ready = self._handoff_ready_from_state(prev_pitch, prev_rootz)
+        recovered_upright = self._recovered_upright_from_state(pitch, next_rootz)
+        handoff_ready = self._handoff_ready_from_state(pitch, next_rootz)
+        viable_lane = torch.maximum(forward_lean * torch.maximum(capture_commitment, front_contact), recovered_upright)
+        prev_rear_trap = self._rear_recovery_phase_from_state(prev_pitch, prev_rootz)
+        rear_trap = self._rear_recovery_phase_from_state(pitch, next_rootz)
+        height_gate = self._lower_tolerance(height, lower=0.45, margin=0.15, value_at_margin=0.0)
         viability = height_gate * viable_lane * (1.0 - rear_trap)
         recovery_gate = self._lower_tolerance(next_rootz, lower=-0.95, margin=0.35, value_at_margin=0.0) * (1.0 - rear_trap)
-        crawl_lane = body_low * forward_lean
+        crawl_lane = body_low * forward_lean * capture_commitment
 
         speed_progress = torch.clamp(x_dot / max(self.hop_speed, 1e-6), min=0.0, max=1.0)
         upward_progress = torch.clamp(z_dot / 0.60, min=0.0, max=1.0)
         liftoff_progress = torch.clamp((0.18 - support) / 0.18, min=0.0, max=1.0)
         sticky_contact = torch.clamp((support - 0.55) / 0.35, min=0.0, max=1.0) * torch.clamp((-z_dot) / 0.35, min=0.0, max=1.0)
-        grounded = torch.clamp((support - 0.12) / 0.40, min=0.0, max=1.0)
         compression_level = torch.clamp(compression / 0.35, min=0.0, max=1.0)
         release_score = (
             torch.clamp(-action[:, 1], min=0.0, max=1.0)
             + torch.clamp(action[:, 2], min=0.0, max=1.0)
             + torch.clamp(action[:, 3], min=0.0, max=1.0)
         ) / 3.0
-        compression_drive = (
-            torch.clamp(action[:, 1], min=0.0, max=1.0)
+        rear_escape_drive = (
+            torch.clamp(action[:, 0], min=0.0, max=1.0)
+            + torch.clamp(-action[:, 1], min=0.0, max=1.0)
+            + torch.clamp(action[:, 2], min=0.0, max=1.0)
+            + torch.clamp(action[:, 3], min=0.0, max=1.0)
+        ) / 4.0
+        rear_collapse_drive = (
+            torch.clamp(-action[:, 0], min=0.0, max=1.0)
+            + torch.clamp(action[:, 1], min=0.0, max=1.0)
             + torch.clamp(-action[:, 2], min=0.0, max=1.0)
             + torch.clamp(-action[:, 3], min=0.0, max=1.0)
-        ) / 3.0
+        ) / 4.0
         release_liftoff = torch.maximum(upward_progress, liftoff_progress)
         pitch_gain = torch.clamp(pitch - prev_pitch, min=0.0, max=0.45) / 0.45
-        front_anchor_gain = torch.clamp(front_anchor - prev_front_anchor, min=0.0, max=0.35) / 0.35
-        front_capture_gain = torch.clamp(front_capture - prev_front_capture, min=0.0, max=0.30) / 0.30
+        capture_gain = torch.clamp(capture - prev_capture, min=0.0, max=0.35) / 0.35
+        contact_gain = torch.clamp(front_contact - prev_front_contact, min=0.0, max=0.35) / 0.35
+
+        prev_standup_window = self._standup_window_from_state(prev_pitch, prev_support, prev_compression, prev_capture, prev_rootz)
+        standup_window = self._standup_window_from_state(pitch, support, compression, capture, next_rootz)
+        prev_arm_ready = self._arm_ready_from_state(prev_pitch, prev_support, prev_compression, prev_capture, prev_rootz)
+        arm_ready = self._arm_ready_from_state(pitch, support, compression, capture, next_rootz)
+        prev_precapture_phase = self._precapture_phase_from_state(prev_pitch, prev_support, prev_compression, prev_rootz, prev_capture)
+        prev_capture_phase = self._capture_crawl_phase_from_state(prev_pitch, prev_support, prev_rootz, prev_capture)
+        prev_standup_phase = self._standup_phase_from_state(prev_pitch, prev_support, prev_compression, prev_rootz, prev_capture)
+        prev_release_phase = self._release_phase_from_state(prev_pitch, prev_support, prev_compression, prev_rootz, prev_capture)
+        prev_handoff_phase = self._handoff_phase_from_state(prev_pitch, prev_support, prev_compression, prev_rootz, prev_capture)
+        prev_crawl_to_standup_bias = self._crawl_to_standup_bias_from_state(prev_pitch, prev_support, prev_compression, prev_rootz, prev_capture)
+        crawl_to_standup_bias = self._crawl_to_standup_bias_from_state(pitch, support, compression, next_rootz, capture)
+
+        arm_ready_gain = torch.clamp(arm_ready - prev_arm_ready, min=0.0, max=0.25) / 0.25
         body_rise = torch.clamp(prev_body_low - body_low, min=0.0, max=0.45) / 0.45
         upright_gain = torch.clamp(recovered_upright - prev_recovered_upright, min=0.0, max=0.45) / 0.45
-        anchor_release = torch.clamp(prev_front_anchor - front_anchor, min=0.0, max=0.35) / 0.35
+        capture_release = torch.clamp(prev_capture - capture, min=0.0, max=0.35) / 0.35
         rootz_gain_progress = torch.clamp(next_rootz - prev_rootz, min=0.0, max=0.25) / 0.25
         handoff_ready_gain = torch.clamp(handoff_ready - prev_handoff_ready, min=0.0, max=0.20) / 0.20
         recovery_support_gain = torch.clamp(recovery_support - prev_recovery_support, min=-0.20, max=0.20) / 0.20
-        unsupported_low = body_low * (1.0 - front_anchor) * torch.sigmoid((self.V4_FRONT_ANCHOR_PITCH_CENTER - pitch) / self.V4_FRONT_ANCHOR_PITCH_SCALE)
-        precapture_gate = recovery_gate * prev_body_low * grounded * (1.0 - prev_front_capture)
-        crawl_gate = recovery_gate * prev_front_capture * prev_body_low * grounded
-        standup_gate = recovery_gate * prev_front_capture * prev_recovery_support * prev_body_low
-        arm_gate = recovery_gate * prev_front_capture * prev_recovery_support * grounded * torch.maximum(prev_recovered_upright, 0.5 * prev_handoff_ready)
-        handoff_gate = recovery_gate * prev_front_capture * prev_recovery_support * prev_handoff_ready
-        premature_release = recovery_gate * prev_body_low * (1.0 - prev_front_capture) * release_score
+        crawl_to_standup_gain = torch.clamp(crawl_to_standup_bias - prev_crawl_to_standup_bias, min=0.0, max=0.25) / 0.25
+        unsupported_low = body_low * (1.0 - capture_commitment) * torch.sigmoid((self.V4_CAPTURE_PITCH_CENTER - pitch) / self.V4_CAPTURE_PITCH_SCALE)
 
-        # Keep only a weak task-agnostic micro-shaping here. Stage-specific rewards
-        # below should carry the recovery sequence, otherwise they get double-counted.
-        positive = viability * (
-            0.12 * speed_progress
-            + 0.08 * upward_progress
+        rear_gate = recovery_gate * prev_rear_trap
+        precapture_gate = recovery_gate * prev_precapture_phase
+        crawl_gate = recovery_gate * prev_capture_phase
+        standup_gate = recovery_gate * prev_standup_phase
+        release_gate = recovery_gate * prev_release_phase
+        handoff_gate = recovery_gate * prev_handoff_phase
+        premature_release = recovery_gate * torch.maximum(prev_rear_trap, prev_precapture_phase) * release_score
+
+        positive = viability * (0.12 * speed_progress + 0.08 * upward_progress)
+        rear_escape_progress = rear_gate * (
+            0.50 * pitch_gain
+            + 0.28 * capture_gain
+            + 0.12 * torch.clamp(recovery_support_gain, min=0.0, max=1.0)
+            + 0.10 * rear_escape_drive
         )
         precapture_progress = precapture_gate * (
-            0.35 * front_capture
-            + 0.25 * front_capture_gain
-            + 0.20 * front_anchor_gain
-            + 0.20 * precapture_corridor
-            + 0.10 * speed_progress * torch.maximum(prev_forward_lean, forward_lean)
+            0.34 * capture_commitment
+            + 0.24 * capture_gain
+            + 0.22 * front_contact
+            + 0.20 * contact_gain
         )
-        crawl_progress = crawl_gate * front_anchor * speed_progress
-        arming_progress = standup_gate * compression_level * compression_drive
-        release_progress = arm_gate * compression_level * release_score * release_liftoff
-        rear_escape_progress = recovery_gate * (0.75 * prev_recovery_support + 0.25 * front_anchor_gain) * pitch_gain
+        crawl_phase_now = self._capture_crawl_phase_from_state(pitch, support, next_rootz, capture)
+        crawl_progress = crawl_gate * crawl_phase_now * (
+            (0.70 - 0.22 * prev_crawl_to_standup_bias) * speed_progress
+            + 0.18 * capture_gain
+            + 0.12 * torch.clamp(recovery_support_gain, min=0.0, max=1.0)
+        )
+        standup_transfer_progress = crawl_gate * prev_crawl_to_standup_bias * (
+            0.30 * body_rise
+            + 0.24 * arm_ready_gain
+            + 0.18 * rootz_gain_progress
+            + 0.16 * upright_gain
+            + 0.12 * crawl_to_standup_gain
+        )
         standup_progress = standup_gate * (
-            0.40 * body_rise + 0.35 * upright_gain + 0.25 * upward_progress
+            0.34 * body_rise
+            + 0.28 * upright_gain
+            + 0.22 * arm_ready_gain
+            + 0.16 * torch.clamp(recovery_support_gain, min=0.0, max=1.0)
         )
-        handoff_progress = handoff_gate * torch.maximum(handoff_ready, 0.5 * body_rise) * (
-            0.24 * body_rise
-            + 0.22 * anchor_release
-            + 0.18 * release_liftoff
-            + 0.14 * rootz_gain_progress
-            + 0.12 * handoff_ready_gain
-            + 0.06 * speed_progress
-            + 0.04 * torch.clamp(recovery_support_gain, min=0.0, max=1.0)
+        release_progress = release_gate * (
+            0.40 * compression_level * release_score * release_liftoff
+            + 0.24 * rootz_gain_progress
+            + 0.20 * body_rise
+            + 0.16 * upward_progress
         )
-        # v4: keep hard failure penalties, but avoid over-punishing cautious crawl
-        # before front capture is fully established.
-        penalty = 0.10 * sticky_contact + 0.20 * rear_trap + 0.06 * unsupported_low * (1.0 - 0.75 * body_rise) + 0.04 * crawl_lane * (1.0 - torch.maximum(front_anchor, 0.6 * front_capture)) + 0.12 * premature_release * (1.0 - torch.maximum(front_capture, 0.5 * body_rise))
+        handoff_progress = handoff_gate * (
+            0.30 * capture_release
+            + 0.24 * release_liftoff
+            + 0.18 * rootz_gain_progress
+            + 0.16 * handoff_ready_gain
+            + 0.12 * speed_progress
+        )
+
+        penalty = (
+            0.10 * sticky_contact
+            + 0.20 * rear_trap
+            + 0.06 * unsupported_low * (1.0 - 0.75 * body_rise)
+            + 0.05 * crawl_lane * (1.0 - capture_commitment)
+            + 0.04 * crawl_gate * prev_crawl_to_standup_bias * sticky_contact * (1.0 - torch.maximum(body_rise, arm_ready_gain))
+            + 0.12 * premature_release * (1.0 - torch.maximum(capture_commitment, 0.5 * body_rise))
+            + 0.08 * rear_gate * rear_collapse_drive
+        )
 
         return (
             true_reward
             + positive
-            + 0.06 * precapture_progress
-            + 0.10 * crawl_progress
-            + 0.08 * arming_progress
-            + 0.16 * release_progress
             + 0.08 * rear_escape_progress
+            + 0.08 * precapture_progress
+            + 0.10 * crawl_progress
+            + 0.12 * standup_transfer_progress
             + 0.14 * standup_progress
+            + 0.16 * release_progress
             + 0.18 * handoff_progress
             - penalty
         )
@@ -871,18 +970,19 @@ class DMControlHopperSDModel(nn.Module):
         return {
             "dt": self.dt,
             "hop_speed": self.hop_speed,
-            "base_control_gears": self.base_control_gears.detach().cpu().tolist(),
             "control_scale": self.control_scale.detach().cpu().tolist(),
-            "joint_neutral_pose": self.joint_neutral_pose.detach().cpu().tolist(),
             "rate_damping": self.rate_damping.detach().cpu().tolist(),
-            "learned_passive_weight": self.learned_passive_weight,
-            "learned_residual_weight": self.learned_residual_weight,
-            "passive_scale": self.passive_scale,
-            "residual_scale": self.residual_scale,
+            "observable_dim": self.OBSERVABLE_DIM,
             "latent_layout": [
-                "height", "vx", "vz", "pitch", "pitch_rate", "compression", "compression_rate",
-                "swing", "swing_rate", "foot_angle", "foot_rate", "support", "stance_mix",
-                "impact", "clearance", "rootz", "front_anchor",
+                "vx",
+                "vz",
+                "pitch",
+                "pitch_rate",
+                "compression",
+                "compression_rate",
+                "support",
+                "rootz",
+                "capture_memory",
             ],
         }
 

@@ -3359,3 +3359,486 @@ front_anchor = body_low * front_anchor_pitch * front_anchor_clearance
 说明阶段顺序约束仍然成立，没有因增强 precapture 而重新放开越级 release。同时，在 canonical 的浅前倾未捕获状态上，单步前向已经可把 `front_anchor` 与 `front_capture` 明显抬升，符合本轮修订目标。
 
 本轮结论是：后续若继续优化，应先观察这条更强的 `pre-capture -> capture` 通道能否把“前倾可救态”稳定送入前撑链，再决定是否继续加强 `arm/release` 端，而不宜过早把主要精力转回后仰死态恢复。
+
+### 2026-04-20 v4.10：将 `arm_ready / release` 从“近 upright 才开启”修订为捕获后的柔性交接走廊
+
+对 `sd_hopper_5k_v4p9_precapture_v3bparams_finaleval_20260419_223143` 的 5k 结果做终点评估分布与闭环 CSV 复核后，问题进一步收敛：
+
+- `v4.9` 相比 `v4.8` 的提升主要来自单条正分轨迹更强，而不是成功覆盖率显著增加；
+- 多条零分轨迹已经不再是“完全进不了 front_capture”，而是进入了高 `front_capture / standup_window` 的低位前撑状态，却始终无法把 `arm_ready / release_ready` 打开；
+- 代表性零分轨迹中，`front_capture_frac`、`standup_frac` 已接近 1，但 `arm_ready_frac` 与 `release_ready_frac` 近乎 0，表现为长时间前撑爬行或原地低位支撑，说明当前 `arm_ready` 定义过于依赖 `recovered_upright / handoff_ready`，把“已捕获、正抬身、仍未 fully upright”的可行中间态误判为尚未进入后续阶段。
+
+由此可见，当前主矛盾不再是 `pre-capture -> capture`，而是 **`capture -> arm_ready / release` 的定义过硬**。如果 release 相关语义只有在几乎 upright 时才开启，那么 planner 会持续把策略压在低位 crawl/standup 盆地，而不是鼓励其沿着“前撑捕获 -> 抬身蓄力 -> 释放驱动”继续前进。
+
+本轮因此做了三项同步修订：
+
+1. 在 `DMControlHopperSDModel` 中新增统一辅助量：
+   - `_body_low_from_rootz(...)`
+   - `_body_high_from_rootz(...)`
+   - `_recovered_upright_from_state(...)`
+   - `_handoff_ready_from_state(...)`
+   - `_standup_window_from_state(...)`
+   - `_arm_ready_from_state(...)`
+2. `arm_ready` 不再只取决于 `recovered_upright` 或 `handoff_ready`，而改为：
+   - 已有 `front_capture`；
+   - 仍在合法 `recovery_support` 走廊内；
+   - `support` 足以支撑；
+   - 且满足一个**柔性 arm corridor**：
+     - `recovered_upright`；
+     - 或 `0.5 * handoff_ready`；
+     - 或 `0.35 * recovery_pitch * compression_arm + 0.20 * body_high`
+   这意味着，只要已经捕获前撑、姿态前倾合理、压缩已建立，即使尚未 fully upright，也允许 `arm_ready` 渐进抬升。
+3. 在动力学与 shaping 中同步把 release 窗口改为：
+   - `release_window = max(standup_window, 0.60 * arm_ready)`
+   - 并在 `predict_plan_reward()` 中用 `prev_arm_ready` 取代原先“必须 upright 才能 release”的硬门；
+   - 同时将 `arming_progress / standup_progress / release_progress / handoff_progress` 的奖励重心向 `arm_ready_gain`、`body_rise`、`rootz_gain` 稍作平移，减少长期停留在 crawl 奖励上的吸引。
+4. 在 release 后的交接连续性上，将 `recovery_support` 中 ordinary support corridor 的底座从 `0.20 + 0.80 * body_high` 轻微抬到 `0.30 + 0.70 * body_high`，以避免正确的 release 序列在第二步因支撑判定掉得过快而被误杀。
+
+该修订的目标不是放开越级 release，也不是惩罚谨慎爬行，而是把：
+
+- “还未 capture”、
+- “已经 capture 但仍在低位抬身”、
+- “已经 arm-ready，可释放交接”
+
+三者区分得更连续。阶段链仍然存在，但从“近乎 upright 才算 arm-ready”修订为“捕获后的渐进 arm corridor 也算合法前置状态”。`scripts/v4_structural_sanity_check.py` 与 `scripts/v4_hopper_closed_loop.py` 已同步采用同一语义，避免未来再次出现训练逻辑与快速检验口径脱节。
+
+同时，快速结构检验中的 `release_preserves_two_step_recovery_corridor` 判据也据此修订：不再要求 release 两步后 `handoff_window` 必须严格高于 hold，而改为要求其 **根高、更 upright、总 plan reward 更优，且 `handoff_window / arm_ready` 维持在最小合法 corridor 之上**。这更符合“正确 release 允许少量丢 front-anchor，但不能把交接走廊完全打断”的真实语义。
+
+### 2026-04-20 v4.11：放宽前倾可恢复态的入口阈值，优先提高 `capture` 建立稳定性
+
+对 50k 三种子训练在 `10k eval` 的分布复核后，当前主矛盾再次收敛：模型并非完全不会恢复，但**前倾可恢复态进入 `front_capture -> recovery_support -> arm_ready` 的成功率仍偏低**。表现上，一部分 seed 已能从同类初值中拿到正分，另一些 seed 却仍在相近初始姿态下全零，说明当前入口仍过于依赖早期偶然动作，而不是形成了足够稳健的通道。
+
+在这一阶段，没有必要继续增强更靠后的跃起/释放逻辑。更有把握的改动是：只把入口链上的几个硬门稍微放宽，并增强 `front_anchor` 的建立与保持，使“方向正确但动作保守”的前倾恢复态更容易被送入后续走廊。
+
+本轮因此仅做了以下窄改动：
+
+1. 将 `front_capture` 的中心从 `0.30` 下调到 `0.26`，使中等强度的前撑更早跨过 capture 门；
+2. 将 `pre-capture` 的前倾门从 `pitch > 0.20` 放宽为更平滑的 `pitch > 0.10` 附近，并放大过渡尺度，降低“前倾已成立但仍差一点点”的误杀；
+3. 将 `handoff_unlock` 所需的 `body_high` 门槛下调，使 torso 刚开始抬升时 ordinary support corridor 就能更早参与；
+4. 将 `arm corridor` 的连续项略增强，使已捕获、正抬身但尚未明显 upright 的状态更容易把 `arm_ready` 渐进打开；
+5. 在 `next_front_anchor` 更新中：
+   - 增强上一时刻 `front_anchor` 的保留；
+   - 增强 `precapture_build` 的累积；
+   - 减弱 `recovered_upright / rootz_gain` 对前撑的过早冲刷；
+   其目的不是让模型长期粘在前撑，而是避免“刚开始抬身就把尚未稳固的前撑提前抹掉”。
+
+本轮设计仍保持两个边界不变：
+
+- 不放松阶段顺序约束，不让未 capture 的状态提前获得 release 优势；
+- 不把后续重点转回跃起 shaping，而是先提高前段进入率与 seed 间稳定性。
+
+因此，`v4.11` 应被理解为一次**入口稳健性修订**，不是新的行为假说。后续判断标准也很明确：若修改有效，首先应看到的不是单条轨迹更高，而是“前倾可恢复态”的成功覆盖率提高、seed 间分化减弱。
+
+### 2026-04-20 v4.12：将连续耦合门控整理为显式阶段图，切断后段对前段的反向污染
+
+在继续推进 `v4.11` 入口稳健性修订后，对当前设计再次复核可见，一个更根本的问题仍然存在：虽然代码里已经出现了“pre-capture / capture / standup / release / handoff”等命名，但这些阶段并未真正隔离职责。尤其 `front_anchor` 作为前段核心量，仍会被 `recovered_upright / handoff_ready / release` 等后段量直接冲刷。这使得：
+
+- 前段是否建立，取决于后段是否已开始出现；
+- 前段与后段的责任边界变得模糊；
+- 一旦失败，很难判断究竟是哪一阶段没有过。
+
+这与当前任务的结构并不匹配。该任务更合理的组织方式，应是**有向阶段图**而非全耦合连续场：
+
+1. `rear_recovery`
+2. `precapture`
+3. `capture_crawl`
+4. 从 `capture` 处分叉为 `crawl_gain` 或 `standup`
+5. `release`
+6. `handoff`
+
+这里允许从同一前置阶段发展出不同后续方向，但不允许后续阶段反向定义前置阶段。
+
+本轮据此做了两类修订：
+
+1. 在 `DMControlHopperSDModel` 中显式加入阶段量：
+   - `_rear_recovery_phase_from_state(...)`
+   - `_precapture_phase_from_state(...)`
+   - `_capture_crawl_phase_from_state(...)`
+   - `_standup_phase_from_state(...)`
+   - `_release_phase_from_state(...)`
+   - `_handoff_phase_from_state(...)`
+2. 将 `predict_plan_reward()` 重新整理为按阶段图加权：
+   - `rear_escape_progress`
+   - `precapture_progress`
+   - `crawl_progress`
+   - `standup_progress`
+   - `release_progress`
+   - `handoff_progress`
+   每一项都只由本阶段与相邻前置阶段打开，不再靠远后段量混合决定。
+3. 将 `next_front_anchor` 更新改回前段自洽形式：
+   - 仅由 `front_anchor` 自身、几何前撑、`precapture_build`、局部支撑驱动与 `rear_trap` 抑制决定；
+   - 移除 `next_handoff_ready`、`next_recovered_upright`、`next_rootz_gain`、`recovery_release` 等后段量对其直接改写。
+
+这一步的目的不是否定此前关于 `arm corridor`、`release corridor` 的工作，而是把这些后段结构重新放回它们应在的位置：**后段只读取前段是否已成立，而不再参与定义前段是否成立**。
+
+相应地，`scripts/v4_structural_sanity_check.py` 与 `scripts/v4_hopper_closed_loop.py` 也同步加入：
+
+- `rear_recovery_phase`
+- `precapture_phase`
+- `capture_phase`
+- `standup_phase`
+- `release_phase`
+- `handoff_phase`
+
+从而保证后续快速检验、闭环日志与训练时的阶段图使用同一语义。后续若继续优化，应围绕“哪一阶段覆盖率不足、哪一阶段分叉选择错误”推进，而不再回到“所有阶段量混在一处连续调阈值”的做法。
+
+### 2026-04-20 v4.13：回到核心反馈环，收缩状态并显式引入 `capture_memory`
+
+在继续复核 `v4.12` 的 5k 结果与结构检验后，当前最根本的问题已不再是某个阶段阈值偏硬，而是**状态语义本身不纯**：
+
+- `front_anchor` 在 `encode_observation()` 中是由单帧几何直接算出的“观测量”；
+- 但在 `forward()` 中又被当作跨步传播、有自保持项的“记忆量”；
+- TD-MPC2 的 consistency loss 同时又把 rollout latent 强行对齐到 `encode(next_obs)`。
+
+这三者合在一起，会把 planner 需要的“已捕获前撑记忆”持续拉回单帧几何代理，从而导致：
+
+- 阶段图看似清楚，但前段核心量仍然在语义上摇摆；
+- `crawl -> standup/release` 的失败，既可能是机制没建起来，也可能只是 hidden memory 被 observation target 吞掉；
+- 后续继续只调 reward 或阶段门，难以真正收敛问题。
+
+因此，本轮不再对原 17 维结构态继续叠加补丁，而是直接收缩为少量核心 stock：
+
+1. `vx`
+2. `vz`
+3. `pitch`
+4. `pitch_rate`
+5. `compression`
+6. `compression_rate`
+7. `support`
+8. `rootz`
+9. `capture_memory`
+
+其中前 8 维视为**可观测 stock**，第 9 维 `capture_memory` 视为**真正的 hidden stock**。它表示“前撑是否已经被建立并持续保持”，不再伪装成单帧几何可直接观测的量。
+
+相应地，本轮做了四类同步修订：
+
+1. `DMControlHopperSDModel` 改写为围绕三条核心反馈环组织：
+   - 压缩-起跳平衡环：`compression -> vz -> rootz/height -> compression`
+   - 前撑捕获强化环：`capture_memory -> support -> low_clearance/body_low -> capture_memory`
+   - 抬身释放推进环：`capture_memory + compression -> vz/rootz rise -> release corridor`
+2. 原 `front_anchor` 拆分为：
+   - `front_contact_geom`：由 `(pitch, compression, rootz, support)` 即时派生的辅助量；
+   - `capture_memory`：唯一跨步保留的前撑记忆存量。
+3. `SDWorldModel` 中新增 observable-only consistency：
+   - consistency loss 仅监督前 8 个可观测维；
+   - `capture_memory` 不再被 `encode(next_obs)` 单帧监督硬拉回去。
+4. 快速结构检验与闭环分析脚本同步改写：
+   - 语义特征改为直接复用模型内部辅助函数；
+   - `rear_trap` 再次纳入 `overall_pass` 聚合，不再出现“局部失败但 overall_pass=true”的假通过。
+
+本轮的核心目标，不是马上追求更高 5k 分数，而是先把 SD 的“状态、动力学、结构检验”三者语义彻底对齐。只有在这一层闭合后，后续的 5k/50k 实验才真正具有解释价值。
+
+### 2026-04-20 v4.14：根据外部审查修正口径闭合，并补入 transition sanity
+
+在对 `v4.13` 做外部复核后，新的问题进一步集中到四点：
+
+1. `run_v4_cycle.sh` 仍默认 `SD_LATENT_DIM=32`，会重新打开 residual latent，破坏“9 核 stock”口径；
+2. `_forward_one_substep()` 中 `release_height_boost / release_pitch_recovery` 直接写入 `rootz / pitch`，与 `vz / pitch_rate` 的积分关系不闭合；
+3. `capture_crawl / standup / release` 的数值仍过度重叠，阶段权重存在退化风险；
+4. 原结构检验主要检查语义顺序，并未显式比较 `SD forward` 与环境真实 transition 的一致性。
+
+本轮因此做了以下修订：
+
+1. 将 `run_v4_cycle.sh` 的 `SD_LATENT_DIM` 默认改为 `9`，并在脚本中显式拒绝非 `9` 的启动参数；`sd_height_loss_coef` 同步改回 `0.0`，避免保留无效参数。
+2. 在 `SDWorldModel` 中加入严格约束：`sd_latent_dim == sd_struct_dim`，不再允许通过 launcher 或手工覆盖重新打开 residual latent。
+3. 将 release 注入改回速度链闭合：
+   - 删除 `forward()` 中直接写入 `rootz / pitch` 的 `release_height_boost / release_pitch_recovery`；
+   - 仅允许 release 通过 `z_acc / pitch_acc` 影响 `next_vz / next_pitch_rate`，再由积分得到 `next_rootz / next_pitch`。
+4. 将 `compression` 更新改为单链积分形式，不再在同一 substep 中同时通过 `dt * vz` 与 `target_comp` 反复吸收同一垂向变化。
+5. 重新拆开阶段定义：
+   - `standup_phase` 不再等同于低位 `capture`，而显式依赖 `recovery_pitch / compression_arm / arm_ready`；
+   - `release_phase` 不再直接等于 `arm_ready`，而要求更靠后的 `compression` 与 `pitch` 门。
+6. 在 `v4_structural_sanity_check.py` 中新增 transition alignment：
+   - 统计 `SD forward` 与环境实际一步 observable struct 的 RMSE；
+   - 统计三步 rollout 的 observable struct RMSE；
+   - 将该项并入 `overall_pass`。
+
+验证结果分成两层：
+
+1. 工程层面已闭合：
+   - 新状态维度、trainer、consistency 路径可正常运行；
+   - `10-step probe` 可完整初始化、采样、更新并结束。
+2. 结构层面仍未完全通过：
+   - `recoverable_front_anchor` 与 `rear_trap` 两项顺序性检查已恢复通过；
+   - 但 `release_ready_corridor` 仍未通过；
+   - 新增的 transition alignment 明确失败：当前 `one-step observable RMSE ≈ 0.51`，`three-step observable RMSE ≈ 0.90`。
+
+因此，`v4.14` 的阶段性结论很明确：**口径问题已收紧，但物理对齐仍明显不足，当前版本仍不适合直接进入 50k 对照。** 下一步应继续优先处理：
+
+1. `release_ready_corridor` 的后段定义；
+2. `SD forward` 与环境 transition 的 observable 对齐；
+3. 如有必要，再回头细化 action sign 约定与注释。
+
+### 2026-04-20 v4.15：收紧 observable dynamics，并解除后段相态对“持续着地”的硬依赖
+
+在继续复核 `v4.14` 的严格结构检验后，两个失败点已经足够明确：
+
+1. `transition_alignment` 误差仍大，说明当前 9 维 stock 的更新里，`support`、`compression/rootz/vz` 这一组 observable 动力学尚未闭合；
+2. `release_ready_corridor` 失败不是“不会起跳”，而是**一旦 release 动作开始起效，`handoff_window` 反而下掉**，表明后段相态仍被“当前是否着地”掐得过死。
+
+本轮因此只做窄范围修订，不再扩状态、不再改训练口径：
+
+1. 将 `recovery_support` 从“几乎退化为 `capture_commitment`”改为真正受 `support/body_high` 共同约束。
+   - 这样做的目的，是让 `capture_memory` 继续作为前段是否已建立的记忆，
+   - 但不再代替可观测支撑条件本身。
+2. 将 `arm_ready / release_phase / handoff_phase` 从“必须持续 grounded”中部分松开。
+   - `arm_ready` 允许在 `body_high` 已建立、`handoff_ready` 已打开时保持走廊；
+   - `release_phase` 允许由 `handoff_ready` 提供后段桥接；
+   - `handoff_phase` 不再用 `release_phase` 双重乘死，而改为 `body_high * handoff_ready * release_bridge`。
+   这样做的目的，是避免“刚刚抬身离地，后段就因 support 下降而自毁”。
+3. 收紧 observable dynamics，使其更多由 observable 量主导，而不是被 hidden `capture_memory` 过度驱动。
+   - `drive_support / lift_support / posture_support / air` 改为主要由 `support + front_contact_geom` 决定；
+   - `compression_acc` 的系数下调，并在 forward 中把 `next_comp_rate` 向 `-next_vz` 回拉，
+   - 从而缓解 `compression_rate` 与 `vz` 长期漂离的问题。
+4. 修正 `support_hold` 的速度符号。
+   - 旧式写法在 `next_vz` 上升时反而更容易“粘住支撑”，这会直接压坏 release/handoff 走廊；
+   - 本轮改为仅在下压或近静止时增强持撑，并在 upward release 时显式减支撑。
+5. 清理 trainer 中已失效的 `height_head` 辅助 loss 分支，避免继续保留无效口径。
+
+本轮的预期不是立即宣称“问题已解”，而是把两个最硬的失败项拆成更可验证的命题：
+
+1. `support` 是否会在 upward release 时合理下降，而不是越抬身越粘地；
+2. `handoff_window` 是否仍能在轻微离地后保持增长；
+3. 一步与三步 observable RMSE 是否开始回落。
+
+若这三点仍没有明显改善，则下一步就不再继续调门，而应直接回到 `support` 与 `compression` 的观测定义，重新考虑是否需要把其中至少一项改成派生量而非独立 stock。
+
+### 2026-04-20 v4.15 diagnostics：逐维 transition 误差归因
+
+在 `v4.15` 严格结构检验后，进一步用同一脚本轨迹做了逐维 observable transition 误差归因。结论已经足够明确：
+
+1. `rootz` 不是当前主问题。
+   - 一步 `rootz` RMSE 仅约 `0.013`，远低于其他关键维。
+   - 这意味着垂向位置积分链本身并未崩坏。
+2. `support` 的旧问题确实存在：更新式过于均值回归。
+   - 高支撑区会被系统性拉低，低支撑区又容易被错误抬高。
+   - 因此已将 `next_support` 从简单线性混合改成附着/脱离的一阶更新。
+3. 当前真正主导总误差的维度是 `pitch_rate`。
+   - 一步 `pitch_rate` RMSE 约 `2.19`，远高于 `pitch` 本身；
+   - 最差样本不是小幅偏差，而是**下一步俯仰角速度直接翻号**，而模型却继续保持原符号。
+4. 这类大误差主要出现在三类状态：
+   - 中低支撑、下落中的接触切换；
+   - 高支撑、强压缩的落地压缩；
+   - 高 `capture_memory`、大正俯仰的 release/handoff 过渡。
+
+据此，当前阶段性判断是：
+
+- `support` 修订值得保留，因为它减少了接触链中的一类系统性偏差；
+- 但仅靠继续细调连续加速度系数，不足以解决 `pitch_rate` 的翻号误差；
+- 后续应把重点转到**俯仰速率的接触冲量/模式切换建模**，而不是继续围绕 `rootz` 或一般性 reward/shaping 调参。
+
+为避免未来重复临时写诊断脚本，`v4_structural_sanity_check.py` 已同步补入：
+
+- observable 一步逐维 RMSE / MAE / bias
+- observable 三步逐维 RMSE / MAE / bias
+
+之后每次结构检验都可直接在报告中读出“是哪一维在主导失配”，不再只看总 RMSE。
+
+随后又做了一次更激进的尝试：将俯仰碰撞直接写成 `next_pitch_rate` 的冲量映射，希望在接触切换时允许角速度翻号。结果表明该做法过强，`pitch_rate` RMSE 反而显著恶化，已回滚，未保留在当前代码中。
+
+因此，当前代码状态保持为：
+
+1. 保留 `support` 的附着/脱离一阶更新；
+2. 不保留直接写入 `next_pitch_rate` 的硬冲量；
+3. 将结构检验进一步补强为同时输出每个 observable 维度的最坏一步样本，便于后续围绕具体失败样本继续建模。
+
+随后又将最坏样本诊断继续结构化：`v4_structural_sanity_check.py` 现在会对 `pitch_rate` 的最坏一步样本打机制标签，例如：
+
+- `rear_trap_tumble`
+- `uncaptured_landing_recoil`
+- `front_capture_tumble`
+- `captured_release_turn`
+- `high_support_rebound`
+
+并在报告中给出各标签计数。
+
+一轮最小 smoke 检验表明，这套新诊断字段已正常落盘，且在该小样本下，`pitch_rate` 最坏样本以 `uncaptured_landing_recoil` 为主。这意味着下一轮应优先建模“未建立 capture 的落地回弹/俯仰反冲”机制，而不是先去修已经 capture 的 release 场景。
+
+### 2026-04-20 v4.16：引入窄 residual wrapper，只托管 `pitch_rate / support` 两个局部快变量
+
+在继续审视 `v4.15` 后，当前边界已经比较清楚：
+
+1. `9` 维核心 stock 仍应保持紧凑，不再重新打开 `32` 维 residual latent 或全维 struct residual；
+2. 但 `pitch_rate` 的接触冲量翻号、`support` 的局部附着/脱离，确实属于高频、局部、难以用高层 SD 显式式子完全写准的成分；
+3. 因此不宜继续把这些误差硬塞回显式核心，而应交给一个窄、零初始化、仅修少数维度的 residual wrapper。
+
+本轮实现如下：
+
+1. `SDWorldModel` 新增 `sd_use_local_residual` 与 `sd_local_residual_scale`。
+2. 新增 `_local_residual` MLP，但其输出只作用于：
+   - `PITCH_RATE_IDX`
+   - `SUPPORT_IDX`
+3. 该 head 最后一层保持零初始化，因此默认打开时仍是严格 no-op，不会改变当前显式动力学基线。
+4. `consistency_loss` 改为只监督 observable 的前 `8` 个结构维；隐藏的 `capture_memory` 不再被一帧观测强行对齐。
+5. 启动与诊断脚本同步显式传入：
+   - `sd_use_local_residual`
+   - `sd_local_residual_scale`
+   同时将遗留的 `sd_height_loss_coef` 默认值统一收敛为 `0.0`。
+
+当前阶段性结论：
+
+- `v4.16` 仍不是正式训练版本，首要目标仍是让结构检验与最小 smoke 跑通；
+- 但从建模边界上，当前代码已经明确采用“高层核心 SD + 窄残差补局部快变量”的路线，不再在状态本体中继续无界扩张。
+
+同时，`v4_structural_sanity_check.py` 也同步补到 wrapper 口径：
+
+1. 语义特征仍由 `DMControlHopperSDModel` 提供，便于保持可解释性；
+2. 但一步/多步 transition 预测改为显式走 `SDWorldModel.next()`；
+3. 因而该脚本现在能真正覆盖 `sd_use_local_residual` 这条新链路，而不再只是检查裸显式核心。
+
+一轮 `episodes=1, steps_per_episode=12` 的最小 smoke 已通过，说明：
+
+1. `SDWorldModel` 的窄 residual wrapper 调用链已经闭合；
+2. 报告可正常生成；
+3. 在零初始化下，transition 误差分布与此前基线基本一致，当前主误差仍然是 `pitch_rate`，且最坏模式仍以 `uncaptured_landing_recoil` 为主。
+
+因此，下一步不应回到扩大显式状态，而应直接围绕该局部机制观察窄 residual 是否能学到补偿；在此之前，仍不宜直接进入正式 50k 训练。
+
+### 2026-04-20 v4.17：收紧高层阶段语义，禁止塌陷前翻态虚高 `standup / arm / release`
+
+在对 `v4.16` 的 5k 轨迹做闭环复核后，新的结论已经很明确：当前主要问题不再是“完全进不了 capture”，也不是 `pitch_rate / support` 这类局部快变量没补好，而是**高层阶段语义本身仍不够干净**。
+
+典型现象是：
+
+1. 某些前倾轨迹在早期已经拿到正向前冲；
+2. 随后身体塌到极低 `rootz`、高度接近 0，并进入极端正 pitch 的前翻锁死；
+3. 但 `capture_memory / standup_window / arm_ready / release_ready` 仍能维持高值。
+
+这违反了本轮确立的设计原则：`SD` 只应承担高层、本质、完全清晰的动力学机制。既然“塌陷前翻锁死”显然不应被视为合法 `standup / release`，那么这就不是细节误差，而是 `SD` 自身高层语义定义有问题，必须由显式模型收回。
+
+本轮因此只做高层门控修订，不触碰局部残差边界：
+
+1. 新增 `noncollapsed_posture`：
+   - 同时依赖 `rootz` 与由 `compression` 派生的 `height`；
+   - 用于表示“身体尚未塌陷到趴死/翻死盆地”。
+2. 新增 `standup_pitch_corridor`：
+   - 要求 pitch 落在“恢复/抬身”的有限前倾区间内；
+   - 不再允许“正 pitch 越大越像 standup”。
+3. 新增 `release_pitch_corridor`：
+   - 要求 release 发生在更窄的合法前倾区间；
+   - 极端前翻态会被直接关掉，而不是继续被 `pitch_gate` 饱和放大。
+4. 将上述高层门控接入：
+   - `_standup_window_from_state(...)`
+   - `_arm_ready_from_state(...)`
+   - `_standup_phase_from_state(...)`
+   - `_release_phase_from_state(...)`
+
+修订后的含义是：
+
+- `capture_crawl` 仍允许低位前撑；
+- 但只有在“尚未塌陷 + pitch 处于合理恢复走廊”时，才允许进入 `standup / arm / release`；
+- 一旦进入极端前翻且高度塌掉，这些后段阶段量会被显式拉回低值。
+
+本轮快速验证分两层：
+
+1. 定点探针：
+   - 合法抬身态仍保持非零 `standup / arm / release`；
+   - 塌陷前翻态的这三项被压至近 0。
+2. 最小结构 smoke：
+   - 调用链仍然闭合；
+   - `v4_structural_sanity_check.py` 正常通过 wrapper 路径运行。
+
+同时也要明确，本轮**没有**试图改善 transition alignment。最小 smoke 中：
+
+- `one-step observable RMSE ≈ 0.627`
+- `three-step observable RMSE ≈ 1.267`
+- 主误差维仍是 `pitch_rate > compression_rate > vz > support`
+
+这符合预期：`v4.17` 的目标是把 `SD` 的高层阶段语义收干净，而不是解决局部快变量误差。后者仍应主要交给窄 residual 负责。
+
+### 2026-04-20 v4.18：为 `capture-crawl -> standup` 开辟柔性上升通道，但不否定谨慎爬行
+
+在继续复核 `v4.17` 的 5k 闭环轨迹后，问题已进一步收敛。当前高层阶段语义已经明显更干净：
+
+- 塌陷前翻锁死态不再虚高 `standup / arm / release`；
+- 但正向高分轨迹仍主要停留在低位前撑爬行；
+- 即，`capture-crawl` 已被识别为合法中间相，却仍容易演化成“长期前冲/前撑粘滞”，而不是自然进入抬身交接。
+
+这一问题属于高层阶段关系，而不是接触细节。需要由 `SD` 明确表达的是：
+
+1. `capture-crawl` 不是终点，而是通向 `standup` 的前置相；
+2. 当已经形成稳定前撑、恢复走廊已成立、姿态仍处在合法抬身 corridor 内时，继续向 `standup` 演化应比“原地维持 crawl”略占优；
+3. 但若尚未满足这些前提，谨慎爬行仍应保留为合法正向前段行为，不应被硬惩罚。
+
+据此，本轮只做高层奖励排序修订，不再扩展显式状态，也不继续细化局部动力学脚本：
+
+1. 新增 `_crawl_to_standup_bias_from_state(...)`：
+   - 由 `capture_crawl_phase`、`recovery_support`、`noncollapsed_posture`、`standup_pitch_corridor`、`compression_arm` 共同构成；
+   - 语义上表示“当前已进入稳定前撑，且已具备从 crawl 向 standup 转移的条件”。
+2. 在 `predict_plan_reward()` 中，对 `crawl_progress` 做柔性降权：
+   - 当上一时刻 `crawl_to_standup_bias` 已高时，纯 crawl 的速度收益权重适度下调；
+   - 这不是禁止爬行，只是避免成熟前撑状态继续被“永远趴着前冲”吸住。
+3. 新增 `standup_transfer_progress`：
+   - 只在 `crawl_gate` 与 `prev_crawl_to_standup_bias` 共同成立时激活；
+   - 奖励 `body_rise`、`arm_ready_gain`、`rootz_gain`、`upright_gain` 与 `crawl_to_standup_bias` 的增长；
+   - 其作用是给出“前撑建立后继续抬身交接”的明确高层奖励坡度。
+4. 新增很小的 `mature_crawl_stall` 型惩罚：
+   - 只作用于“已具备 standup 条件、却继续高接触粘滞且没有抬身进展”的状态；
+   - 目的是削弱前撑盆地的吸附性，而不是惩罚所有 crawl。
+
+同步更新如下：
+
+- `scripts/v4_structural_sanity_check.py`
+  - 新增 `crawl_to_standup_bias` 语义输出；
+  - 新增 canonical `mature_capture_crawl`；
+  - 增加 `mature_capture_prefers_standup_nudge_over_hold` 检查，要求成熟前撑态上，温和抬身动作的 plan reward 不低于继续原地 crawl，并推动 `rootz / standup_window / recovered_upright` 中至少一项前进。
+- `scripts/v4_hopper_closed_loop.py`
+  - 同步记录 `crawl_to_standup_bias`，便于后续闭环轨迹直接检查该高层机制是否被真实轨迹触发。
+
+本轮的研究意图非常具体：不是再把 `SD` 扩成“会写动作脚本的伪精细模型”，而是只在阶段图层面补上一条缺失的、有方向性的高层反馈边：
+
+`capture-crawl -> standup`
+
+后续若快速结构检查通过，则应优先用轻量 `5k smoke` 观察两点：
+
+1. 正例是否从“单纯前撑前冲”变为“前撑后出现更多抬身/交接迹象”；
+2. 零分前倾轨迹中，是否有一部分不再提早掉回 `rear_trap`，而能进入更稳定的 `capture -> standup` 走廊。
+
+### 2026-04-20 v4.19：高层结构收口审查，停止开放式扩展 `SD`
+
+在 `v4.18` 完成后，对当前 `SD` 高层阶段图又做了一轮收口式审查。此次审查的目的不是继续发明新结构，而是回答一个更根本的问题：**当前还是否存在明显缺失、且必须由高层 `SD` 显式承担的机制。**
+
+审查结果是：当前高层阶段图已经基本闭合，不宜再继续开放式扩展 `SD`。现有图中已明确表达的主链包括：
+
+- `rear_recovery`
+- `precapture`
+- `capture_crawl`
+- `crawl_to_standup`
+- `standup`
+- `release`
+- `handoff`
+
+并且，与阶段顺序直接相关的快速结构检验已经全部通过：
+
+- `recoverable_front_anchor`
+- `rear_trap`
+- `mature_capture_crawl`
+- `release_ready_corridor`
+- `phase_dependency`
+
+这意味着，当前主问题已不再是“还缺很多高层节点/边”，而是：
+
+1. 局部快变量与接触切换误差仍大；
+2. 正例是否真的会沿着已有高层路径稳定演化，仍需通过训练与闭环轨迹验证。
+
+基于这一轮审查，后续原则正式收紧为：
+
+1. **不再开放式扩展 `SD` 高层结构。**
+   - 不能再因为某条轨迹看起来不理想，就继续往 `SD` 中加入新的局部机制、局部脚本或额外中间量。
+2. **只保留一个近期候选高层缺口：**
+   - `precapture -> stable_capture` 的反冲稳定化。
+   - 其含义是：对“已前倾、理论上可救、但在 capture 建立前被下落反冲打回 rear_trap”的轨迹，若实验反复证明这一失败模式占主导，则允许补一条高层边，表达“先稳住，不要在 capture 之前被反冲打坏”。
+3. **除上述单一候选项外，其余问题默认交给窄 residual。**
+   - 这包括但不限于：
+     - `pitch_rate` 的翻号误差；
+     - `support / vz / compression_rate` 的接触快变；
+     - 鼻/脚/躯干谁先着地、谁先脱离的微观时序；
+     - 具体关节释放顺序、脉冲强度与持续时间。
+
+因此，从 `v4.19` 起，策略不再是“继续想还有哪些高层结构”，而改为：
+
+1. 先用轻量 `5k smoke` 与闭环轨迹验证当前高层图；
+2. 若主失败仍集中在 `pitch_rate / support / vz` 等快变量，则直接归入窄 residual，不再补高层结构；
+3. 只有当实验反复表明“前倾可救态在 capture 之前被反冲打坏”是主导失败模式时，才允许补入 `precapture -> stable_capture` 这一条唯一候选高层边。
+
+这一步的研究含义是：`SD` 的职责边界已被正式收口。后续工作重点转向“验证现有高层图是否足够”，而不是“继续把更多机制塞进高层显式模型”。

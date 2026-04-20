@@ -90,8 +90,10 @@ def parse_args():
     parser.add_argument("--sd_reward_curriculum_start", type=int, default=10000)
     parser.add_argument("--sd_reward_curriculum_end", type=int, default=30000)
     parser.add_argument("--sd_max_resid_scale", type=float, default=5.0)
-    parser.add_argument("--sd_height_loss_coef", type=float, default=0.05)
+    parser.add_argument("--sd_height_loss_coef", type=float, default=0.0)
     parser.add_argument("--sd_use_struct_residual", type=str2bool, default=False)
+    parser.add_argument("--sd_use_local_residual", type=str2bool, default=True)
+    parser.add_argument("--sd_local_residual_scale", type=float, default=0.20)
     parser.add_argument("--zero_reward_threshold", type=float, default=0.05)
     parser.add_argument("--low_reward_threshold", type=float, default=1.0)
     return parser.parse_args()
@@ -157,6 +159,8 @@ def build_cfg(args, checkpoint: Path):
         "sd_max_resid_scale": args.sd_max_resid_scale,
         "sd_height_loss_coef": args.sd_height_loss_coef,
         "sd_use_struct_residual": args.sd_use_struct_residual,
+        "sd_use_local_residual": args.sd_use_local_residual,
+        "sd_local_residual_scale": args.sd_local_residual_scale,
     }
     for key, value in overrides.items():
         cfg[key] = value
@@ -206,42 +210,36 @@ def physics_snapshot(physics) -> Dict[str, float]:
 
 
 def v4_state_features(model, snap: Dict[str, float], struct: np.ndarray) -> Dict[str, float]:
+    state = torch.tensor(struct, dtype=torch.float32).unsqueeze(0)
     rootz = float(snap["qpos_rootz"])
     pitch = float(snap["qpos_rooty"])
-    body_low = sigmoid((model.V4_ROOTZ_LOW_CENTER - rootz) / model.V4_ROOTZ_LOW_SCALE)
-    body_high = 1.0 - body_low
-    forward_lean = sigmoid((pitch - model.V4_PITCH_FWD_CENTER) / model.V4_PITCH_FWD_SCALE)
-    recovered_upright = body_high * sigmoid((1.0 - abs(pitch)) / model.V4_PITCH_NEUTRAL_SPREAD)
-    handoff_ready = body_high * sigmoid((1.8 - abs(pitch)) / 0.45)
-    rear_trap = body_low * sigmoid(-(pitch - model.V4_PITCH_BACK_CENTER) / model.V4_PITCH_BACK_SCALE)
-    crawl_lane = body_low * forward_lean
     support = float(struct[model.SUPPORT_IDX])
-    clearance = float(struct[model.CLEARANCE_IDX])
-    height = float(struct[model.HEIGHT_IDX])
+    compression = float(struct[model.COMP_IDX])
     vx = float(struct[model.VX_IDX])
     vz = float(struct[model.VZ_IDX])
-    front_anchor_pitch = sigmoid((pitch - model.V4_FRONT_ANCHOR_PITCH_CENTER) / model.V4_FRONT_ANCHOR_PITCH_SCALE)
-    front_anchor_clearance = sigmoid(((-clearance) - model.V4_FRONT_ANCHOR_CLEARANCE_CENTER) / model.V4_FRONT_ANCHOR_CLEARANCE_SCALE)
-    front_anchor_geom = body_low * front_anchor_pitch * front_anchor_clearance
-    if struct.shape[0] > model.FRONT_ANCHOR_IDX:
-        front_anchor = float(struct[model.FRONT_ANCHOR_IDX])
-    else:
-        front_anchor = front_anchor_geom
-    front_capture_commitment = sigmoid((front_anchor - model.V4_FRONT_CAPTURE_CENTER) / model.V4_FRONT_CAPTURE_SCALE)
-    handoff_unlock = front_capture_commitment * sigmoid((body_high - model.V4_HANDOFF_BODY_HIGH_CENTER) / model.V4_HANDOFF_BODY_HIGH_SCALE)
-    recovery_support_gate = sigmoid((pitch - model.V4_RECOVERY_SUPPORT_PITCH_CENTER) / model.V4_RECOVERY_SUPPORT_PITCH_SCALE)
-    support_corridor_scale = handoff_unlock * min(1.0, 0.20 + 0.80 * body_high)
-    recovery_support = max(front_anchor, support_corridor_scale * support * recovery_support_gate)
-    compression = float(struct[model.COMP_IDX])
-    compression_level = min(max(compression / 0.35, 0.0), 1.0)
-    grounded = min(max((support - 0.12) / 0.40, 0.0), 1.0)
-    recovery_pitch = sigmoid((pitch - model.V4_RECOVERY_PITCH_CENTER) / model.V4_RECOVERY_PITCH_SCALE)
-    compression_arm = sigmoid((compression - model.V4_RECOVERY_COMP_CENTER) / model.V4_RECOVERY_COMP_SCALE)
-    crawl_ready = front_capture_commitment * body_low * grounded
-    standup_window = front_capture_commitment * recovery_support * body_low * recovery_pitch * compression_arm
-    arm_ready = front_capture_commitment * recovery_support * grounded * max(recovered_upright, 0.5 * handoff_ready)
-    release_ready = arm_ready * compression_level
-    unsupported_low = body_low * (1.0 - front_anchor) * sigmoid((model.V4_FRONT_ANCHOR_PITCH_CENTER - pitch) / model.V4_FRONT_ANCHOR_PITCH_SCALE)
+    capture_memory = float(struct[model.CAPTURE_IDX])
+    with torch.no_grad():
+        height = float(model.predict_height(state)[0].item())
+        body_low = float(model._body_low_from_rootz(state[:, model.ROOTZ_IDX])[0].item())
+        body_high = 1.0 - body_low
+        forward_lean = float(torch.sigmoid((state[:, model.PITCH_IDX] - model.V4_PITCH_FWD_CENTER) / model.V4_PITCH_FWD_SCALE)[0].item())
+        recovered_upright = float(model._recovered_upright_from_state(state[:, model.PITCH_IDX], state[:, model.ROOTZ_IDX])[0].item())
+        handoff_ready = float(model._handoff_ready_from_state(state[:, model.PITCH_IDX], state[:, model.ROOTZ_IDX])[0].item())
+        rear_trap = float(model._rear_recovery_phase_from_state(state[:, model.PITCH_IDX], state[:, model.ROOTZ_IDX])[0].item())
+        crawl_lane = body_low * forward_lean * float(model._capture_commitment(state[:, model.CAPTURE_IDX])[0].item())
+        front_contact_geom = float(model._front_contact_geom_from_state(state[:, model.PITCH_IDX], state[:, model.COMP_IDX], state[:, model.ROOTZ_IDX], state[:, model.SUPPORT_IDX])[0].item())
+        capture_commitment = float(model._capture_commitment(state[:, model.CAPTURE_IDX])[0].item())
+        recovery_support = float(model._recovery_support_from_state(state[:, model.PITCH_IDX], state[:, model.SUPPORT_IDX], state[:, model.CAPTURE_IDX], state[:, model.ROOTZ_IDX])[0].item())
+        standup_window = float(model._standup_window_from_state(state[:, model.PITCH_IDX], state[:, model.SUPPORT_IDX], state[:, model.COMP_IDX], state[:, model.CAPTURE_IDX], state[:, model.ROOTZ_IDX])[0].item())
+        arm_ready = float(model._arm_ready_from_state(state[:, model.PITCH_IDX], state[:, model.SUPPORT_IDX], state[:, model.COMP_IDX], state[:, model.CAPTURE_IDX], state[:, model.ROOTZ_IDX])[0].item())
+        release_phase = float(model._release_phase_from_state(state[:, model.PITCH_IDX], state[:, model.SUPPORT_IDX], state[:, model.COMP_IDX], state[:, model.ROOTZ_IDX], state[:, model.CAPTURE_IDX])[0].item())
+        handoff_phase = float(model._handoff_phase_from_state(state[:, model.PITCH_IDX], state[:, model.SUPPORT_IDX], state[:, model.COMP_IDX], state[:, model.ROOTZ_IDX], state[:, model.CAPTURE_IDX])[0].item())
+        precapture_phase = float(model._precapture_phase_from_state(state[:, model.PITCH_IDX], state[:, model.SUPPORT_IDX], state[:, model.COMP_IDX], state[:, model.ROOTZ_IDX], state[:, model.CAPTURE_IDX])[0].item())
+        capture_phase = float(model._capture_crawl_phase_from_state(state[:, model.PITCH_IDX], state[:, model.SUPPORT_IDX], state[:, model.ROOTZ_IDX], state[:, model.CAPTURE_IDX])[0].item())
+        standup_phase = float(model._standup_phase_from_state(state[:, model.PITCH_IDX], state[:, model.SUPPORT_IDX], state[:, model.COMP_IDX], state[:, model.ROOTZ_IDX], state[:, model.CAPTURE_IDX])[0].item())
+        crawl_to_standup_bias = float(model._crawl_to_standup_bias_from_state(state[:, model.PITCH_IDX], state[:, model.SUPPORT_IDX], state[:, model.COMP_IDX], state[:, model.ROOTZ_IDX], state[:, model.CAPTURE_IDX])[0].item())
+        release_ready = release_phase * min(max(compression / 0.35, 0.0), 1.0)
+    unsupported_low = body_low * (1.0 - capture_commitment)
     foot_low = 1.0 if snap["foot_z"] < 0.08 else 0.0
     nose_low = 1.0 if snap["nose_z"] < 0.08 else 0.0
     front_support = max(foot_low, nose_low)
@@ -256,20 +254,22 @@ def v4_state_features(model, snap: Dict[str, float], struct: np.ndarray) -> Dict
         "handoff_ready": handoff_ready,
         "rear_trap": rear_trap,
         "crawl_lane": crawl_lane,
-        "front_anchor_pitch": front_anchor_pitch,
-        "front_anchor_clearance": front_anchor_clearance,
-        "front_anchor_geom": front_anchor_geom,
-        "front_anchor": front_anchor,
-        "front_capture_commitment": front_capture_commitment,
-        "handoff_unlock": handoff_unlock,
+        "front_contact_geom": front_contact_geom,
+        "capture_memory": capture_memory,
+        "capture_commitment": capture_commitment,
         "recovery_support": recovery_support,
-        "crawl_ready": crawl_ready,
         "standup_window": standup_window,
         "arm_ready": arm_ready,
         "release_ready": release_ready,
+        "rear_recovery_phase": rear_trap,
+        "precapture_phase": precapture_phase,
+        "capture_phase": capture_phase,
+        "crawl_to_standup_bias": crawl_to_standup_bias,
+        "standup_phase": standup_phase,
+        "release_phase": release_phase,
+        "handoff_phase": handoff_phase,
         "unsupported_low": unsupported_low,
         "support": support,
-        "clearance": clearance,
         "height": height,
         "vx": vx,
         "vz": vz,
@@ -326,9 +326,10 @@ def summarize_episode(ep_idx: int, rows: List[Dict[str, float]], total_reward: f
         "rear_trap_frac": mean_of(rows, "rear_trap_gt_05"),
         "crawl_frac": mean_of(rows, "crawl_gt_05"),
         "upright_frac": mean_of(rows, "upright_gt_05"),
-        "front_anchor_frac": mean_of(rows, "front_anchor_gt_05"),
-        "front_capture_frac": mean_of(rows, "front_capture_gt_05"),
+        "capture_memory_frac": mean_of(rows, "capture_memory_gt_05"),
+        "capture_commitment_frac": mean_of(rows, "capture_commitment_gt_05"),
         "standup_frac": mean_of(rows, "standup_gt_05"),
+        "crawl_to_standup_frac": mean_of(rows, "crawl_to_standup_gt_05"),
         "arm_ready_frac": mean_of(rows, "arm_ready_gt_05"),
         "release_ready_frac": mean_of(rows, "release_ready_gt_05"),
         "unsupported_low_frac": mean_of(rows, "unsupported_low_gt_05"),
@@ -337,7 +338,6 @@ def summarize_episode(ep_idx: int, rows: List[Dict[str, float]], total_reward: f
         "foot_low_frac": mean_of(rows, "foot_low"),
         "launch_like_frac": mean_of(rows, "launch_like"),
         "mean_support": mean_of(rows, "support"),
-        "mean_clearance": mean_of(rows, "clearance"),
         "mean_vx": mean_of(rows, "vx"),
         "mean_vz": mean_of(rows, "vz"),
         "max_height": max(float(r["height"]) for r in rows),
@@ -388,9 +388,10 @@ def rollout_pass(env, agent, args, out_dir: Path, render_episode_ids: set[int]) 
             row["rear_trap_gt_05"] = 1.0 if features["rear_trap"] >= 0.5 else 0.0
             row["crawl_gt_05"] = 1.0 if features["crawl_lane"] >= 0.5 else 0.0
             row["upright_gt_05"] = 1.0 if features["recovered_upright"] >= 0.5 else 0.0
-            row["front_anchor_gt_05"] = 1.0 if features["front_anchor"] >= 0.5 else 0.0
-            row["front_capture_gt_05"] = 1.0 if features["front_capture_commitment"] >= 0.5 else 0.0
+            row["capture_memory_gt_05"] = 1.0 if features["capture_memory"] >= 0.5 else 0.0
+            row["capture_commitment_gt_05"] = 1.0 if features["capture_commitment"] >= 0.5 else 0.0
             row["standup_gt_05"] = 1.0 if features["standup_window"] >= 0.5 else 0.0
+            row["crawl_to_standup_gt_05"] = 1.0 if features["crawl_to_standup_bias"] >= 0.5 else 0.0
             row["arm_ready_gt_05"] = 1.0 if features["arm_ready"] >= 0.5 else 0.0
             row["release_ready_gt_05"] = 1.0 if features["release_ready"] >= 0.5 else 0.0
             row["unsupported_low_gt_05"] = 1.0 if features["unsupported_low"] >= 0.5 else 0.0
@@ -552,7 +553,8 @@ env MUJOCO_GL=glfw CUDA_VISIBLE_DEVICES=${{CUDA_VISIBLE_DEVICES:-0}} /home/anaco
   sd_reward_mode={args.sd_reward_mode} sd_reward_curriculum_alpha={args.sd_reward_curriculum_alpha} \\
   sd_reward_curriculum_alpha_min={args.sd_reward_curriculum_alpha_min} sd_reward_curriculum_start={args.sd_reward_curriculum_start} \\
   sd_reward_curriculum_end={args.sd_reward_curriculum_end} sd_max_resid_scale={args.sd_max_resid_scale} \\
-  sd_height_loss_coef={args.sd_height_loss_coef} sd_use_struct_residual={'true' if args.sd_use_struct_residual else 'false'}
+  sd_height_loss_coef={args.sd_height_loss_coef} sd_use_struct_residual={'true' if args.sd_use_struct_residual else 'false'} \
+  sd_use_local_residual={'true' if args.sd_use_local_residual else 'false'} sd_local_residual_scale={args.sd_local_residual_scale}
 """
     with open(next_smoke, "w", encoding="utf-8") as f:
         f.write(next_smoke_cmd)

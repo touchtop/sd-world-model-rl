@@ -304,7 +304,11 @@ class TDMPC2(torch.nn.Module):
 		consistency_loss = 0
 		for t, (_action, _next_z) in enumerate(zip(action.unbind(0), next_z.unbind(0))):
 			z = self.model.next(z, _action, task)
-			consistency_loss = consistency_loss + F.mse_loss(z, _next_z) * self.cfg.rho**t
+			if hasattr(self.model, 'consistency_loss'):
+				step_consistency = self.model.consistency_loss(z, _next_z)
+			else:
+				step_consistency = F.mse_loss(z, _next_z)
+			consistency_loss = consistency_loss + step_consistency * self.cfg.rho**t
 			zs[t+1] = z
 
 		# Predictions
@@ -329,28 +333,8 @@ class TDMPC2(torch.nn.Module):
 			termination_loss = 0.
 		value_loss = value_loss / (self.cfg.horizon * self.cfg.num_q)
 
-		# Auxiliary loss: train height_head to predict the true height from
-		# the rollout latent.  Without this, height_head has no gradient and
-		# its contribution to predict_reward / predict_plan_reward is either
-		# random (after Bug 1 fix) or accidentally near-zero (current state).
 		height_loss = 0.0
-		height_coef = float(getattr(self.cfg, 'sd_height_loss_coef', 0.0))
-		if height_coef > 0 and hasattr(self.model, '_dynamics') and hasattr(self.model._dynamics, 'height_head'):
-			try:
-				with torch.no_grad():
-					obs_flat = obs[:-1].reshape(-1, obs.shape[-1])
-					true_struct = self.model._dynamics.encode_observation(obs_flat)
-					true_height = true_struct[:, self.model._dynamics.HEIGHT_IDX]
-					true_height = true_height.reshape(self.cfg.horizon, self.cfg.batch_size)
-				z_struct_rollout, _ = self.model._split_latent(_zs)
-				z_struct_flat = z_struct_rollout.reshape(-1, z_struct_rollout.shape[-1])
-				pred_height = self.model._dynamics.predict_height(z_struct_flat)
-				pred_height = pred_height.reshape(self.cfg.horizon, self.cfg.batch_size)
-				for t in range(self.cfg.horizon):
-					height_loss = height_loss + F.mse_loss(pred_height[t], true_height[t]) * self.cfg.rho**t
-				height_loss = height_loss / self.cfg.horizon
-			except Exception:
-				height_loss = 0.0
+		height_coef = 0.0
 
 		total_loss = (
 			self.cfg.consistency_coef * consistency_loss +
