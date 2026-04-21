@@ -3842,3 +3842,542 @@ front_anchor = body_low * front_anchor_pitch * front_anchor_clearance
 3. 只有当实验反复表明“前倾可救态在 capture 之前被反冲打坏”是主导失败模式时，才允许补入 `precapture -> stable_capture` 这一条唯一候选高层边。
 
 这一步的研究含义是：`SD` 的职责边界已被正式收口。后续工作重点转向“验证现有高层图是否足够”，而不是“继续把更多机制塞进高层显式模型”。
+
+## 2026-04-20 工程修订：闭环分析脚本安全关闭
+
+在 `v4.19` 的闭环轨迹分析完成后，`scripts/v4_hopper_closed_loop.py` 末尾暴露出一个工程性问题：脚本主体已经完成 CSV 与报告落盘，但在双 pass 模式下会于收尾阶段调用 `env.close()`，而外层 `TensorWrapper(DMControlWrapper(...))` 未显式暴露 `close()`，从而在退出时抛出 `AttributeError`。
+
+该问题不影响本轮轨迹诊断结论，但会污染脚本退出状态，并为后续自动化闭环分析制造噪声。因此作如下最小修订：
+
+1. 新增 `safe_close_env()`，沿包装链递进查找可调用的 `close()`；
+2. 将原先单点 `env.close()` 替换为 `safe_close_env(env)`；
+3. 在 `main()` 末尾加入统一 `finally` 收尾，保证单 pass / 双 pass 都能安静退出。
+
+此次修订仅处理资源关闭，不改变轨迹生成、诊断汇总、视频渲染或下一步假设生成逻辑。
+
+### 2026-04-20 v4.20：收紧 `capture / handoff` 拓扑约束，撤回 v4.19 的过早收口判断
+
+在 `v4.19` 之后，外部审查对当前高层图又指出了两个新的“奖励短路”问题。复核代码与数值探针后，判断为成立：
+
+1. `handoff` 仍可绕过 `release` 激活。
+   - 旧实现中，`_handoff_phase_from_state()` 近似等于 `body_high * max(handoff_ready, 0.35 * release_phase)`。
+   - 由于 `handoff_ready` 本身主要由 upright 几何决定，因此在 `capture≈0`、`release≈0` 的 upright 态，`handoff_phase` 仍可接近满格。
+2. `capture` 家族对极端前翻 `tumble` 态仍然开放。
+   - `_front_contact_geom_from_state()` 使用单边 `sigmoid((pitch - center)/scale)`；
+   - `capture_seed` 的第二项、`support_commit`、`precapture_phase` 也沿用了同类“正 pitch 越大越像前撑”的单调门；
+   - 因而在低位极端前翻态中，`front_contact / capture_seed / precapture` 会继续被充高，而不是被识别为失效相。
+
+本轮修订的目标不是扩展 `SD`，而是把现有阶段图里已经声明的方向约束真正落到代码上。
+
+#### 修订 1：为 `capture` 家族补上有上界的 pitch corridor
+
+新增 `_capture_pitch_corridor_from_state()`，采用 `lower_gate * upper_gate` 形式，取代原先单边正 pitch `sigmoid`。随后将该 corridor 接入：
+
+1. `_front_contact_geom_from_state()`
+2. `encode_observation()` 中 `capture_seed` 的第二项
+3. `_precapture_phase_from_state()`
+4. `_capture_crawl_phase_from_state()`
+5. `_forward_one_substep()` 中 `support_commit`
+
+这样做的意图是：
+
+1. 保留“前倾且低位时可形成前撑 capture”的高层语义；
+2. 但不再允许 `pitch` 越大、甚至接近倒栽葱时，`capture` 相关量继续单调升高；
+3. 并且避免直接把 `noncollapsed_posture` 生硬乘到 `capture_crawl` 上。
+
+最后一点是本轮一个有意的取舍。原因在于，合法低位 crawl 本身就明显低于直立态；若直接将 `capture_crawl / precapture` 乘上 `noncollapsed_posture`，会把正常 crawl 一并压坏。定点探针显示：
+
+- 合法低位 crawl 代表态：`noncollapsed ≈ 0.0687`
+- 极端前翻 tumble：`noncollapsed ≈ 0.0067`
+
+两者虽然有差别，但都处于很低区间，不适合拿来做 `capture` 主门控。故本轮采用“收紧 capture corridor”而非“用 noncollapsed 粗暴关门”的策略。
+
+#### 修订 2：让 `handoff` 真正依赖 `release` 已被点亮
+
+新增 `_release_engagement_from_phase()`，仅当 `release_phase` 达到有意义的非零区间后，才允许 `handoff_ready` 进入 `handoff_bridge`。于是：
+
+- 旧式：`release_bridge = max(handoff_ready, 0.35 * release_phase)`
+- 新式：`release_bridge = max(0.35 * release_phase, handoff_ready * release_engagement)`
+
+其研究含义是：
+
+1. `handoff` 仍然保留“后段姿态已立起”的高层语义；
+2. 但不再允许 planner 仅凭 upright 几何，就直接吃到 `handoff_progress`；
+3. `handoff` 现在必须建立在“`release` 已被真正点亮”的前提上，而不是绕过中间阶段。
+
+#### 最小数值验证
+
+修订后，最关键的两个定点探针已发生预期变化：
+
+1. `handoff` 绕行被压掉：
+   - `upright_nocap`：`release≈0.0008, handoff_phase≈0.0003`
+   - `upright_in_air`：`release≈0.0008, handoff_phase≈0.0003`
+   - `upright_cap_nocomp`：`release≈0.0005, handoff_phase≈0.0002`
+   - 合法 `release_ready` 态仍保持：`release≈0.3145, handoff_phase≈0.8545`
+2. `tumble -> capture` 充电被切断：
+   - `rootz=-0.9, comp=1.2, pitch=1.2`：`front_contact≈0.8175, capture_seed≈0.8298, precapture≈0.8001, capture_crawl≈0.8354`
+   - `rootz=-0.9, comp=1.2, pitch=2.8`：`front_contact≈0.0395, capture_seed≈0.0398, precapture≈0.0384, capture_crawl≈0.0008`
+
+这说明本轮修订已经把“正常前撑 crawl”与“极端 tumble 伪前撑”重新拉开，而不是继续让后者吃到前段奖励。
+
+#### 对阶段判断的修正
+
+据此，`v4.19` 中“高层结构已基本闭合”的表述被判定为过早。更准确的版本应是：
+
+1. `v4.19` 时，高层图的命名与主要节点已经成形；
+2. 但奖励拓扑约束尚未完全落到代码实现中；
+3. `v4.20` 之后，`capture` 与 `handoff` 两处最明显的语义短路才被实质收紧。
+
+因此，当前阶段性结论更新为：
+
+1. 仍不适合直接进入 `50k × 3` 正式对照；
+2. 下一步应先重新运行 `v4_structural_sanity_check.py`，确认：
+   - `handoff` 无 `release` 时不再高亮；
+   - `tumble` 态下 `capture / precapture / capture_crawl` 不再高于合法 crawl；
+   - `transition_alignment` 是否仍以 `pitch_rate` 为主导失败维；
+3. 若上述新约束成立，再决定是否继续用 `5k smoke` 观察窄 residual 能否吸收剩余 `pitch_rate / support` 误差。
+
+### 2026-04-20 工程修订：关闭 `step=0 eval`
+
+在随后启动 `v4.20` 的 `5k` 窄 residual smoke 时，又暴露出一个与实验效率直接相关的工程问题：`OnlineTrainer.train()` 在 `self._step = 0` 时也会触发 `eval_next = True`，从而在真正开始训练前先跑完整一轮评估。
+
+对当前 Hopper 短训工作流，这一行为的代价明显大于收益：
+
+1. `step=0` 的策略仍是未训练初始化，评估结果几乎没有研究价值；
+2. 但其耗时很大。若配置为 `eval_episodes=10`、`episode_length=500`，则会先消耗完整 `5000` 个环境步；
+3. 在这轮初始评估结束前，训练日志与 `eval.csv` 都不会落盘，外部观察上会表现为“进程在跑，但看不出训练已到哪一步”。
+
+因此，本轮作出以下工程修订：
+
+1. 在 `external/tdmpc2/tdmpc2/trainer/online_trainer.py` 中，将周期性评估触发条件从
+   - `self._step % self.cfg.eval_freq == 0`
+   改为
+   - `self._step > 0 and self._step % self.cfg.eval_freq == 0`
+2. 项目级实验启动记忆同步更新：对 `5k/10k smoke` 这类快速学习检验，默认关闭 `step=0 eval`。
+
+这是一项纯工程性改动，不改变学习目标、奖励结构或世界模型本体，只是去掉一轮对短训几乎无信息量、却会严重拖慢实验反馈的初始评估。
+
+### 2026-04-20 v4.21：补入 `precapture -> stable_capture` 唯一高层边
+
+对 `v4.20` 窄 residual `5k` smoke 的闭环轨迹复核后，失败模式进一步收敛为一类更具体的问题：部分初始前倾、理论上可救的 episode，会在 `capture` 尚未建立前就被反冲打坏，随后迅速跌入 `rear_trap`。这类轨迹并不表现为“缺少新的后段阶段”，而更像是前撑建立阶段缺少一条最小的抗塌稳定机制。
+
+在坚持“SD 仅负责高层、本质、清晰机制，快变量与局部细节交给窄 residual”这一约束下，本轮仅补入此前保留的唯一候选高层边：`precapture -> stable_capture`。该边的语义不是新增一个完整阶段，而是显式表示：
+
+1. 当系统处于浅前倾、低位、已有部分地面支撑、但 `capture_memory` 尚未成熟的 `precapture` 入口态时；
+2. 允许存在一条有限的“抗塌稳定化”通道，用于在前撑建立前短暂抑制继续塌陷；
+3. 该通道只服务于 `precapture` 到 `capture` 的过渡，不直接替代 `capture_crawl / standup / release / handoff` 的后续链条。
+
+本轮代码修订如下：
+
+1. 在 `src/world_model/dmcontrol_hopper_sd_model.py` 中新增 `_stable_capture_phase_from_state(...)`，由 `precapture_phase`、前撑几何、地面支撑与低 `capture_commitment` 共同决定；
+2. 在 `_explicit_rate_dynamics()` 中加入 `stable_capture_recoil`，仅通过 `z_acc` 与 `pitch_acc` 提供有限的抗塌抬升；
+3. 在 `_forward_one_substep()` 的 `next_capture` 更新中加入 `+ 0.18 * next_stable_capture`，使这一入口稳定化可转化为更稳的前撑记忆积累；
+4. 在 `predict_plan_reward()` 中加入 `stable_capture_progress`，只在 `precapture_gate` 下奖励这条新边的成立与增长；
+5. 在诊断脚本中同步暴露 `stable_capture_phase`，以便结构检验与闭环 CSV 能直接观察该量。
+
+最小定点探针表明，这条新边的开启位置符合预期：
+
+1. `recoverable_precapture`：`precapture≈0.118`，`stable_capture≈0.044`，`capture_crawl≈0.004`；
+2. `episode00_like_step5`：`precapture≈0.122`，`stable_capture≈0.050`，`capture_crawl≈0.003`；
+3. `mature_crawl_low`：`precapture≈0.094`，`stable_capture≈0.000`，`capture_crawl≈0.377`；
+4. `tumble_low`：`precapture≈0.038`，`stable_capture≈0.017`，`capture_crawl≈0.001`。
+
+这说明该边只在“可救但尚未建稳”的前撑入口态上有可见激活，对成熟 crawl 与 tumble 都未重新放开高值通道。因此，它仍属于高层阶段图的收口修订，而不是重新走回开放式扩模。
+
+#### `v4_structural_sanity_check.py` 复核结果（`results/structural_sanity_v421_r2`）
+
+本轮又发现一个检验脚本层面的口径问题：若直接沿用 `recoverable_front_anchor` 去验 `stable_capture`，会把一个已经部分进入 `release-ready` 走廊、且 `vz>0` 的代表态，误当成“正在下坠、需要抗塌稳定化”的 `precapture` 入口态，进而得到假阴性。
+
+因此，结构检验脚本同步修订为：
+
+1. 保留原 `recoverable_front_anchor` 检查，仅验证“该态更偏向 hold/crawl，而非过早 release”；
+2. 另行加入 `recoverable_precapture` canonical state，专门验证：
+   - `precapture` 已打开；
+   - `stable_capture` 有意义但 `capture/release` 尚未成熟；
+   - 该态更偏向 stabilize，而非 early release。
+
+修订后的 `v4_structural_sanity_check.py` 结果如下：
+
+1. 高层 transition 约束通过：
+   - `recoverable_front_anchor`
+   - `rear_trap`
+   - `release_ready_corridor`
+   - `mature_capture_crawl`
+   - `phase_dependency`
+   - `recoverable_precapture`
+2. 新增检查 `precapture_state_prefers_stabilize_over_early_release = True`，说明 `precapture -> stable_capture` 这条高层边已按预期落地；
+3. `transition_alignment` 仍未通过：
+   - one-step observable RMSE `0.4549`
+   - three-step observable RMSE `0.8262`
+   - 主误差维仍为 `pitch_rate > compression_rate > vz > support`
+4. `forward_anchor_like` 仍未通过，原因不是新边把图冲坏，而是短 rollout 中采到的该类样本 `standup_window` 仍偏低；
+5. 因此，当前代码状态可以判定为：
+   - 高层阶段图进一步收口；
+   - 新增 `stable_capture` 边已通过语义验收；
+   - 但正式训练前的主要障碍仍是快变量与接触切换的 transition 对齐，而不是继续补新高层节点。
+
+### 2026-04-20 v4.22：将快变量误差正式转交窄残差，并补快速监督 probe
+
+`v4.21` 的结构检验已经说明，当前主要失败项不再是高层阶段图缺口，而是快变量对齐，尤其集中在：
+
+1. `pitch_rate`
+2. `compression_rate`
+3. `vz`
+4. `support`
+
+据此，本轮不再继续扩展高层 SD，而是把这部分误差明确交给 `local residual`。这一决定遵循当前已收口的建模原则：高层显式模型只负责清晰、本质、慢变量主导的阶段机制；接触切换、速度快变量与局部瞬态补偿由窄残差承担。
+
+本轮代码修订如下：
+
+1. 在 `external/tdmpc2/tdmpc2/common/sd_world_model.py` 中，将 `local residual` 的写域由原先的两维：
+   - `pitch_rate`
+   - `support`
+   扩为四维：
+   - `vz`
+   - `pitch_rate`
+   - `compression_rate`
+   - `support`
+2. 对前三维仍采用小尺度加性修正；
+3. 对 `support` 改为受限 `logit` 更新，而不再直接做加法后统一截断。其目的在于：
+   - 保留 `support ∈ [0,1]` 的有界语义；
+   - 允许残差修正接触切换时的快门控误差；
+   - 避免把 `support` 这一半概率量学成粗暴的线性偏移。
+
+同时，为避免再次依赖 `5k` 训练才能判断“残差设计是否对症”，本轮新增 `scripts/v4_local_residual_fit_probe.py`。该脚本的研究用途是：
+
+1. 固定当前显式 SD 主体不变；
+2. 只训练 `local residual`；
+3. 用短 rollout 采样出的监督 transition，直接检验窄残差是否能显著降低：
+   - one-step observable RMSE
+   - three-step observable RMSE
+4. 若该 probe 都不能带来明显改进，则说明问题不在 RL 训练时长，而在残差写域或残差参数化本身。
+
+这一步的研究含义是：当前主线已从“是否还缺高层机制”正式转向“是否为快变量设计了正确的局部补偿接口”。
+
+#### `v4_local_residual_fit_probe.py` 初步结果（`results/local_residual_probe_v422_r3`）
+
+用一个更小规模的监督 probe 对新四维 `local residual` 做了初步验证。设置为：
+
+1. `episodes=6`
+2. `steps_per_episode=120`
+3. `epochs=20`
+4. 训练/验证按 episode 切分为 `4/2`
+
+结果表明，这一方向是有效的，但当前参数化只能带来有限改善：
+
+1. 验证集 one-step observable RMSE：
+   - `0.8655 -> 0.8510`
+   - 相对改善约 `1.7%`
+2. 验证集 three-step observable RMSE：
+   - `1.2370 -> 1.1885`
+   - 相对改善约 `3.9%`
+3. 四个目标快变量在验证集上均有下降：
+   - `vz`：one-step `0.4571 -> 0.4385`，three-step `0.8047 -> 0.6829`
+   - `pitch_rate`：one-step `2.3232 -> 2.2892`，three-step `3.2437 -> 3.1497`
+   - `compression_rate`：one-step `0.4608 -> 0.4482`，three-step `0.8008 -> 0.7063`
+   - `support`：one-step `0.3306 -> 0.3108`，three-step `0.4029 -> 0.3848`
+
+由此可得两点结论：
+
+1. “继续靠训练自己消化误差”并非全无作用，窄残差确实能学到部分快变量补偿；
+2. 但现有这版窄残差的表达力和训练口径仍然偏弱，尚不足以把 `pitch_rate` 这一主误差维显著压下。
+
+因此，当前最合理的研究判断是：
+
+1. 不需要再回头扩高层 SD；
+2. 也不应直接进入大规模 `50k × 3` 正式训练；
+3. 下一步应继续围绕窄残差本身做针对性增强，例如：
+   - 提高 `pitch_rate` 相关修正的可达幅度或单独尺度；
+   - 为 local residual 补入更直接的多步监督；
+   - 必要时重新审视 `support` 是否应继续保留为 stock，或改为更受几何约束的派生量。
+
+#### 对“再加训练信号设计”的边界复核
+
+随后又做了一次更克制的尝试：不改残差结构，只在 `consistency_loss` 中对 `vz / pitch_rate / compression_rate / support` 给予适度加权，希望用更强的学习信号帮助当前窄残差收敛。
+
+对应的小 probe 结果（`results/local_residual_probe_v422_r4`）表明：
+
+1. 验证集 one-step observable RMSE 仅从 `0.8510` 进一步微降到 `0.8499`；
+2. 但验证集 three-step observable RMSE 反而从 `1.1885` 回升到 `1.2006`；
+3. 各快变量的 one-step 大多仅有边际改善，而 `pitch_rate / vz / compression_rate` 的 three-step 结果略变差。
+
+据此，本轮作出一个明确取舍：
+
+1. 不再继续沿“额外设计训练信号”方向加码；
+2. 该加权 `consistency_loss` 不纳入当前主线代码；
+3. 保留已经确认有用、且仍然简洁的改动：
+   - 四维 `local residual`
+   - `support` 的受限 `logit` 更新
+4. 后续应优先让训练去利用这一更合理但仍简洁的残差接口，而不是继续靠手工损失权重去替代训练本身。
+
+### 2026-04-20 v4.23：最小修订，打掉 `ep01` 型冻结鼻撑盆地
+
+对上轮 `5k smoke` 的 `episode_00 / episode_01` 失败轨迹复核后，可以确认：当前更紧迫的不是再补高层阶段，而是堵住一条新的局部最优路径，即“高支撑、低运动、边缘 `capture_memory`、大正 pitch”的静态鼻撑冻结态。
+
+在坚持“最小修订、不过度设计替代训练”的原则下，本轮只做两项最小改动：
+
+1. 上调 `capture_commitment` 的激活中心：
+   - `V4_CAPTURE_CENTER: 0.35 -> 0.55`
+   - 目的不是否定 `capture_memory`，而是把“边缘鼻撑半激活”与“真正建立前撑”拉开，避免 `capture=0.46` 一类冻结态过早进入中段奖励区间。
+2. 在 `predict_plan_reward()` 中加入 `frozen_capture` 惩罚：
+   - 仅在 `support` 很高、`|vx|` 与 `|vz|` 都很低、`capture_commitment` 已非零且 `pitch` 足够前倾时生效；
+   - 该惩罚显式针对 `ep01` 型“高支撑 + 低运动 + 边缘 capture”冻结盆地，而不试图重新定义整个 crawl 语义。
+
+这次修订有意没有做：
+
+1. 不引入新的接触状态维；
+2. 不把鼻/calf 接触代理直接并入 SD 主体；
+3. 不进一步手工改写 crawl/release 阶段图。
+
+定点探针显示该修订符合预期：
+
+1. `frozen_nose`：reward `-0.0405`，`capture_commitment≈0.245`
+2. `mature_crawl_static`：reward `-0.0235`，`capture_commitment≈0.984`
+3. `mature_crawl_forward`：reward `+0.0266`，`capture_commitment≈0.984`
+4. `edge_capture_forward`：reward `-0.0048`，`capture_commitment≈0.245`
+
+据此可以判定：
+
+1. `ep01` 型冻结鼻撑被明确压低；
+2. 成熟 crawl 若完全静止，也不再被鼓励；
+3. 但已经建立前撑并继续前进的 crawl 仍保持正向驱动，没有被一刀切打死。
+
+因此，本轮修订满足“最小、收口、针对性强”的要求，可以据此进入下一轮 `5k smoke` 验收，重点观察 `ep01` 型冻结是否消失，以及是否出现新的过度压制副作用。
+
+### 2026-04-21 v4.24：局部打通 `crawl -> standup` 桥，并补 `rear_escape` 定点 probe
+
+对 `v4.23` 的完整闭环诊断（`results/closed_loop/sd_hopper_5k_v423_freezecap_smoke_20260420_r2_finaldiag`）复核后，可以确认三个结论：
+
+1. `ep01` 型冻结鼻撑已不再是主导失败盆地；
+2. 当前 `10` 条里已有 `2` 条正分 episode（`ep01`, `ep05`），说明前撑推进路径本身已可达；
+3. 但 `standup / release / handoff` 在全部 `10` 条里仍几乎没有持续激活，主缺口集中在 `crawl -> standup` 桥，而非“训练预算不足”。
+
+据此，本轮不扩状态维、不重定义全局 `noncollapsed`，只做两个最小改动：
+
+1. 仅在 `_crawl_to_standup_bias_from_state()` 局部放宽桥接姿态门：
+   - 新增 `body_rise_attempt = sigmoid((rootz - V4_BRIDGE_RISE_ROOTZ_CENTER) / V4_BRIDGE_RISE_ROOTZ_SCALE)`；
+   - 用 `max(noncollapsed, body_rise_attempt)` 替代原本只依赖 `noncollapsed` 的桥接门；
+   - 这样做的意图不是把“已经抬起”的定义整体下放，而是允许长期前撑 crawl 在尚未完全抬身时，也能开始获得“正在尝试抬升”的中间桥接信号。
+2. 在 `predict_plan_reward()` 中放宽 `standup_progress` 的前置门：
+   - 原实现：`standup_gate = recovery_gate * prev_standup_phase`
+   - 新实现：`standup_gate = recovery_gate * max(prev_standup_phase, 0.40 * prev_crawl_to_standup_bias)`
+   - 目的在于关闭典型的 chicken-and-egg：只有当策略已经进入 `standup_phase` 时，才给 `standup_progress`；而现在允许“桥接已建立但还未完全进入 standup”的轨迹获得部分后续梯度。
+
+同时，本轮补入 `scripts/v4_rear_escape_probe.py`，用于回答另一条尚未定性的研究问题：`rear_trap` 之所以仍然主导失败，究竟是 reward shaping 没有被策略利用，还是显式 SD 动力学本身就无法把后仰态拉回前向恢复走廊。
+
+该 probe 的设计很窄：
+
+1. 从闭环诊断的 `episode_csv` 中读取某一时刻的结构状态；
+2. 施加固定 `rear_escape_drive` 风格动作；
+3. 仅沿显式 SD `forward()` rollout 若干步；
+4. 输出 `pitch / rootz / rear_phase / precapture_phase` 序列，检查是否能跨过 `pitch > -0.3`、`rootz > -0.7` 等恢复阈值。
+
+本轮取舍刻意保持克制：
+
+1. 不直接下调全局 `V4_NONCOLLAPSED_*` 常量，避免把 `standup_window / arm_ready / release_phase` 的语义一起放松；
+2. 不在此轮同时新增 rear-trap 专用高层边；
+3. 先用局部桥接修订检验 `crawl -> standup` 是否终于可达，再用 `rear_escape` probe 判断 rear-trap 的瓶颈究竟落在 reward 还是显式 dynamics。
+
+改动后，已完成两类快速验证：
+
+1. `rear_escape` 定点 probe：
+   - 以 `ep00 step20` 的 rear-trap 态为起点，施加固定 `rear_escape_drive = [1, -1, 1, 1]`，沿显式 SD rollout `12` 步；
+   - 结果：`pitch: -1.12 -> +0.55`，`rootz: -0.89 -> -0.64`，且已跨过 `pitch > -0.3`、`pitch > 0.0`、`rootz > -0.7`；
+   - 这说明当前 rear-trap 的主问题未必是“显式 dynamics 无法表达逃逸”，更可能是训练没有把 reward 通道用出来。
+2. `crawl -> standup` 桥接量对照：
+   - 在 `ep01/05/09` 的典型 crawl 态上，旧桥接量约为 `0.0006 ~ 0.0059`，新桥接量抬到 `0.0127 ~ 0.2508`；
+   - 对应地，`standup_gate` 也从原本近似为零的 `0.0006 ~ 0.0013`，抬到 `0.0269 ~ 0.0836`；
+   - 据此可以确认：本轮改动已经把“桥完全关死”的局面改成“bridge / standup 后半段开始可达”，后续应通过新的 `5k smoke` 观察该信号是否能在真实训练中转化为更稳定的 `standup/release/handoff` 激活。
+
+### 2026-04-21 v4.24b：正式 eval 轨迹与验收口径对齐
+
+此前的一个工程性问题已经确认：训练自带的 `eval.csv / eval_full.csv` 与事后闭环诊断脚本所 replay 的 episode 集并不天然一致，因此会出现“官方均值几乎为零，但闭环里挑出若干正分轨迹”的现象。对于研究判断而言，这会把“正式评估结果”和“分析对象”分离开。
+
+为消除这一歧义，本轮在 `OnlineTrainer.eval()` 中补入正式 eval 轨迹导出逻辑，并保持原始 `eval.csv / eval_full.csv` 完全不变：
+
+1. 新增配置项 `save_eval_traces`，默认开启；
+2. 当任务为当前主线的 `hopper-hop + sd_hopper` 时，正式 eval 会在同一次官方评估循环内额外落盘：
+   - `work_dir/official_eval/step_XXXXXXX/episode_csv/episode_YY.csv`
+   - `work_dir/official_eval/step_XXXXXXX/eval_episode_summary.csv`
+3. 这些文件与 `eval.csv` 中同一步的 `episode_reward_list` 严格同源，episode 顺序完全对齐，不再依赖事后重新 rollout；
+4. 为避免无谓拖慢训练，本轮仍然只导出数值轨迹与汇总，不在正式 eval 中直接写 mp4。
+
+轨迹字段刻意与既有闭环诊断 CSV 保持接近，包含：
+
+1. 每步 reward 与 done；
+2. 关键 physics 量（`geom_xpos / qpos / qvel`）；
+3. 结构量与阶段量（`capture_commitment / standup_window / crawl_to_standup_bias / release_phase / handoff_phase` 等）；
+4. 动作；
+5. 若干 `*_gt_05` 二值门，用于后续按正式 eval episode 直接做 failure-mode 分析。
+
+一个最小 `1k` 烟雾实验已验证该导出链条正常工作：
+
+1. `official_eval/step_0001000/episode_csv/episode_00.csv`
+2. `official_eval/step_0001000/episode_csv/episode_01.csv`
+3. `official_eval/step_0001000/eval_episode_summary.csv`
+
+据此，后续工作流需要同步切换：
+
+1. 验收口径仍以官方 `eval.csv / eval_full.csv` 为准；
+2. 轨迹分析的默认输入改为对应 `official_eval/step_XXXXXXX/` 下的 summary 与 episode CSV；
+3. 现有闭环 replay/diagnostic 工具不再承担“官方评估结果解释器”的默认角色，只在需要额外诊断时作为补充工具使用。
+
+### 2026-04-21 v4.24c：补全实验环境依赖清单，生成可迁移的根目录 `requirements.txt`
+
+为将当前 Hopper v4 主线实验迁移到新服务器，本轮对训练、官方评估、结构诊断、闭环轨迹导出所经过的实际 Python 依赖链做了一次收敛整理，并据此重写根目录 `requirements.txt`。
+
+本次整理遵循两个原则：
+
+1. 以当前主线真正使用到的 import 链为准，而不是沿用上游 TD-MPC2 的完整历史依赖；
+2. 以当前 `sdmcts_p100` 环境的实际版本为准，避免把文档、旧实验、未启用组件的包误写进主环境。
+
+最终纳入根目录 `requirements.txt` 的依赖分为四组：
+
+1. 核心数值与张量栈：`torch`、`torchvision`、`numpy`、`tensordict`、`kornia`；
+2. Hopper / dm_control 环境栈：`gymnasium`、`dm-control`、`mujoco`、`glfw`、`h5py`；
+3. 配置与启动栈：`hydra-core`、`hydra-submitit-launcher`、`omegaconf`、`submitit`、`termcolor`；
+4. 日志、评估与轨迹导出：`pandas`、`tqdm`、`imageio`、`imageio-ffmpeg`。
+
+同时，额外记录两点边界信息：
+
+1. `wandb` 在当前主线里仍然是可选依赖。由于 Hopper 训练通常使用 `enable_wandb=false`，因此默认未作为硬依赖写入，只以注释形式保留；
+2. `torchrl` 被刻意排除。当前 fork 已在 `common/buffer.py` 中切换为本地 replay buffer，实现上不再依赖 `torchrl`。这样做的原因是：`torchrl` 与现有训练环境存在版本兼容问题，而主实验链并不需要它。
+
+此外，根目录 `requirements.txt` 头部补入了 PyTorch CUDA 轮子来源说明：
+
+1. 当前 P100 环境使用 `cu118` 轮子；
+2. 若迁移到新服务器，应优先保证 `torch / torchvision` 与目标 CUDA 栈一致；
+3. 其余纯 Python 依赖可直接沿用当前 pin 版本。
+
+### 2026-04-21 v4.25：恢复低姿 crawl 入口，保持桥局部 Markov，并补全 `pitch wrap / rear-flight penalty`
+
+在 `v4.24` 三种子正式训练推进到 `30k` 后，当前主线已满足切换条件：
+
+1. 三条 `30k` 官方 eval 分别为 `0.000 / 0.264 / 0.267`；
+2. `standup_frac / crawl_to_standup_frac / release_ready_frac / handoff_frac` 在三条种子上仍全部为 `0`；
+3. 因此，`v4.24` 的局部桥接放宽虽然在模型层不再是死门，但到策略层仍未打通 `crawl -> standup -> release` 链，继续追加训练预算的边际信息价值已经很低。
+
+据此，当前三条 `v4.24` 训练会话已全部手动停止，正式转入 `v4.25` 的 SD 修订。本轮修订保持此前已确认的原则不变：
+
+1. 不开放式扩展 SD 状态维；
+2. 不引入 episode-level 历史量；
+3. 不回退 `v4.20-v4.24` 已修好的工程自洽项；
+4. 只处理“低姿 crawl 入口被误封”和“eval 被非物理行为污染”这两类当前主阻塞。
+
+本轮代码改动集中在 `src/world_model/dmcontrol_hopper_sd_model.py`，以及三个调用 `_crawl_to_standup_bias_from_state()` 的辅助脚本/导出点。
+
+#### 修订 1：放宽 `_capture_pitch_corridor` 上界，恢复 `v3b` 型低姿前撑 crawl 可行域
+
+将：
+
+1. `V4_CAPTURE_PITCH_HIGH_CENTER: 1.85 -> 2.80`
+2. `V4_CAPTURE_PITCH_HIGH_SCALE: 0.30 -> 0.50`
+
+其目的不是重新放开极端 tumble，而是恢复 `pitch≈2.0~2.8` 区间的低姿前撑 crawl 入口，使 `capture_seed / front_contact / capture_crawl` 不再把 `v3b` 成功轨迹依赖的前撑姿态整体排除在外。
+
+#### 修订 2：桥 gating 继续保持 Markov，只补当前状态局部代理
+
+在上一轮 `body_rise_attempt(rootz)` 的基础上，新增：
+
+1. `_crawl_forward_progress_from_state(vx, support, capture_memory)`
+
+其形式只依赖当前时刻的：
+
+1. 前向速度 `vx`
+2. 当前接地程度 `support`
+3. 当前 `capture_memory`
+
+即用 `capture_commitment * grounded * speed_gate` 作为“已建立前撑、并出现真实前向 crawl”的局部代理。
+
+随后 `_crawl_to_standup_bias_from_state()` 改为使用：
+
+1. `max(noncollapsed, body_rise_attempt, crawl_forward_progress)`
+
+而不是只依赖 `noncollapsed / body_rise_attempt`。这样做的意图是：
+
+1. 保持桥接仍然是一步 Markov 量；
+2. 不引入 `max_rootx_in_episode` 等 episode-level 历史；
+3. 允许“低姿 crawl 已经形成真实前进”时，桥的姿态门比 `v4.24` 再略微软化，但仍然只在当前状态下生效。
+
+由于该函数签名新增了 `vx`，本轮同步修订了三处辅助调用：
+
+1. `external/tdmpc2/tdmpc2/trainer/online_trainer.py`
+2. `scripts/v4_hopper_closed_loop.py`
+3. `scripts/v4_structural_sanity_check.py`
+
+以保证正式 eval 导出、闭环分析、结构 sanity 检查的 `crawl_to_standup_bias` 统计口径仍与模型一致。
+
+#### 修订 3：补全 `pitch wrap` 的闭环一致性
+
+此前虽然：
+
+1. `obs_to_state()` 已对原始 `qpos` 角做 wrap；
+2. `encode_observation()` 也已对输入观测角做 wrap；
+
+但显式 latent rollout 内部的 `pitch` 在 `_forward_one_substep()` 与 `project_state()` 中仍只做数值裁剪，没有重新映射回 `[-pi, pi]` 主值域。
+
+本轮将：
+
+1. `project_state()` 的 `pitch` 投影改为 `_wrap_angle_torch(...)`
+2. `_forward_one_substep()` 中的 `next_pitch` 更新也改为 `_wrap_angle_torch(...)`
+3. 并在子步返回前统一走一次 `project_state()`
+
+其研究意义在于：
+
+1. `pitch=4.9+` 的连续翻转不再以“大角度饱和尾部”形式潜入后续阶段门；
+2. latent rollout 与 encode 口径重新一致；
+3. 评估中关于 tumble / rotation 的统计不会继续被“等价角未 wrap”污染。
+
+#### 修订 4：在 `predict_plan_reward()` 中加入 `rear-flight penalty`
+
+新增：
+
+1. `rear_flight = rear_trap * clamp(z_dot, min=0, max=1)`
+2. 并将 `0.12 * rear_flight` 纳入总 penalty
+
+其目的是切断此前已反复出现的“后仰、高 `rear_trap`、向上飞、却仍能蹭到 standing/hopping 正奖励”的后仰飞 hack。
+
+这里保持了最小实现：
+
+1. 仍以 `rear_trap` 作为语义门；
+2. 只用正向 `vz` 作为 flight 信号；
+3. 不额外引入新的高层 stock 或复杂的后仰飞专用机制。
+
+#### 轻量预验收
+
+本轮先做了两级最小检查。
+
+第一类是直接数值探针：
+
+1. `capture_corridor([1.85, 2.5, 2.8, 3.1]) -> [0.8675, 0.6456, 0.5000, 0.3543]`
+   - 说明 `pitch≈2.5~2.8` 的低姿 crawl 区间已经重新落回 corridor 内；
+2. `project_state(pitch=4.94)` 会被 wrap 到 `-1.3432`
+   - 说明 `pitch wrap` 不再只停留在编码入口；
+3. 一个大角速度前翻态经 `forward()` 后得到 `forward_pitch=-2.9891`
+   - 说明 latent rollout 内部的 `pitch` 也已走主值角；
+4. 构造的前撑 crawl 态上，`crawl_to_standup_bias=0.402875`
+   - 说明桥已开始接受“当前前进中的 capture crawl”这一局部 Markov 代理；
+5. 构造的后仰上抛态上，`rear_flight_signal=0.785514`
+   - 说明 `rear-flight penalty` 的专用信号已被点亮。
+
+第二类是一个小规模 simulator-backed 结构预检：
+
+1. 命令：`scripts/v4_structural_sanity_check.py --episodes 2 --steps_per_episode 60`
+2. 结果已落盘到：`/tmp/structural_sanity_v425_precheck/report.json`
+3. 该次预检成功执行到结束，说明：
+   - 新签名调用未打坏 sanity 检查链；
+   - `pitch wrap` 未破坏 encode / forward / report 导出；
+   - 正式辅助脚本仍能在当前修订下运行。
+
+需要说明的是，这个小规模 sanity 的 `overall_pass` 仍为 `false`，但其主因仍是当前已知的结构/transition 阈值不过，并非本轮补丁引入新的显著回归。与本轮最相关的两个结果是：
+
+1. `pitch_abs_err_max = 1.17e-07`
+   - 说明结构 `pitch` 与原始物理角的一致性仍然闭合；
+2. `forward_anchor_like` 样本被成功覆盖，且 `mean_capture_memory ≈ 0.627`、`mean_rear_trap ≈ 0`
+   - 说明放宽后的前撑 corridor 确实重新允许前撑类样本进入语义量统计。
+
+据此，本轮 `v4.25` 的最小实现已经就位。下一步应在此基础上重新启动一个新的 `5k smoke`，优先验收三件事：
+
+1. 是否重新出现 `v3b` 型低姿前撑 crawl；
+2. `standup_frac / crawl_to_standup_frac` 是否终于出现非零 episode；
+3. `rear_trap` 正分与连续正向翻转是否被显著压低。

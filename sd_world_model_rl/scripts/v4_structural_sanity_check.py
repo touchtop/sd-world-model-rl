@@ -151,9 +151,10 @@ def semantic_features(model: DMControlHopperSDModel, struct: np.ndarray, snap: d
         arm_ready = float(model._arm_ready_from_state(state[:, model.PITCH_IDX], state[:, model.SUPPORT_IDX], state[:, model.COMP_IDX], state[:, model.CAPTURE_IDX], state[:, model.ROOTZ_IDX])[0].item())
         handoff_window = float(model._handoff_phase_from_state(state[:, model.PITCH_IDX], state[:, model.SUPPORT_IDX], state[:, model.COMP_IDX], state[:, model.ROOTZ_IDX], state[:, model.CAPTURE_IDX])[0].item())
         precapture_phase = float(model._precapture_phase_from_state(state[:, model.PITCH_IDX], state[:, model.SUPPORT_IDX], state[:, model.COMP_IDX], state[:, model.ROOTZ_IDX], state[:, model.CAPTURE_IDX])[0].item())
+        stable_capture_phase = float(model._stable_capture_phase_from_state(state[:, model.PITCH_IDX], state[:, model.SUPPORT_IDX], state[:, model.COMP_IDX], state[:, model.ROOTZ_IDX], state[:, model.CAPTURE_IDX])[0].item())
         capture_phase = float(model._capture_crawl_phase_from_state(state[:, model.PITCH_IDX], state[:, model.SUPPORT_IDX], state[:, model.ROOTZ_IDX], state[:, model.CAPTURE_IDX])[0].item())
         standup_phase = float(model._standup_phase_from_state(state[:, model.PITCH_IDX], state[:, model.SUPPORT_IDX], state[:, model.COMP_IDX], state[:, model.ROOTZ_IDX], state[:, model.CAPTURE_IDX])[0].item())
-        crawl_to_standup_bias = float(model._crawl_to_standup_bias_from_state(state[:, model.PITCH_IDX], state[:, model.SUPPORT_IDX], state[:, model.COMP_IDX], state[:, model.ROOTZ_IDX], state[:, model.CAPTURE_IDX])[0].item())
+        crawl_to_standup_bias = float(model._crawl_to_standup_bias_from_state(state[:, model.VX_IDX], state[:, model.PITCH_IDX], state[:, model.SUPPORT_IDX], state[:, model.COMP_IDX], state[:, model.ROOTZ_IDX], state[:, model.CAPTURE_IDX])[0].item())
         release_phase = float(model._release_phase_from_state(state[:, model.PITCH_IDX], state[:, model.SUPPORT_IDX], state[:, model.COMP_IDX], state[:, model.ROOTZ_IDX], state[:, model.CAPTURE_IDX])[0].item())
         release_ready = release_phase * min(max(compression / 0.35, 0.0), 1.0)
         unsupported_low = body_low * (1.0 - capture_commitment)
@@ -180,6 +181,7 @@ def semantic_features(model: DMControlHopperSDModel, struct: np.ndarray, snap: d
         'handoff_window': handoff_window,
         'rear_recovery_phase': rear_trap,
         'precapture_phase': precapture_phase,
+        'stable_capture_phase': stable_capture_phase,
         'capture_phase': capture_phase,
         'crawl_to_standup_bias': crawl_to_standup_bias,
         'standup_phase': standup_phase,
@@ -217,6 +219,11 @@ def canonical_struct(model: DMControlHopperSDModel, name: str) -> np.ndarray:
     if name == 'uncaptured_forward_lean':
         return np.array(
             [0.16, 0.20, 0.58, 0.00, 0.28, 0.00, 0.88, -0.46, 0.06],
+            dtype=np.float32,
+        )
+    if name == 'recoverable_precapture':
+        return np.array(
+            [0.10, -0.35, 0.62, 0.00, 0.44, 0.00, 0.80, -0.62, 0.12],
             dtype=np.float32,
         )
     if name == 'release_ready_corridor':
@@ -300,6 +307,7 @@ def transition_and_reward_checks(world_model: SDWorldModel, model: DMControlHopp
     forward_source = canonical_struct(model, 'recoverable_front_anchor').tolist()
     rear_source = candidates['rear_nose_support'][0]['struct'] if candidates['rear_nose_support'] else canonical_struct(model, 'rear_trap').tolist()
     uncaptured_source = canonical_struct(model, 'uncaptured_forward_lean').tolist()
+    precapture_source = canonical_struct(model, 'recoverable_precapture').tolist()
     release_ready_source = canonical_struct(model, 'release_ready_corridor').tolist()
     mature_capture_source = canonical_struct(model, 'mature_capture_crawl').tolist()
 
@@ -327,6 +335,10 @@ def transition_and_reward_checks(world_model: SDWorldModel, model: DMControlHopp
     }
     uncaptured_probes = {
         name: transition_probe(world_model, model, np.array(uncaptured_source, dtype=np.float32), action_bank[name])
+        for name in ('hold_crawl', 'release_handoff', 'neutral')
+    }
+    precapture_probes = {
+        name: transition_probe(world_model, model, np.array(precapture_source, dtype=np.float32), action_bank[name])
         for name in ('hold_crawl', 'release_handoff', 'neutral')
     }
     release_ready_probes = {
@@ -358,6 +370,8 @@ def transition_and_reward_checks(world_model: SDWorldModel, model: DMControlHopp
     rear_worsen = rear_probes['rear_worsen']
     uncaptured_hold = uncaptured_probes['hold_crawl']
     uncaptured_release = uncaptured_probes['release_handoff']
+    precapture_hold = precapture_probes['hold_crawl']
+    precapture_release = precapture_probes['release_handoff']
     release_ready_hold = release_ready_probes['hold_crawl']
     release_ready_release = release_ready_probes['release_handoff']
     mature_capture_hold = mature_capture_probes['hold_crawl']
@@ -398,6 +412,14 @@ def transition_and_reward_checks(world_model: SDWorldModel, model: DMControlHopp
         and uncaptured_release['next']['capture_commitment'] <= uncaptured_hold['next']['capture_commitment'] + 1e-4
         and uncaptured_release['next']['standup_window'] <= uncaptured_hold['next']['standup_window'] + 1e-4
         and uncaptured_release['next']['release_ready'] <= 0.15
+    )
+    precapture_stability_pass = bool(
+        precapture_hold['prev']['precapture_phase'] >= 0.25
+        and precapture_hold['prev']['stable_capture_phase'] >= 0.10
+        and precapture_hold['prev']['capture_phase'] <= 0.10
+        and precapture_hold['prev']['release_ready'] <= 0.08
+        and precapture_hold['plan_reward'] >= precapture_release['plan_reward'] - 1e-4
+        and precapture_hold['next']['capture_commitment'] >= precapture_release['next']['capture_commitment'] - 1e-3
     )
     mature_capture_progress_pass = bool(
         mature_capture_standup['plan_reward'] > mature_capture_hold['plan_reward'] + 1e-4
@@ -453,6 +475,14 @@ def transition_and_reward_checks(world_model: SDWorldModel, model: DMControlHopp
                 'uncaptured_state_does_not_prefer_release': uncaptured_phase_order_pass,
             },
             'pass': bool(uncaptured_phase_order_pass),
+        },
+        'recoverable_precapture': {
+            'source': 'canonical',
+            'probes': precapture_probes,
+            'checks': {
+                'precapture_state_prefers_stabilize_over_early_release': precapture_stability_pass,
+            },
+            'pass': bool(precapture_stability_pass),
         },
     }
 
@@ -734,7 +764,7 @@ def main():
     covered_pass = all(checks[name]['pass'] for name in covered_check_names)
     transition_checks = transition_and_reward_checks(world_model, model, candidates)
     alignment_check = transition_alignment_checks(world_model, model, rows, args)
-    focus_transition_names = ['recoverable_front_anchor', 'rear_trap', 'mature_capture_crawl', 'release_ready_corridor', 'phase_dependency', 'transition_alignment']
+    focus_transition_names = ['recoverable_front_anchor', 'rear_trap', 'mature_capture_crawl', 'release_ready_corridor', 'phase_dependency', 'recoverable_precapture', 'transition_alignment']
     transition_pass = all(transition_checks[name]['pass'] for name in focus_transition_names if name in transition_checks) and alignment_check['pass']
 
     report = {

@@ -129,6 +129,19 @@ def default_out_dir(checkpoint: Path) -> Path:
     return REPO_ROOT / "results" / "closed_loop" / f"{checkpoint.stem}_{stamp}"
 
 
+def safe_close_env(env) -> None:
+    """Close wrapped environments when the outer wrapper does not expose close()."""
+    visited = set()
+    current = env
+    while current is not None and id(current) not in visited:
+        visited.add(id(current))
+        close_fn = getattr(current, "close", None)
+        if callable(close_fn):
+            close_fn()
+            return
+        current = getattr(current, "env", None)
+
+
 def build_cfg(args, checkpoint: Path):
     hydra.utils.get_original_cwd = lambda: str(REPO_ROOT)
     cfg = OmegaConf.load(TDMPC2_ROOT / "config.yaml")
@@ -235,9 +248,10 @@ def v4_state_features(model, snap: Dict[str, float], struct: np.ndarray) -> Dict
         release_phase = float(model._release_phase_from_state(state[:, model.PITCH_IDX], state[:, model.SUPPORT_IDX], state[:, model.COMP_IDX], state[:, model.ROOTZ_IDX], state[:, model.CAPTURE_IDX])[0].item())
         handoff_phase = float(model._handoff_phase_from_state(state[:, model.PITCH_IDX], state[:, model.SUPPORT_IDX], state[:, model.COMP_IDX], state[:, model.ROOTZ_IDX], state[:, model.CAPTURE_IDX])[0].item())
         precapture_phase = float(model._precapture_phase_from_state(state[:, model.PITCH_IDX], state[:, model.SUPPORT_IDX], state[:, model.COMP_IDX], state[:, model.ROOTZ_IDX], state[:, model.CAPTURE_IDX])[0].item())
+        stable_capture_phase = float(model._stable_capture_phase_from_state(state[:, model.PITCH_IDX], state[:, model.SUPPORT_IDX], state[:, model.COMP_IDX], state[:, model.ROOTZ_IDX], state[:, model.CAPTURE_IDX])[0].item())
         capture_phase = float(model._capture_crawl_phase_from_state(state[:, model.PITCH_IDX], state[:, model.SUPPORT_IDX], state[:, model.ROOTZ_IDX], state[:, model.CAPTURE_IDX])[0].item())
         standup_phase = float(model._standup_phase_from_state(state[:, model.PITCH_IDX], state[:, model.SUPPORT_IDX], state[:, model.COMP_IDX], state[:, model.ROOTZ_IDX], state[:, model.CAPTURE_IDX])[0].item())
-        crawl_to_standup_bias = float(model._crawl_to_standup_bias_from_state(state[:, model.PITCH_IDX], state[:, model.SUPPORT_IDX], state[:, model.COMP_IDX], state[:, model.ROOTZ_IDX], state[:, model.CAPTURE_IDX])[0].item())
+        crawl_to_standup_bias = float(model._crawl_to_standup_bias_from_state(state[:, model.VX_IDX], state[:, model.PITCH_IDX], state[:, model.SUPPORT_IDX], state[:, model.COMP_IDX], state[:, model.ROOTZ_IDX], state[:, model.CAPTURE_IDX])[0].item())
         release_ready = release_phase * min(max(compression / 0.35, 0.0), 1.0)
     unsupported_low = body_low * (1.0 - capture_commitment)
     foot_low = 1.0 if snap["foot_z"] < 0.08 else 0.0
@@ -263,6 +277,7 @@ def v4_state_features(model, snap: Dict[str, float], struct: np.ndarray) -> Dict
         "release_ready": release_ready,
         "rear_recovery_phase": rear_trap,
         "precapture_phase": precapture_phase,
+        "stable_capture_phase": stable_capture_phase,
         "capture_phase": capture_phase,
         "crawl_to_standup_bias": crawl_to_standup_bias,
         "standup_phase": standup_phase,
@@ -575,22 +590,25 @@ def main():
     print(f"[closed-loop] checkpoint={checkpoint}")
     print(f"[closed-loop] out_dir={out_dir}")
 
-    if args.single_pass:
-        final_results = rollout_pass(env, agent, args, out_dir, render_episode_ids=set(range(args.episodes)))
-    else:
-        dry_results = rollout_pass(env, agent, args, out_dir, render_episode_ids=set())
-        render_episode_ids = choose_render_episodes(dry_results, args.render_failures, args.render_successes)
+    try:
+        if args.single_pass:
+            final_results = rollout_pass(env, agent, args, out_dir, render_episode_ids=set(range(args.episodes)))
+        else:
+            dry_results = rollout_pass(env, agent, args, out_dir, render_episode_ids=set())
+            render_episode_ids = choose_render_episodes(dry_results, args.render_failures, args.render_successes)
 
-        env.close()
-        cfg, env = build_cfg(args, checkpoint)
-        set_seed(cfg.seed)
-        agent = load_agent(cfg)
-        final_results = rollout_pass(env, agent, args, out_dir, render_episode_ids=render_episode_ids)
-    diagnosis = aggregate_diagnosis(final_results)
-    write_summary_files(out_dir, checkpoint, args, final_results, diagnosis)
+            safe_close_env(env)
+            cfg, env = build_cfg(args, checkpoint)
+            set_seed(cfg.seed)
+            agent = load_agent(cfg)
+            final_results = rollout_pass(env, agent, args, out_dir, render_episode_ids=render_episode_ids)
+        diagnosis = aggregate_diagnosis(final_results)
+        write_summary_files(out_dir, checkpoint, args, final_results, diagnosis)
 
-    print(f"[closed-loop] diagnosis={json.dumps(diagnosis, ensure_ascii=False, sort_keys=True)}")
-    print(f"[closed-loop] report={out_dir / 'report.md'}")
+        print(f"[closed-loop] diagnosis={json.dumps(diagnosis, ensure_ascii=False, sort_keys=True)}")
+        print(f"[closed-loop] report={out_dir / 'report.md'}")
+    finally:
+        safe_close_env(env)
 
 
 if __name__ == "__main__":

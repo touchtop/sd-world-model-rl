@@ -32,6 +32,7 @@ save_full_state: false
 checkpoint: ???
 eval_episodes: 10
 eval_freq: 50000
+save_eval_traces: true
 
 # training
 steps: 10_000_000

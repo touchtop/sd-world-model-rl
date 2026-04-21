@@ -1,3 +1,41 @@
-gymnasium>=0.29.0
-numpy>=1.24.0
-torch>=2.0.0
+# Python runtime used by the current hopper v4 experiments: Python 3.10.
+#
+# For GPU machines, install with a PyTorch wheel matching the server CUDA stack.
+# The current P100 environment uses the cu118 wheels below.
+--extra-index-url https://download.pytorch.org/whl/cu118
+
+# Core numerical stack
+numpy==1.26.4
+torch==2.1.2+cu118
+torchvision==0.16.2+cu118
+tensordict==0.2.1
+kornia==0.7.2
+
+# RL environment stack
+gymnasium==0.29.1
+dm-control==1.0.16
+mujoco==3.1.2
+glfw==2.7.0
+h5py==3.11.0
+
+# Config / launcher
+hydra-core==1.3.2
+hydra-submitit-launcher==1.2.0
+omegaconf==2.3.0
+submitit==1.5.4
+termcolor==2.3.0
+
+# Logging / analysis / trace export
+pandas==2.0.3
+tqdm==4.66.4
+imageio==2.34.1
+imageio-ffmpeg==0.4.9
+
+# Optional remote logging. Current hopper experiments usually run with
+# `enable_wandb=false`, so this is not a hard dependency.
+# wandb==0.17.4
+
+# Intentionally omitted:
+# - torchrl: this fork uses a local replay buffer because torchrl conflicted
+#   with the current training environment.
+# - moviepy: not imported by the hopper training / official eval main path.
