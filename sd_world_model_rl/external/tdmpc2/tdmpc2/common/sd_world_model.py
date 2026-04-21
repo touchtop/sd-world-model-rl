@@ -64,9 +64,18 @@ class SDWorldModel(nn.Module):
 		self.use_local_residual = bool(getattr(cfg, 'sd_use_local_residual', True))
 		self.local_residual_scale = float(getattr(cfg, 'sd_local_residual_scale', 0.20))
 		self._local_residual_dims = (
+			DMControlHopperSDModel.VZ_IDX,
 			DMControlHopperSDModel.PITCH_RATE_IDX,
+			DMControlHopperSDModel.COMP_RATE_IDX,
 			DMControlHopperSDModel.SUPPORT_IDX,
 		)
+		local_scale_basis = torch.tensor([0.90, 1.00, 0.80, 1.75], dtype=torch.float32)
+		self.register_buffer(
+			'_local_residual_scales',
+			self.local_residual_scale * local_scale_basis,
+		)
+		self._local_residual_support_slot = self._local_residual_dims.index(DMControlHopperSDModel.SUPPORT_IDX)
+		self._local_residual_support_eps = 1e-4
 		self.observable_struct_dim = int(getattr(self._dynamics, 'OBSERVABLE_DIM', self.struct_dim))
 		if self.resid_dim > 0:
 			self._residual_encoder = layers.mlp(cfg.obs_shape['state'][0], 2*[cfg.mlp_dim], self.resid_dim)
@@ -167,6 +176,33 @@ class SDWorldModel(nn.Module):
 			return z_struct
 		return torch.cat([z_struct, z_resid], dim=-1)
 
+	def _apply_local_residual(self, next_struct_base, z_struct, a_flat):
+		# Local residual is intentionally limited to fast variables and bounded support updates,
+		# so high-level SD stocks remain governed by the explicit model.
+		local_hybrid = torch.cat([z_struct, a_flat], dim=-1)
+		local_raw = torch.tanh(self._local_residual(local_hybrid))
+		local_delta = local_raw * self._local_residual_scales.to(dtype=local_raw.dtype).unsqueeze(0)
+		add_dims = [dim for dim in self._local_residual_dims if dim != DMControlHopperSDModel.SUPPORT_IDX]
+		add_slots = [i for i, dim in enumerate(self._local_residual_dims) if dim != DMControlHopperSDModel.SUPPORT_IDX]
+		add_delta = torch.zeros_like(next_struct_base)
+		add_delta[:, add_dims] = local_delta[:, add_slots]
+		pre_support_struct = next_struct_base + add_delta
+
+		support_base = pre_support_struct[:, DMControlHopperSDModel.SUPPORT_IDX].clamp(
+			min=self._local_residual_support_eps,
+			max=1.0 - self._local_residual_support_eps,
+		)
+		support_logit = torch.logit(support_base, eps=self._local_residual_support_eps)
+		next_support = torch.sigmoid(
+			support_logit + local_delta[:, self._local_residual_support_slot]
+		)
+		next_cols = [
+			next_support if idx == DMControlHopperSDModel.SUPPORT_IDX else pre_support_struct[:, idx]
+			for idx in range(pre_support_struct.shape[1])
+		]
+		next_struct = torch.stack(next_cols, dim=-1)
+		return self._dynamics.project_state(next_struct)
+
 	def consistency_loss(self, pred_z, target_z):
 		pred_flat, _ = self._flatten_batch(pred_z)
 		target_flat, _ = self._flatten_batch(target_z)
@@ -198,13 +234,7 @@ class SDWorldModel(nn.Module):
 		z_struct, z_resid = self._split_latent(z_flat)
 		next_struct_base = self._dynamics(z_struct, a_flat)
 		if self._local_residual is not None:
-			local_hybrid = torch.cat([z_struct, a_flat], dim=-1)
-			local_delta = self.local_residual_scale * torch.tanh(self._local_residual(local_hybrid))
-			next_struct_base = next_struct_base.clone()
-			next_struct_base[:, list(self._local_residual_dims)] = (
-				next_struct_base[:, list(self._local_residual_dims)] + local_delta
-			)
-			next_struct_base = self._dynamics.project_state(next_struct_base)
+			next_struct_base = self._apply_local_residual(next_struct_base, z_struct, a_flat)
 		if self.resid_dim > 0:
 			hybrid = torch.cat([z_flat, a_flat], dim=-1)
 			if self._struct_residual is not None:
@@ -353,5 +383,6 @@ class SDWorldModel(nn.Module):
 			"use_local_residual": self.use_local_residual,
 			"local_residual_scale": self.local_residual_scale,
 			"local_residual_dims": [int(i) for i in self._local_residual_dims],
+			"local_residual_dim_scales": self._local_residual_scales.detach().cpu().tolist(),
 		})
 		return params
