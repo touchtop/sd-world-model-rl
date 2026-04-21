@@ -2713,3 +2713,87 @@ v4 主线即将建立，ablation0_transition2x 与 ablation1_no_struct_residual 
   - `/tmp/sdwm_ablation1_no_struct_residual/sd_world_model_rl/logs/hopper-hop/3/sd_hopper_5k_ablation1_no_struct_residual_smoke_20260418/`
 
 注：/tmp 不持久，正式归档应把 patch 复制到 docs/worklog/patches/ 下，下一步 v4 commit 前一起做。
+
+---
+
+## 2026-04-21：v4 结构路线受阻时的备选发展路径
+
+基于本轮对 `v3b`、`v4.24` 及其 30k 评估轨迹的并行对照，需补记一条方法论判断：
+
+当前 `v4` 路线中，显式阶段链、`pitch wrap`、`rear-flight penalty`、`frozen_capture`、`release_engagement` 等修订，确实提升了结构语义的一致性与诊断清晰度；但这些改动并未自动转化为策略层的可学习性。现有证据更支持如下解释：`v4` 的问题不是“结构先验错误”，而是“结构先验正确但可进入的行为盆地过窄”，导致策略尚未稳定进入 `crawl -> standup -> release -> handoff` 的后半阶段链。
+
+据此，若后续继续沿“纯 9 维显式结构态 + 极窄局部残差”方向优化，仍无法在正式对照中稳定出现非零 `standup/release/handoff` 统计，则应将“受控残差回接”作为 `v4` 的第二条发展路径，而不再将其视为对结构路线的放弃。
+
+### 该备选路径的核心判断
+
+- 即便接回较大的 residual latent，`SD` 的作用也不会因此被剥夺，只要高层奖励塑形、阶段推进与验收口径仍由显式结构量主导。
+- `v3b` 在低预算下明显优于 DreamerV3 与 TD-MPC2，并不只能归因为“更宽的神经自由度”；更关键的差异仍在于，结构化先验使 reward shaping 可以围绕明确的动力学子目标来设计，而不是依赖黑盒 latent 的间接相关量。
+- 因而，后续若恢复较强残差，应理解为“在显式语义之下补回探索与校正空间”，而不是退回无结构黑盒模型。
+
+### 备选路径的设计原则
+
+若进入该路线，建议遵循以下约束，而非简单回退到早期的宽残差形态：
+
+1. 保留当前 `v4` 的显式核心 stock 与阶段链，使 `capture / crawl_to_standup / standup / release / handoff` 仍是主身份。
+2. 恢复一个受限的 hidden residual latent，用于吸收未建模接触、快变量切换、求解器细节及局部动力学失配。
+3. 高层奖励塑形继续主要由显式结构态计算，尤其是阶段推进奖励、冻结惩罚、后仰飞惩罚、绕行抑制等，不交由 residual 直接决定。
+4. 残差优先修正快变量、桥接变量或局部动力学量，不直接重写高层 phase stock；若确有结构残差，也应带有 trend protection 与幅度边界。
+5. 验收时除总回报外，仍必须检查显式阶段量是否真正被激活，防止 residual 通过旁路机制重新制造“有分但不可解释”的策略。
+
+### 与恢复低姿前撑入口的关系
+
+该备选路径与“恢复 `v3b` 型低姿态前撑爬行入口”并不冲突。更准确地说，两者应被视为同一策略的上游与下游：
+
+- 上游通过放宽可行域与有限残差，为策略重新提供可进入的前撑/爬行行为盆地；
+- 下游继续通过显式阶段链与结构化 shaping，引导策略由低姿前撑逐步转向抬身、释放与持续推进。
+
+因此，后续若 `v4` 仅靠继续收紧结构定义仍难以突破，不宜直接得出“结构路线失败”的结论；更合理的下一步，是尝试“显式 SD 主干 + 受控 residual latent + 保留 v4 已修补漏洞”的中间方案，并将其作为 `v4` 的正式备选发展路径归档。
+
+---
+
+## 2026-04-21：恢复版 `v3b` 200k 续训修复与重启
+
+为将恢复版 `v3b` 的三 seed `50k` 结果继续延伸到 `200k`，本轮先尝试直接以 `resume_from=final.full.pt` 后台续训，但首次启动失败。问题定位与修复如下。
+
+### 首次失败原因
+
+- 后台命令沿用了主线 `v4` 的若干 override，例如 `sd_use_struct_residual=false`。恢复版 `legacy_v3b_restore` 的 Hydra 配置不包含这些新键，训练在配置解析阶段即退出，因此未创建新的实验目录。
+- 改为仅沿用恢复版 `50k` 成功运行的最小参数集合后，前台探针可进入 `load_full_state`，但在 `step=50001` 处又触发 `UnboundLocalError: local variable 'info' referenced before assignment`。
+
+### 续训边界 bug 诊断
+
+- 文件：`legacy_v3b_restore/external/tdmpc2/tdmpc2/trainer/online_trainer.py`
+- 现象：从 `final.full.pt` 恢复后，训练状态中包含模型、优化器、buffer 与计数器，但并未保存 live env 与当前未结束 episode 的 `info/_tds`。
+- 原实现假定 `done=True` 分支内始终可以读取上一轮 episode 的 `info`，导致恢复后的首个循环在尚未执行任何 `env.step()` 之前就访问未定义的 `info`。
+
+### 修复内容
+
+- 在 `train()` 中新增 `last_info = None`；
+- 仅当 `last_info` 与 `_tds` 均已存在且 episode 至少包含一条 transition 时，才回写上一轮 episode 的训练日志并将该 episode 压入 replay buffer；
+- 恢复后默认从新的 episode 边界重新 `env.reset()` 开始训练，不再假定 live env 状态可被 checkpoint 精确恢复。
+
+该修复与当前 `full_state` 的真实保存范围一致，即“恢复模型训练状态 + replay buffer”，而不声称支持 mid-episode 的物理状态精确恢复。
+
+### 200k 续训启动参数
+
+三条正式续训统一改为：
+
+- `steps=200000`
+- `eval_freq=25000`
+- `checkpoint_freq=25000`
+- `eval_episodes=10`
+- `save_full_state=true`
+- `compile=false`
+- `resume_from=<对应 seed 的 50k final.full.pt>`
+
+并保持恢复版 `v3b` 原有模型规模与 planner 参数，不再混入主线 `v4` 的额外 override。
+
+### 当前状态
+
+- `seed=1`、`seed=2`、`seed=3` 的 `200k` 续训已重新启动；
+- 日志目录分别为：
+  - `logs/hopper-hop/1/legacy_v3b_restore_200k_seed1_resume50k_20260421/`
+  - `logs/hopper-hop/2/legacy_v3b_restore_200k_seed2_resume50k_20260421/`
+  - `logs/hopper-hop/3/legacy_v3b_restore_200k_seed3_resume50k_20260421/`
+- 训练均已从 `step=50001` 恢复并继续推进；
+- 首个新的官方评估点为 `75000`。
