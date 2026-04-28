@@ -53,14 +53,29 @@ def train(cfg: dict):
 	env = make_env(cfg)
 	agent = TDMPC2(cfg)
 	init_from = cfg.get('init_from', None)
+	sd_supervised_init_from = cfg.get('sd_supervised_init_from', None)
 	resume_from = cfg.get('resume_from', None)
 	if init_from and resume_from:
 		raise ValueError('init_from and resume_from are mutually exclusive.')
+	if sd_supervised_init_from and init_from:
+		raise ValueError('sd_supervised_init_from and init_from are mutually exclusive.')
 	if init_from:
 		import os as _os
 		assert _os.path.exists(init_from), f'init_from checkpoint not found: {init_from}'
 		print(colored(f'Loading model weights from: {init_from}', 'cyan', attrs=['bold']))
 		agent.load(init_from)
+	if sd_supervised_init_from:
+		import os as _os
+		assert _os.path.exists(sd_supervised_init_from), f'sd_supervised_init_from checkpoint not found: {sd_supervised_init_from}'
+		assert cfg.world_model_kind == 'sd_hopper', 'sd_supervised_init_from only applies to world_model_kind=sd_hopper.'
+		assert hasattr(agent.model, 'load_supervised_dynamics'), 'Current world model does not support supervised SD init.'
+		print(colored(f'Loading supervised SD dynamics from: {sd_supervised_init_from}', 'cyan', attrs=['bold']))
+		load_info = agent.model.load_supervised_dynamics(sd_supervised_init_from)
+		print(colored(
+			f"Loaded {load_info['loaded_keys']} SD dynamics tensors "
+			f"(missing={len(load_info['missing_keys'])}, unexpected={len(load_info['unexpected_keys'])})",
+			'cyan',
+		))
 	trainer = trainer_cls(
 		cfg=cfg,
 		env=env,

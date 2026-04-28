@@ -60,8 +60,13 @@ def parse_cfg(cfg: OmegaConf) -> OmegaConf:
 
 	# Model size
 	if cfg.get('world_model_kind', 'tdmpc2') == 'sd_hopper':
-		cfg.sd_struct_dim = int(cfg.get('sd_struct_dim', 15))
-		cfg.sd_latent_dim = int(cfg.get('sd_latent_dim', max(cfg.sd_struct_dim, 32)))
+		try:
+			from src.world_model.dmcontrol_hopper_sd_model import DMControlHopperSDModel
+			default_struct_dim = DMControlHopperSDModel.STATE_DIM
+		except Exception:
+			default_struct_dim = 9
+		cfg.sd_struct_dim = int(cfg.get('sd_struct_dim', default_struct_dim))
+		cfg.sd_latent_dim = int(cfg.get('sd_latent_dim', max(cfg.sd_struct_dim, int(cfg.get('latent_dim', 512)))))
 		cfg.latent_dim = cfg.sd_latent_dim
 	elif cfg.get('model_size', None) is not None:
 		assert cfg.model_size in MODEL_SIZE.keys(), \

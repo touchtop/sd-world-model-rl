@@ -218,6 +218,22 @@
     - `episode end`: `vt:2, it:52, vf:1, vl:1`
     - `lock=900`
   - `4500`：
+
+## 2026-04-23
+
+### Hopper-Hop：`v4.30` 终点轨迹复盘后的奖励修订
+
+在 `v4.30` 的三种子 `50k` 结果中，`seed1/seed3` 已出现非零终点评估，但从 `official_eval/step_0050000/episode_csv` 的逐条轨迹统计看，主要得分模式并不来自 `grounded_prepared -> rising_air` 这条目标链，而更接近 `grounded_unprepared` 下的近地前移。与此同时，`seed2` 已能够较稳定地产生 `grounded_prepared` 与少量 `rising_air` 片段，但尚未转化成明显环境回报。
+
+据此，后续修订不再沿“堵住近地模式”的方向推进，而改为保持所有合法模式开放，仅增强目标状态迁移的正向吸引。此次仅调整 `predict_shaping_reward()` 内的 `launch_reward`：
+
+- 保留四状态判据不变；
+- 保留 `prepared_reward` 不变；
+- 将 `launch_reward` 的权重从 `0.30` 提高到 `0.45`；
+- 将 `launch_reward` 明确写为依赖 `next_state` 结果量的形式，即在 `prev_grounded_prepared * prepared_release` 的门下，主奖励 `next_upward_progress`，并仅附带少量 `next_forward_progress`；
+- 不新增针对近地移动、单侧接触或低姿推进的惩罚项。
+
+这一改动的研究意图是：利用结构化 SD 世界模型对下一状态可解释量的显式预测能力，使奖励直接面向“预备后的真实起跳结果”，而非面向动作幅度或额外复杂状态机。若后续轨迹中 `prepared` 片段继续存在且 `rising_air` 与环境回报同步上升，则说明当前瓶颈主要在于目标链吸引不足，而非状态语义失真。
     - `lockdiag`: `elite_pseudo=1.00, elite_f=1.00`
     - `recent512`: `vt:3, it:13, vf:6, vl:2`
   - `5000`：
@@ -2797,3 +2813,2994 @@ v4 主线即将建立，ablation0_transition2x 与 ablation1_no_struct_residual 
   - `logs/hopper-hop/3/legacy_v3b_restore_200k_seed3_resume50k_20260421/`
 - 训练均已从 `step=50001` 恢复并继续推进；
 - 首个新的官方评估点为 `75000`。
+
+## 2026-04-24：将 Hopper 奖励正式改为“五状态静态判别 + 下一步迁移奖励”
+
+围绕 Hopper 主线奖励语义，再次做了收口。此前虽然已经逐步从状态内连续 shaping 收回到更简洁的闭环设计，但实现中仍残留一部分“在某个状态里直接给奖励”的表达方式，容易让奖励语义滑回“状态内停留也有收益”。本轮据此明确改为：奖励一律基于 `state --action--> next_state` 的推演结果，只按**下一步进入了什么状态**来给分，而不再对当前状态本身直接给状态内奖励。
+
+### 一、主状态口径
+
+当前 Hopper 主状态统一为五类，且在实现中保持互斥：
+
+1. `falling_air`
+2. `rising_air`
+3. `grounded_prepared`
+4. `grounded_recovery`
+5. `grounded_failed`
+
+其中：
+
+- `grounded_prepared` 与 `grounded_recovery` 都要求足部支撑充分；
+- `grounded_failed` 不再要求足部支撑，只要求 `z_min` 表示已着地，但姿态未进入 `prepared/recovery`；
+- 前伏与后仰失败态仍使用 `pitch + z_min` 判据识别，并继续用于动作先验边界裁剪。
+
+### 二、奖励语义修订
+
+`src/world_model/dmcontrol_hopper_sd_model.py` 中，`predict_shaping_reward()` 已改为纯迁移奖励，不再包含状态内持续奖励。当前只保留五类弱迁移引导：
+
+1. `grounded_failed -> grounded_recovery`
+2. `grounded_recovery -> grounded_prepared`
+3. `grounded_prepared -> rising_air`
+4. `falling_air -> grounded_recovery`
+5. `falling_air -> grounded_prepared`
+
+这一步的意图是把结构化奖励重新压回“引导下一状态朝目标类型迁移”的角色，而不是在某个状态内持续堆收益。对于 Hopper 这类强接触任务，这样的表达更符合状态机语义，也更便于后续直接核对“当前策略到底有没有进入目标状态迁移链”。
+
+### 三、离线验证结果
+
+使用已有保存轨迹，按最新五状态口径做离线回算：
+
+1. `v441 5k smoke` 坏轨迹
+   - 数据集：`logs/hopper-hop/3/sd_hopper_5k_v441_recoveryevent_smoke_20260424_run1/official_eval/step_0005000/episode_csv`
+   - 结果：`grounded_failed` 占比 `0.9406`，`falling_air` 占比 `0.0594`，其余三态基本为 `0`
+   - 含义：坏轨迹几乎全部被归为“已着地但失败”的状态，符合视频观察
+2. `td-mpc2 200k` 高分标准 hop 轨迹
+   - 数据集：`results/tdmpc2_hopper_200k_sameprotocol_20260422_062444_seed2/trace_probe_v428`
+   - 结果：`falling_air ≈ 0.3813`，`grounded_failed ≈ 0.2133`，`grounded_prepared ≈ 0.0860`，`rising_air ≈ 0.3193`，`grounded_recovery ≈ 0`
+   - 含义：标准 hop 轨迹中已能稳定出现 `prepared` 与 `rising_air`，但 `recovery` 仍偏少，说明当前 `recovery` 门仍较窄
+
+另外，对上述两批轨迹按 `state >= 0.2` 做互斥检查，未发现同一步多个主状态同时显著激活，说明这轮五状态互斥实现基本成立。
+
+### 四、当前判断
+
+截至本轮，可以确认两点：
+
+1. “奖励应基于推演到下一步状态后再给分，而不是做状态内奖励”这一口径已经落到主逻辑；
+2. 当前最值得继续审查的，不再是失败态识别，而是 `grounded_recovery` 的门是否仍偏窄，导致坏轨迹长期停留在 `grounded_failed`。
+
+因此，后续若继续做 `5k smoke` 或更长训练，观察重点应转向：
+
+1. 是否首次稳定出现 `grounded_failed -> grounded_recovery`
+2. 是否逐步形成 `grounded_recovery -> grounded_prepared`
+3. 这些迁移是否最终转化为 `grounded_prepared -> rising_air`
+
+## 2026-04-24：修复 Hopper 自动评估导出的旧字段兼容问题，并补回 `v443` 的 5k 评估轨迹
+
+在 `sd_hopper_5k_v443_nextstate_transition_smoke_20260424_run1` 跑完后，训练本体已正常落盘到 `5000.pt / 5000.full.pt`，但 `eval.csv` 与 `official_eval` 没有自动生成。排查 `external/tdmpc2/tdmpc2/trainer/online_trainer.py` 后确认，原因不是 `save_eval_traces` 未开启，而是 Hopper 评估导出逻辑仍在读取旧字段 `grounded_unprepared`，而主线 `SD` 已改为 `grounded_failed`。
+
+据此，本轮做了两项修订：
+
+1. 在 `online_trainer.py` 的 Hopper 评估导出路径中加入字段兼容：
+   - 若存在 `grounded_failed`，则优先读取；
+   - 同时继续回写 `grounded_unprepared` 兼容列，避免旧分析脚本失效。
+2. 用 `scripts/export_hopper_eval_traces.py` 对
+   `logs/hopper-hop/3/sd_hopper_5k_v443_nextstate_transition_smoke_20260424_run1/models/5000.pt`
+   补做一次 `10` 条 episode 的评估轨迹导出，并回填到：
+   `official_eval/step_0005000/episode_csv`
+
+补回后的 `v443 5k smoke` 结果如下：
+
+1. `10` 条 episode 平均回报：`1.0075`
+2. 最高单条回报：`5.5326`
+3. 非零分 episode 数：`3 / 10`
+4. 分布：`[0.1515, 4.3905, 0, 0, 0, 5.5326, 0, 0, 0, 0]`
+
+按当前五状态口径离线回算后，可得：
+
+1. `falling_air ≈ 0.0484`
+2. `grounded_failed ≈ 0.9516`
+3. `grounded_recovery = 0`
+4. `grounded_prepared = 0`
+5. `rising_air = 0`
+
+这说明：
+
+1. 本轮 `5k smoke` 已不再是完全 `0` 分；
+2. 但当前非零回报尚未来自目标状态迁移链，而仍主要发生在 `grounded_failed` 内部；
+3. “奖励按下一步状态迁移给分”的语义已落地，但从行为上看，策略在 `5k` 时仍几乎没有进入 `grounded_recovery / grounded_prepared / rising_air`。
+
+---
+
+## 2026-04-21：v4 奖励设计回退到“最小闭环主状态”
+
+围绕 `src/world_model/dmcontrol_hopper_sd_model.py` 的 `predict_plan_reward()`，本轮不再继续沿 `precapture / stable_capture / crawl / standup / release / handoff` 这类长阶段链追加桥接项，而是按第一性原理重新收缩到“接触主状态 + 运动标签”的最小闭环设计。
+
+### 背景判断
+
+前序 `v4` 版本虽然在语义自洽性、`pitch wrap`、冻结惩罚、后仰飞惩罚等方面做了较多修补，但实际训练暴露出两个持续问题：
+
+- 阶段链过长，导致奖励本身承担了过多“过程编排”职责，策略难以稳定进入后半段；
+- “状态”与“努力目标”被混写，例如把前撑、站起、handoff 等目标导向概念直接并入阶段定义，使奖励结构逐渐变成工程态堆叠。
+
+据此，本轮决定先把奖励语义压回闭环最小要求：主状态只描述当前客观接触关系，目标与奖励方向再由标签调制，而不再直接把“应该完成什么功能”写成状态节点。
+
+### 本轮采用的最小状态表示
+
+主状态收缩为四类：
+
+1. `air`：无有效足支撑；
+2. `ground`：足触地主导支撑；
+3. `front_abnormal`：前体异常接地代理态；
+4. `back_abnormal`：后体异常接地代理态。
+
+其中：
+
+- `front_abnormal` 与 `back_abnormal` 仍是代理态，而非严格的 body contact 真值；当前实现只依赖已有观测与局部推演量，不新增接触维；
+- `上升/下落`、`直立/前倾/后倾`、`压缩/中性/伸展`、`旋转受控/失控` 统一降为标签，不再占用主状态节点。
+
+### 具体实现
+
+在 `DMControlHopperSDModel` 中新增 `_state_reward_features()`，只基于当前已有的结构量构造最小奖励判据：
+
+- 直接使用 `height / vx / vz / pitch / pitch_rate / compression / compression_rate / support`；
+- 派生 `posture_control / spin_control / forward_progress / upward_progress / low_height / low_motion`；
+- 用软门控构造四类主状态：
+  - `air`
+  - `ground`
+  - `front_abnormal`
+  - `back_abnormal`
+- 再额外派生 `compressing / extending / rotation_loss` 作为标签型调制量。
+
+在 `predict_plan_reward()` 中，奖励被改写为：
+
+- `true_reward`
+- `air` 内部 shaping：鼓励空中姿态可控、下降阶段准备落地；
+- `ground` 内部 shaping：鼓励可控支撑、压缩、伸展和前向推进；
+- `front_abnormal` / `back_abnormal` 内部 shaping：鼓励减轻异常姿态、抬高身体并恢复足支撑；
+- 少量转移奖励：`ground -> air`、`air -> ground`、`front_abnormal -> ground`、`back_abnormal -> ground`；
+- 全局惩罚仅保留：
+  - `spin_penalty`
+  - `front_freeze_penalty`
+  - `rear_trap_penalty`
+  - `rear_flight_penalty`
+  - `ground_stuck_penalty`
+  - 向前/向后塌陷的 `collapse_penalty`
+
+### 保留与移除项
+
+本轮明确保留：
+
+- `v4` 当前显式结构状态编码；
+- `pitch wrap`；
+- 后仰飞行惩罚这一类针对明显 reward-hack 的工程修补。
+
+本轮明确移除或停止继续扩展：
+
+- 长阶段链主导的 reward 设计；
+- episode 级历史型桥接与 memory 逻辑；
+- 继续围绕 `capture / crawl / standup / release / handoff` 追加细粒度 gating。
+
+### 最小验证
+
+修改后进行了两项轻量验证：
+
+1. `python -m py_compile src/world_model/dmcontrol_hopper_sd_model.py`
+2. 直接实例化 `DMControlHopperSDModel`，调用 `forward()` 与 `predict_plan_reward()` 做前向探针
+
+验证结果表明：
+
+- 模块可正常编译导入；
+- `next_state` 维度保持 `(batch, 15)`；
+- `predict_plan_reward()` 输出为有限值张量，未出现 `NaN/Inf`。
+
+### 当前方法学位置
+
+这一改动不等于回退到 `v3b`。更准确地说，它是在 `v4` 主线上保留显式结构态、`pitch wrap` 与若干已验证必要的漏洞修补后，将奖励设计从“复杂阶段机”收缩为“最小闭环主状态 + 标签调制”。
+
+下一步实验验收重点不再是某个阶段量是否被人工桥接激活，而是观察：
+
+- 是否重新出现可持续的低姿前撑/前进入口；
+- 是否避免前撑冻结与后仰飞 reward-hack；
+- 是否在此基础上逐步恢复更长时程的正向推进行为。
+
+## 2026-04-21：将 `v4` 奖励从“最小闭环主状态”进一步回调为宽松连续 shaping
+
+在对 `sd_hopper_5k_v4_minloop_smoke_20260421_r2` 的 `10` 条官方评估轨迹逐条复核后，当前判断进一步收敛为：问题不在于策略完全不会产生有效动作，而在于 `v4` 的 reward 仍然过早把低姿过渡态归入 `front_abnormal / back_abnormal`，并用这些标签去切断主正向 shaping。结果是：
+
+- 多条 episode 在前十步内已出现明显前冲或姿态变化，但随后仍被压回 rear basin；
+- `episode_09` 一类轨迹中，`vx` 已接近 `1.8`，但由于仍处低姿前撑区间，主奖励基本未被放行；
+- `front/back abnormal` 在实现上虽然名义上只是标签，但实际上承担了“硬判死”的作用，背离了引入 residual 为过渡路径留弹性的初衷。
+
+据此，本轮不再继续细化阶段或补更多局部 bridge，而是把 `predict_plan_reward()` 直接回调为更接近 `v3b` 哲学的宽松连续 shaping，同时保留 `v4` 中已经验证必要的工程自洽项。
+
+### 本轮代码调整
+
+`src/world_model/dmcontrol_hopper_sd_model.py`
+
+1. `_state_reward_features()`
+   - 保留 `front_abnormal / back_abnormal / rear_flight_risk` 等标签型量；
+   - 新增 `height_gate / pitch_gate / viability`，供主 shaping 直接使用；
+   - 明确这些量仅作连续调制，不再作为切断主奖励的状态门。
+
+2. `predict_plan_reward()`
+   - 恢复 `v3b` 风格的主 shaping：
+     - `forward_progress`
+     - `upward_progress`
+     - `support_relief`
+     - `liftoff_progress`
+     - `clearance_gain`
+   - 增加少量连续辅助项：
+     - `grounded_drive`，在地面压缩/伸展阶段补一点向上与向前驱动；
+     - `transition_bonus`，对 `ground -> air` 与 `air -> ground` 只做弱鼓励；
+     - `low_pose_recovery_bonus`，对低姿前撑/后仰这类过渡态仅鼓励“减小姿态误差、抬高身体、保持前进”，不再视为主状态外的失败区。
+   - 惩罚项压缩为少数必要漏洞修补：
+     - `rotation_loss`
+     - `rear_flight_risk`
+     - `sticky_contact`
+     - `support_heavy * low_motion * low_height`
+
+### 本轮方法学判断
+
+这一回调不是放弃 `v4`，而是明确纠正前一轮偏差：
+
+- `SD` 负责给出可解释的方向性先验；
+- residual 负责吸收显式结构未完整覆盖的真实可行路径；
+- reward shaping 只负责引导，不再承担“审判过渡态”的功能。
+
+换言之，`v4` 后续若要继续有效发展，核心不是再补更细的阶段和更硬的 gating，而是保持显式结构语义正确，同时把奖励重新收回到“宽松、连续、低耦合”的形式。
+
+### 最小校验
+
+本轮修改后完成两项最小静态校验：
+
+1. `python -m py_compile src/world_model/dmcontrol_hopper_sd_model.py`
+2. 实例化 `DMControlHopperSDModel`，随机采样 `state/action`，检查 `forward()` 与 `predict_plan_reward()` 输出均为有限值张量
+
+预期下一步不应再直接从均值出发判断是否加预算，而应优先复看新版本 `5k smoke` 的逐条轨迹，确认：
+
+- 是否重新允许低姿过渡态进入正向 shaping；
+- 是否仍能抑制后仰飞 reward-hack；
+- 是否比当前 `minloop` 版本更容易形成可持续前进而非单次短促动作。
+
+## 2026-04-21：固化 Hopper `v4 5k smoke` 启动脚本，避免再把评估点落入随机采样阶段
+
+本日再次复核主线 TD-MPC2 Hopper 的启动逻辑后，确认一个必须固定下来的实验约束：
+
+- `envs/__init__.py` 会将 Hopper 的 `seed_steps` 设为 `max(1000, 5 * episode_length)`；
+- Hopper `episode_length=500`，因此 `seed_steps=2500`；
+- `online_trainer.py` 的评估触发只看 `self._step % eval_freq == 0`，并不会自动避开 seed 阶段；
+- 因此，若手工写成 `eval_freq=1000`，则 `1000 / 2000` 的评估仍处在纯随机采样阶段，结果没有分析意义。
+
+为防止后续再因手写命令混入错误评估点，新增专用脚本：
+
+- `scripts/run_hopper_v4_5k_smoke.sh`
+
+该脚本只允许外部指定三项：
+
+1. `GPU_ID`
+2. `EXP_NAME`
+3. `SEED`
+
+其余关键实验口径全部固定写死：
+
+- `steps=5000`
+- `eval_freq=5000`
+- `checkpoint_freq=5000`
+- `eval_episodes=10`
+- `save_full_state=true`
+
+并在启动前显式打印以下不变量：
+
+- Hopper `seed_steps=2500`
+- `2500` 之前只做随机采样
+- 不允许把中途评估点放在 `1000/2000`
+- `online_trainer` 会在 `2500` 自动保存 seed checkpoint
+
+这样做的目的不是增加灵活性，而是降低人为失误空间：后续若需重跑主线 `v4 5k smoke`，原则上应优先调用该脚本，而不再临时手写一长串 train 命令。
+
+## 2026-04-22：将 Hopper `v4` 奖励主状态进一步收口为四态闭环
+
+围绕 Hopper 的高层奖励语义，再次按第一性原理做了收口。此前主线虽已从长阶段链退回到“最小闭环主状态”，但仍保留了 `front_abnormal / back_abnormal` 这类带有较强失败含义的状态名；它们虽然最初只想作为标签，实际仍容易在分析与实现上被当作“应尽快判出的坏状态”，从而再次把低姿过渡态判死。
+
+本轮确认的高层主状态只保留四类，形成闭环：
+
+1. `下落（空中）`
+2. `着地未预备`
+3. `着地预备`
+4. `上升（空中）`
+
+其中：
+
+- “过度前倾、过度后仰、趴地前行、单点支撑但未稳住”等都统一归入 `着地未预备`；
+- “整足支撑、姿态较正、蓄力已形成”才归入 `着地预备`；
+- 其余细节不再提升为主状态，而只保留为辅助标签或连续量。
+
+### 当前显式 SD 与四态的对应关系
+
+本轮没有直接重排显式 latent 维度，仍保留当前 `v4` 主线的 15 维显式态：
+
+`[height, vx, vz, pitch, pitch_rate, compression, compression_rate, swing, swing_rate, foot_angle, foot_rate, support, stance_mix, impact, clearance]`
+
+但重新核对后，确认其中已有两组量可以支撑四态判定：
+
+1. `support`
+   - 作为“是否离地/是否着地”的主判据；
+2. `stance_mix`
+   - 作为“足部支撑分布”的代理量；
+   - `|stance_mix|` 小时，更接近整足均匀支撑；
+   - `stance_mix` 明显偏正时，更接近前掌主支撑；
+   - `stance_mix` 明显偏负时，更接近后跟侧支撑。
+
+这意味着当前显式 SD 虽未像更激进方案那样直接拆成 `toe_support / heel_support` 两个独立 stock，但在本轮四态奖励设计下，已经可以用 `support + stance_mix` 近似表达“整足支撑 vs 前掌支撑”的关键信号。
+
+### 四态的具体判据
+
+`src/world_model/dmcontrol_hopper_sd_model.py` 中的 `_state_reward_features()` 已按以下口径改写：
+
+1. `下落（空中）`
+   - `support` 足够低；
+   - `vz < 0`；
+2. `上升（空中）`
+   - `support` 足够低；
+   - `vz > 0`；
+3. `着地预备`
+   - 已有稳定足支撑；
+   - `stance_mix` 接近 0，即更接近整足支撑；
+   - `|pitch|` 较小；
+   - `compression` 已形成；
+   - 垂直速度幅值不大，不再处于明显砸地或反弹阶段；
+4. `着地未预备`
+   - 已接触地面，但不满足上述“着地预备”条件。
+
+由此，原先的“前倾、后仰、低姿爬行、单点支撑、尚未蓄力完成”等情形，统一只作为 `着地未预备` 内部的连续差异，而不再拆成额外主状态。
+
+### 奖励语义的同步收口
+
+`predict_plan_reward()` 已同步改为四态闭环下的简洁 shaping：
+
+1. `下落（空中）`
+   - 仅弱奖励姿态控制与旋转受控，目的是为落地做准备；
+2. `着地未预备`
+   - 仅弱奖励向 `着地预备` 靠近的过程，例如整足支撑增强、姿态回正、蓄力增长；
+3. `着地预备`
+   - 仅弱奖励起跳相关量，例如向上速度、减载、离地趋势与前向推进；
+4. `上升（空中）`
+   - 仅弱奖励前向速度、高度保持、姿态和旋转控制。
+
+同时，只保留少数明确需要的惩罚项：
+
+1. `rotation_loss`
+2. `rear_flight_risk`
+3. `sticky_ground`
+4. `front_sink_risk`
+5. `backward_speed`
+
+这一步的目的是让结构化奖励重新回到“小幅引导”角色，而不是再承担阶段编排或过渡态审判。
+
+### 当前暴露出的 SD 限制
+
+本轮梳理后，也明确记录一个仍然存在但暂不必立刻重构的限制：
+
+- 当前显式态中的“整足支撑 vs 前掌支撑”仍是通过 `stance_mix` 做代理，而不是显式保存 `toe / heel` 两个独立支撑 stock。
+
+因此，若后续轨迹分析仍持续出现“前掌支撑被误判成可接受站稳”的问题，则下一步最自然的结构改动不是再加奖励门，而是把显式接触状态进一步拆细为更直接的 `toe / heel` 支撑表示。
+
+### 本轮结论
+
+截至本轮，主线 `v4` 的奖励状态定义已从：
+
+- `air / ground / front_abnormal / back_abnormal`
+
+进一步收口为：
+
+- `下落（空中） -> 着地未预备 -> 着地预备 -> 上升（空中）`
+
+这更符合“状态描述客观存在，奖励描述在该状态下应努力的方向”这一原则，也更接近 `v3b` 的宽松 shaping 哲学：主状态尽量少，连续引导尽量弱，剩余细节交由残差和训练去吸收。
+
+## 2026-04-22：按四态收口 Hopper 奖励，只保留弱引导与两项全局轻惩罚
+
+在继续讨论后，本轮又将 Hopper `v4` 主线的结构化奖励进一步收紧。核心结论是：前一版虽然已经把长阶段链压回四态闭环，但在实现层面仍混入了过多辅助门控与旧派生量，容易再次滑回“奖励主导过程编排”的方向。为避免这一点，本轮明确把结构化奖励限制为：
+
+1. 四个状态内的单一主方向引导；
+2. 两个全局轻惩罚；
+3. 其余一切复杂 failure-mode 惩罚、memory 与桥接逻辑全部退出。
+
+### 本轮确认的四态弱引导
+
+四个状态分别只奖励一类最核心行为：
+
+1. `下落（空中）`
+   - 仅轻奖励姿态稳定；
+   - 具体量为 `pitch` 与 `pitch_rate`。
+2. `着地未预备`
+   - 仅轻奖励整足支撑增强与身体压低；
+   - 在现有 latent 约束下，使用 `support` 与 `stance_mix` 构造 `full_foot_support` 近似整足支撑；
+   - 身体压低继续用当前 latent 中可直接读到的 `height` 代理。
+3. `着地预备`
+   - 仅轻奖励开始起跳；
+   - 具体量为 `vz` 为主、`vx` 为辅。
+4. `上升（空中）`
+   - 仅轻奖励姿态稳定；
+   - 具体量仍为 `pitch` 与 `pitch_rate`。
+
+### 全局轻惩罚
+
+本轮最终只保留两项全局惩罚：
+
+1. `过度旋转惩罚`
+   - 用 `|pitch_rate|` 过大表示；
+2. `明显后退惩罚`
+   - 用 `vx < 0` 表示。
+
+此前讨论过的“着地后卡死惩罚”在本轮未纳入实现，原因是其本质是时间累计型现象，若硬塞入单步 shaping，反而容易把当前奖励重新做复杂。
+
+### 代码实现收口
+
+本轮主要修改：
+
+1. `src/world_model/dmcontrol_hopper_sd_model.py`
+
+`_state_reward_features()` 只保留当前奖励真正需要的少量量：
+
+1. `height`
+2. `vx / vz`
+3. `pitch / pitch_rate`
+4. `support / stance_mix`
+5. 基于 `support` 与 `stance_mix` 构造的 `full_foot_support`
+6. 基于 `height` 构造的 `low_body`
+7. 四态对应的软标签：
+   - `falling_air`
+   - `grounded_unprepared`
+   - `grounded_prepared`
+   - `rising_air`
+
+`predict_plan_reward()` 则被压成：
+
+1. `falling_reward`
+2. `prepare_reward`
+3. `launch_reward`
+4. `rising_reward`
+5. `rotation_penalty`
+6. `backward_penalty`
+
+不再保留：
+
+1. `landing_progress`
+2. `support_relief`
+3. `prepared_hold`
+4. `rear_flight_risk`
+5. `front_sink_risk`
+6. `sticky_ground`
+7. 任何依赖旧阶段链语义的辅助奖励项
+
+### 方法学说明
+
+需要单独记录的是：本轮奖励实现已经完全按四态弱引导思路收口，但由于当前主线显式 latent 仍是旧 `height / support / stance_mix` 结构，因此这一版代码实现仍带有一个明确限制：
+
+1. “低重心”在概念上已决定应优先使用更直接的身体高度坐标，但在当前 latent 中仍以 `height` 代理落地；
+2. “整足支撑”在概念上已决定应优先由前后足接触共同定义，但在当前 latent 中仍以 `support + stance_mix` 构造 `full_foot_support` 代理落地。
+
+也就是说，本轮已先把**奖励方向**收口正确；若后续还需继续提高物理语义一致性，下一步优先级应是对显式状态做同步收口，而不是再往奖励里补更多门控。
+
+## 2026-04-22：确认奖励与 SD 的后续改造原则
+
+在继续审查 Hopper `v4` 主线后，本轮不再围绕旧 15 维显式态做局部修补，而是先将奖励设计与 SD 设计的收口原则明确写入工作日志，作为后续版本的统一依据。
+
+### 一、奖励设计的最终收口口径
+
+本轮确认：结构化奖励的职责只能是**引导**，不能再次承担“主导训练过程”或“替代真实任务奖励”的功能。因此后续奖励设计统一遵循以下标准：
+
+1. 真实环境 reward 为主；
+2. 结构化 reward 只提供弱方向性引导；
+3. 每个状态只奖励一个最核心方向；
+4. 复杂阶段链、memory、桥接逻辑、failure-mode 专属惩罚一律不再继续扩展。
+
+在此基础上，四状态下的弱引导奖励口径确认如下：
+
+1. `下落（空中）`
+   - 目标：落地前姿态稳定；
+   - 奖励量：`pitch`、`pitch_rate`；
+   - 含义：仅轻奖励不乱翻、不剧烈旋转。
+2. `着地未预备`
+   - 目标：站稳并压低；
+   - 奖励量：`toe_support`、`heel_support` 及其构成的整足支撑代理，外加身体高度代理；
+   - 含义：仅轻奖励整足支撑增强、低重心形成。
+3. `着地预备`
+   - 目标：开始起跳；
+   - 奖励量：`vz` 为主、`vx` 为辅；
+   - 含义：仅轻奖励向上速度转正，并给少量前向速度引导。
+4. `上升（空中）`
+   - 目标：空中姿态稳定；
+   - 奖励量：`pitch`、`pitch_rate`；
+   - 含义：仅轻奖励起跳后的姿态稳定。
+
+全局惩罚最终仅保留两项：
+
+1. `过度旋转惩罚`
+   - 对应 `|pitch_rate|` 过大；
+2. `明显后退惩罚`
+   - 对应 `vx < 0`。
+
+此前讨论过的“卡死惩罚”不纳入当前版本，原因是其本质上需要时间累计判断，若硬塞入当前单步 shaping，会再次把奖励设计做复杂。
+
+### 二、SD 设计的职责重新定义
+
+本轮同时确认：在 Hopper 这类强接触、强模式切换任务中，SD 的核心作用**不是**像 cartpole 那样精确承担完整物理转移，而是：
+
+1. 支撑高层状态判定；
+2. 支撑弱奖励引导；
+3. 提供少量可信、高层、可解释的结构先验。
+
+因此，后续 SD 设计的评价标准不再是“是否尽量完整地写出动力学”，而是：
+
+1. 是否足够支持状态判定；
+2. 是否足够支持弱奖励引导；
+3. 是否语义清楚、来源直接、结构简洁；
+4. 是否避免将不确定代理量误当成核心存量。
+
+### 三、SD 主干的最小化收口方向
+
+按上述标准，当前 Hopper `v4` 主线中的 15 维显式态已经明显过宽。后续 SD 主干不再以“现有 15 维为基础继续修补”为目标，而应转向“判定-引导最小集合”。
+
+当前已确认可作为后续 SD 核心量候选的量为：
+
+1. `rootz`
+2. `vx`
+3. `vz`
+4. `pitch`
+5. `pitch_rate`
+6. `touch_toe`
+7. `touch_heel`
+
+在这些量之上，只再派生少量标签量用于状态判定与奖励引导，例如：
+
+1. `z_min`
+   - 由当前可观测或可直接几何推演的若干 `z` 坐标取最小值得到；
+   - 只用于“是否着地”的判定。
+2. `full_foot_support`
+   - 由脚尖与脚跟接触共同构造；
+   - 只用于“整足支撑是否形成”的判定。
+
+与之相对，以下这批量不再被视为后续 SD 主干的优先保留对象：
+
+1. `height`
+2. `compression`
+3. `compression_rate`
+4. `swing`
+5. `swing_rate`
+6. `foot_angle`
+7. `foot_rate`
+8. `support`
+9. `stance_mix`
+10. `impact`
+11. `clearance`
+
+这并不意味着它们在代码里必须立刻全部消失，而是意味着：后续版本不再把这些量默认视为“核心存量”，而是优先审查哪些可以降级为辅助代理量，哪些应直接退出主干。
+
+### 四、后续改造顺序
+
+本轮最终确认的顺序是：
+
+1. 先以工作日志明确奖励设计与 SD 设计的收口原则；
+2. 再以“状态判定与弱奖励引导是否足够”为标准，重新设计 Hopper 的 SD 最小主干；
+3. 不再围绕旧 15 维显式态继续补复杂流量方程；
+4. 只有在新的最小 SD 主干确定后，才继续推进代码级同步改造与实验。
+
+这一步的目的，是避免后续再次落入“先写复杂结构，再用奖励或 residual 为其救火”的循环，而是先把设计哲学统一，再做实现。
+
+## 2026-04-22：Hopper SD 主干首次压缩到最小核心量集合
+
+在上述原则确认后，本轮已开始真正修改代码，而不再只停留在方法学讨论。核心动作是：将 Hopper 主线显式 SD 状态从旧版 15 维宽结构，第一次直接压缩到仅服务于状态判定与弱奖励引导的最小核心量集合。
+
+### 本轮新的显式 SD 主干
+
+`src/world_model/dmcontrol_hopper_sd_model.py` 中，显式 latent 已改为 8 维：
+
+1. `rootz`
+2. `vx`
+3. `vz`
+4. `pitch`
+5. `pitch_rate`
+6. `touch_toe`
+7. `touch_heel`
+8. `z_min`
+
+其中：
+
+- `rootz / vx / vz / pitch / pitch_rate` 直接来自当前原始观测；
+- `touch_toe / touch_heel` 来自原始触觉观测，经标准化后直接进入显式态；
+- `z_min` 则由当前可直接几何推演的若干关键 `z` 坐标取最小值得到，包括根部、骨盆、大腿、小腿、脚身、脚尖、脚跟等点。
+
+### 同步删除的旧核心量
+
+本轮不再把以下量视为 Hopper 主线 SD 的核心显式态：
+
+1. `height`
+2. `compression`
+3. `compression_rate`
+4. `swing`
+5. `swing_rate`
+6. `foot_angle`
+7. `foot_rate`
+8. `support`
+9. `stance_mix`
+10. `impact`
+11. `clearance`
+
+这些量并非被证明“永远无用”，而是本轮先明确退出主干，避免它们继续以旧设计残留身份主导状态转移与奖励。
+
+### 状态推进的实现口径
+
+本轮代码没有再试图为一大批宽状态编写复杂流量方程，而是改为：
+
+1. 只对 `vx / vz / pitch_rate` 这类真正 rate-like 的量写显式更新骨架；
+2. `rootz` 与 `pitch` 通过积分更新；
+3. `touch_toe / touch_heel / z_min` 则采用更简单的“当前状态 + 动作 + 少量几何启发 + 小幅学习修正”方式更新。
+
+这样做的目的不是追求物理完美，而是让 SD 主干重新回到“少量可信结构量 + 简单可解释更新”的角色。
+
+### 奖励与 SD 的一致性
+
+本轮修改后，弱奖励设计与 SD 主干首次真正对齐：
+
+1. 空中姿态稳定直接使用 `pitch / pitch_rate`；
+2. 起跳趋势直接使用 `vz` 与少量 `vx`；
+3. 低重心判断直接使用 `rootz`；
+4. 整足支撑判断直接使用 `touch_toe / touch_heel` 的共同强度；
+5. 是否着地则优先由 `z_min` 提供几何接地代理。
+
+这意味着 Hopper 当前主线已从“宽显式态 + 复杂派生奖励”开始转向“最小显式态 + 弱状态引导”的统一口径。
+
+### 调用链同步
+
+本轮同时已同步修改：
+
+1. `external/tdmpc2/tdmpc2/common/sd_world_model.py`
+   - 使 `SDWorldModel` 的结构维度断言、趋势保护索引与耦合索引适配新的 8 维显式态。
+2. `external/tdmpc2/tdmpc2/common/parser.py`
+   - 将 `sd_hopper` 的默认 `sd_struct_dim` 改为跟随 `DMControlHopperSDModel.STATE_DIM`，避免训练入口继续默认使用旧 15 维。
+
+### 最小验证
+
+本轮完成了三类最小验证：
+
+1. `py_compile` 通过，说明主线相关文件无语法错误；
+2. 直接实例化 `DMControlHopperSDModel`，执行 `encode_observation -> forward -> predict_plan_reward / predict_viable_reward`，结果均为有限值；
+3. 在带 `PYTHONPATH` 的条件下实例化 `SDWorldModel` 外层封装，确认 `encode / next / reward` 可在新 8 维显式态下正常运行。
+
+这意味着：主线 Hopper SD 已不再只是“理念上要收口”，而是已经进入第一版最小主干代码形态。
+
+## 2026-04-22：补齐训练入口默认配置，并通过 8 维 SD 的主线 smoke
+
+在完成 Hopper 8 维显式 SD 主干改造后，又对训练调用链做了完整复核，目的是确认当前版本不只是单模块前向可用，而是能够被主线训练入口直接实例化、采样并写出日志。
+
+### 补齐的调用链残留
+
+复核中发现两处仍会把新主线意外拉回旧 15 维结构：
+
+1. `external/tdmpc2/tdmpc2/config.yaml`
+   - `sd_struct_dim` 仍写死为 `15`；
+2. `scripts/run_hopper_v4_5k_smoke.sh`
+   - 启动脚本中同样仍显式传入 `sd_struct_dim=15`。
+
+这两处若不修正，即使 `parser.py` 已改为读取 `DMControlHopperSDModel.STATE_DIM`，训练入口在未额外手工覆盖时，仍会把 Hopper 主线退回旧结构维度。因此本轮已将两处统一改为 `sd_struct_dim=8`。
+
+### 训练入口 smoke
+
+使用项目既定的 `sdmcts_p100` Python 环境，执行了一次极短的 Hopper 主线 smoke：
+
+- 入口：`external/tdmpc2/tdmpc2/train.py`
+- 任务：`hopper-hop`
+- 世界模型：`sd_hopper`
+- 预算：`600` steps
+- 目的：只验证主线能否在新 8 维显式态下正确启动、采样并写出日志，不评估性能
+
+### smoke 结果
+
+本轮 smoke 已完整通过，未出现结构维度错误、前向错误或训练入口崩溃。启动日志显示：
+
+1. `SDWorldModel._dynamics` 已正确实例化为新的 `DMControlHopperSDModel`
+2. `passive_flow / residual_flow / contact_head / zmin_head` 输入输出维度与 8 维显式态一致
+3. 外层 `_struct_residual` 输出维度也已联动更新为 `8`
+4. 训练流程能够正常完成一个 episode 并写出：
+   - `train.csv`
+   - `eval.csv`
+   - `eval_full.csv`
+
+其中：
+
+- `train.csv` 已记录 `step=500` 的训练轨迹；
+- `eval.csv` 已记录入口评估点；
+- 说明当前主线训练入口已经真正接受新的 8 维 SD 结构，而不是只在局部探针里成立。
+
+### 当前结论
+
+截至本轮，Hopper `v4` 主线在代码层面已完成以下闭环：
+
+1. 奖励设计已按四状态弱引导收口；
+2. 显式 SD 主干已压缩到 8 维最小核心量；
+3. 训练入口默认配置已同步到 8 维；
+4. 主线训练 smoke 已通过。
+
+因此，后续若继续推进 `5k smoke` 或更长预算实验，当前首要问题已不再是“调用链是否仍停留在旧 15 维”，而是新奖励与最小 SD 主干在训练中的实际行为质量。
+
+## 2026-04-22：明确当前 Hopper `v4` 的职责分工与方法学立场
+
+在继续核对主线实现后，本轮将一个关键方法学判断正式记录下来，以统一后续版本的评估标准：当前 Hopper `v4` 的目标，不是让 `SD` 取代原有 TD-MPC2 学习机制，而是在尽量保留原算法能力的前提下，让 `SD` 提供高层、可解释、弱耦合的结构先验。
+
+### 一、当前实现中的真实分工
+
+按当前代码，Hopper `sd_hopper` 主线可分为两层：
+
+1. `SD` 显式主干
+   - 负责给出少量高层、可解释的结构量；
+   - 当前已收口为 `rootz / vx / vz / pitch / pitch_rate / touch_toe / touch_heel / z_min` 八维；
+   - 主要用途是支撑状态判定与弱奖励引导。
+2. learned + residual 部分
+   - 包括 `reward head / Q / policy / residual latent / residual dynamics`；
+   - 负责吸收显式结构未覆盖的复杂信息，并学习长期回报、动作细节与策略修正。
+
+因此，当前设计并不是“只相信 SD”，而是明确采取：
+
+- `SD` 提供方向性先验；
+- residual 与 learned 部分保留表达弹性与纠错空间。
+
+### 二、为什么当前分工比旧版更合理
+
+此前若把 `SD` 写成宽状态、长阶段链、强门控，其实际效果往往不是“辅助学习”，而是“替训练过程做决定”。这会带来两个问题：
+
+1. `SD` 一旦把过渡态判死，policy 很难再通过 residual 自行修正；
+2. 结构化奖励一旦过强，训练目标就会与真实任务目标发生偏移。
+
+当前版本之所以更接近合理折中，是因为它同时满足以下条件：
+
+1. 显式 SD 主干已压缩到少量核心量；
+2. 四状态 shaping 已收口为弱引导，而不是阶段编排；
+3. `sd_latent_dim=32` 下仍保留额外 residual latent 空间，而不是把模型压成纯结构化系统；
+4. 参数更新阶段仍以 learned reward 为主，不直接把结构化奖励变成训练主目标。
+
+这意味着：`SD` 负责“更像正确方向”，原算法负责“具体怎样学会做到”。
+
+### 三、当前设计希望实现的平衡
+
+本轮确认，当前 Hopper `v4` 的理想职责平衡应表述为：
+
+1. `SD` 的作用
+   - 提供高层状态语义；
+   - 提供少量可信的几何/接触先验；
+   - 提供小幅、连续的方向性 shaping。
+2. 原算法的作用
+   - 保留 TD-MPC2 的规划、价值学习与策略学习能力；
+   - 通过 learned reward、Q 和 policy 学习长期行为；
+   - 通过 residual latent 吸收结构主干未覆盖的有效路径。
+
+这正是当前版本试图达成的核心折中：既不退回完全黑盒，也不把训练过程重新交给手工设计的阶段机。
+
+### 四、后续判断标准
+
+据此，后续评估 `v4` 是否走在正确方向上，不应再只问“结构化奖励是否更细”，而应优先问以下几点：
+
+1. `SD` 的状态判定是否足够稳定、足够少误判；
+2. shaping 是否保持弱引导，而未压过 learned 部分；
+3. residual 是否仍有足够空间吸收过渡态与非标准可行路径；
+4. 规划时的结构化偏置是否与训练目标保持基本一致，而未形成过强失配。
+
+若以上条件成立，则可以认为：当前设计确实有望同时发挥 `SD` 的优势，并保留原有 TD-MPC2 的核心学习能力。
+
+## 2026-04-22：将规划混合从“显式总奖励”改为“learned reward + shaping delta”
+
+在进一步复核 Hopper `v4` 的 reward 路径后，本轮又修正了一个更基础的设计问题：此前规划阶段的结构化分支使用的是 `predict_plan_reward()`，其内部形式为
+
+`true_reward + shaping - penalty`
+
+这意味着在 `curriculum / hybrid` 模式下，规划阶段实际上会把“learned reward 对环境奖励的预测”与“显式重写的一份环境奖励近似”再次混合。虽然这不是最直接的重复相加，但本质上仍属于对环境奖励的双重表达，容易带来两类问题：
+
+1. 若显式 `true_reward` 与真实环境 reward 公式近似不准，则规划会被额外偏移；
+2. 若结构化分支权重增大，则规划目标会越来越像“手工显式 reward”，而不是 learned reward 所拟合的训练目标。
+
+据此，本轮将规划混合逻辑进一步收口为：
+
+1. learned reward 继续作为主底座；
+2. 结构化分支只提供 shaping 增量；
+3. 规划阶段使用 `learned reward + alpha * shaping_delta`；
+4. 不再在 `curriculum / hybrid` 分支中重复混入显式 `true_reward`。
+
+### 代码调整
+
+1. `src/world_model/dmcontrol_hopper_sd_model.py`
+
+- 新增 `predict_shaping_reward()`
+  - 只返回四状态弱引导对应的 `positive - penalty`；
+  - 不再包含 `true_reward`。
+- 保留 `predict_plan_reward()`
+  - 作为兼容包装，返回 `predict_reward() + predict_shaping_reward()`；
+  - 这样现有脚本中依赖“完整显式规划奖励”的调用仍可继续工作。
+
+2. `external/tdmpc2/tdmpc2/common/sd_world_model.py`
+
+- 对 `reward()` 分支做了区分：
+  - `learned` 模式或训练态：仍直接返回 learned reward；
+  - `explicit` 模式：仍允许使用完整显式 reward；
+  - `curriculum / hybrid` 模式：改为只在 learned reward 上叠加 `shaping_delta`。
+- 新增 `_scalar_add_to_logits()`，用于把 shaping 增量映射回 two-hot reward logits。
+
+### 本轮后的方法学含义
+
+这一步的含义是明确的：
+
+1. 环境奖励的主体表达只保留一份，由 learned reward head 承担；
+2. 结构化奖励只承担“小幅引导”的角色，而不再重写环境奖励主体；
+3. `SD` 在规划阶段的作用更接近“方向性偏置”，而不是“替代奖励函数”。
+
+因此，这一改动比此前的“显式总奖励混合”更符合本轮已经确认的总体原则：`SD` 提供高层先验与弱 shaping，原算法继续承担主导性的 reward/value/policy 学习。
+
+### 最小验证
+
+本轮修改后已完成以下最小验证：
+
+1. `py_compile` 通过；
+2. `DMControlHopperSDModel` 上验证：
+   - `predict_shaping_reward()`、`predict_reward()`、`predict_plan_reward()` 输出均为有限值；
+   - 且满足 `predict_plan_reward == predict_reward + predict_shaping_reward`；
+3. `SDWorldModel` 上验证：
+   - `reward()` 在 `eval()` 与 `train()` 两种模式下均能正常返回 `(batch, 101)` 的 two-hot logits；
+   - 输出有限，无 `NaN/Inf`。
+
+## 2026-04-22：先只将 `sd_latent_dim` 恢复到 512，不同步改结构
+
+在继续讨论 Hopper `v4` 的世界模型替换关系后，本轮确认一个更稳妥的实验口径：当前版本暂不进一步删除 `struct_residual` 或重排 residual 结构，而是先只把 `sd_latent_dim` 从 `32` 恢复到 `512`，使总 latent 容量与主线 TD-MPC2 默认配置保持一致。
+
+### 背景判断
+
+当前 `sd_hopper` 并不是“纯 SD 替换黑盒世界模型”，而是：
+
+1. 前部 `8` 维为显式 SD 结构态；
+2. 后部为 residual latent；
+3. 外层仍保留 learned reward、Q、policy 与 residual dynamics 等黑盒学习部件。
+
+此前将 `sd_latent_dim` 压到 `32`，实际上同时改变了两件事：
+
+1. 用显式 SD 主干替换了部分黑盒结构；
+2. 把总 latent 容量也从原版 TD-MPC2 常用的 `512` 大幅压缩到了 `32`。
+
+这会导致实验解释变得不清楚：一旦性能变化，无法区分究竟是结构先验本身造成的，还是仅仅因为总模型容量被压得过小。
+
+据此，本轮决定先拆开变量：
+
+1. 结构暂时保持当前版本不动；
+2. 总 latent 容量先恢复到 `512`；
+3. 先观察“容量对齐后的 SD 主线”表现，再决定是否继续动 `struct_residual`。
+
+### 具体改动
+
+本轮已同步修改以下入口，使 `sd_hopper` 默认总 latent 维度恢复为 `512`：
+
+1. `external/tdmpc2/tdmpc2/config.yaml`
+   - `sd_latent_dim: 512`
+2. `external/tdmpc2/tdmpc2/common/parser.py`
+   - `sd_hopper` 分支下，`sd_latent_dim` 的默认值改为参考 `cfg.latent_dim`，而不再固定退回 `32`
+3. `external/tdmpc2/tdmpc2/common/sd_world_model.py`
+   - `SDWorldModel` 内部的 `latent_dim` 默认读取也同步改为参考 `cfg.latent_dim`
+4. `scripts/run_hopper_v4_5k_smoke.sh`
+   - 默认启动参数改为 `sd_latent_dim=512`
+
+### 当前方法学含义
+
+这一步并不意味着“512 一定最合理”，而是意味着：
+
+1. 先与原版 TD-MPC2 的总容量保持一致，是更自然的对照起点；
+2. 这样可以先把“容量是否过小”与“SD 结构是否过强”这两个问题拆开；
+3. 若后续仍需做容量消融，可再系统比较 `32 / 128 / 256 / 512`。
+
+换言之，本轮的优先目标不是重新论证最优 latent 大小，而是避免在结构替换实验中额外引入一个不必要的容量缩减因素。
+
+### 最小验证
+
+本轮修改后已完成两项最小验证：
+
+1. `py_compile` 通过；
+2. 直接实例化 `SDWorldModel`，在 `sd_struct_dim=8, sd_latent_dim=512` 条件下验证：
+   - `encode(obs)` 输出形状为 `(batch, 512)`；
+   - `next(z, a)` 输出形状为 `(batch, 512)`；
+   - `reward(z, a)` 输出形状为 `(batch, 101)`；
+   - 全部输出为有限值。
+
+## 2026-04-22：回收 `v4` 中仍有效的工程闭环，后续以主线为唯一工作树
+
+在再次核对 `v4` 工作树与主线后，确认两类内容需要明确区分：
+
+1. 一类是仍然有效的工程闭环，应迁回主线继续使用；
+2. 另一类是 `v4.25-v4.27` 特定阶段的方法学实现，已被当前主线的“8 维最小显式态 + 四状态弱引导”设计取代，不再继续保留为开发基线。
+
+据此，本轮正式决定：
+
+1. 后续 Hopper `v4` 相关工作完全回到主线目录进行；
+2. `sd_world_model_rl_v4` 不再作为继续开发的主工作树；
+3. 仅回收 `v4` 中仍与当前主线设计兼容的工程闭环，不回迁已废弃的 9 维相位设计与受控 17 维 residual 方案。
+
+### 本轮回收的工程闭环
+
+本轮只补回两项与当前方法学无冲突、但对实验管理必要的机制：
+
+1. 官方 `eval` 自动保存轨迹数据；
+2. 每个正式 `eval` 点自动保存 checkpoint 与 `.full.pt` 可续训状态。
+
+具体落实为：
+
+1. `external/tdmpc2/tdmpc2/config.yaml`
+   - 将 `save_full_state` 主线默认值改为 `true`；
+   - 新增 `save_eval_traces: true`，使官方评估点默认导出轨迹数据。
+2. `external/tdmpc2/tdmpc2/trainer/online_trainer.py`
+   - 为 `hopper-hop + sd_hopper` 增加 `official_eval/step_xxxxxxx/episode_csv/*.csv` 与 `eval_episode_summary.csv` 自动导出；
+   - 导出字段改按当前主线 8 维显式态与四状态弱引导口径重写，不再沿用 `v4.27` 的 `compression_ready / launch_phase / fore_support_crawl` 等旧相位主字段；
+   - 每个正式 `eval_freq` 触发的评估点，除写 `eval.csv / eval_full.csv` 外，同步保存对应步数的模型权重与 `.full.pt`。
+
+### 明确不回迁的内容
+
+经复核，以下 `v4` 内容已被当前主线设计替代，因此本轮不再迁回：
+
+1. `v4.27` 的 9 维 `toe_support / heel_support / compression` 显式主状态及其相位链；
+2. `v4.25` 的 `sd_struct_dim=9, sd_latent_dim=17` 受控 residual latent 方案；
+3. 围绕 `compression_ready / launch_phase / fore_support_crawl` 的旧导出与分析主口径。
+
+当前主线的正式口径仍保持为：
+
+1. 显式 SD 主干：`rootz / vx / vz / pitch / pitch_rate / touch_toe / touch_heel / z_min`；
+2. 奖励设计：四状态弱引导；
+3. 总 latent：`sd_latent_dim=512`；
+4. 训练与规划职责分工：learned 主导，显式结构只提供高层先验与弱引导。
+
+### 暂缓项
+
+此前在 `v4` 中提出的 `shaping` 限幅保护，本轮暂不迁回主线。该项待后续实验进一步观察后再决定是否纳入默认配置。
+
+## 2026-04-22：将主线当前版本正式记为 `v4.28`，并以主线口径重启三种子 `50k`
+
+在完成 `v4` 工程闭环回收后，主线 Hopper SD 的当前稳定口径已足以单独继续推进，因此本轮将主线当前版本正式命名为 `v4.28`。该版本的含义是：
+
+1. 开发基线完全回到主线目录；
+2. `v4` 工作树停止承担后续实验主线职责；
+3. 当前有效方法学口径保持为“8 维最小显式态 + 四状态弱引导 + 512 总 latent”；
+4. 已补齐官方 `eval` 自动导出轨迹与评估点自动保存可续训状态的工程闭环。
+
+### `v4.28` 定义
+
+`v4.28` 的正式定义如下：
+
+1. 显式 SD 状态：`rootz / vx / vz / pitch / pitch_rate / touch_toe / touch_heel / z_min`
+2. 奖励口径：四状态弱引导，规划侧使用 `learned reward + shaping delta`
+3. 总 latent：`sd_latent_dim=512`
+4. 评估与续训：官方 `eval` 自动导出轨迹 CSV，并在评估点自动保存 checkpoint 与 `.full.pt`
+5. 暂不纳入：`shaping` 限幅保护，待后续实验观察后再决定
+
+### 本轮训练入口修订
+
+为避免评估目录再次混入 `step=0` 的无意义官方评估，本轮又对训练入口做了一条最小修正：
+
+1. `external/tdmpc2/tdmpc2/trainer/online_trainer.py`
+   - 将正式评估触发条件收回为 `self._step > 0 and self._step % eval_freq == 0`
+
+这样做的目的只有一个：使 `official_eval/step_xxxxxxx` 只对应已经完成 seed 数据收集后的正式评估点，不再在实验目录中生成 `step_0000000` 这一无分析意义的起始评估。
+
+### `v4.28` 三种子 `50k` 运行口径
+
+本轮三种子 `50k` 使用统一配置：
+
+1. `steps=50000`
+2. `eval_freq=25000`
+3. `checkpoint_freq=25000`
+4. `eval_episodes=10`
+5. `save_full_state=true`
+6. `save_eval_traces=true`
+
+同时新增：
+
+1. `scripts/run_hopper_v428_50k.sh`
+
+该脚本固定了本轮 `v4.28` 的训练参数与主线环境变量，后续可直接复用，避免再次因手工命令分叉而引入评估频率、保存开关或 latent 配置的不一致。
+
+### 同日启动期补记：修复 DMControl `None reward` 兼容
+
+在本轮 `v4.28` 三种子 `50k` 首次启动时，训练已成功进入真实 GPU 会话并完成模型实例化，但在环境步进第一轮即统一报错：
+
+1. `external/tdmpc2/tdmpc2/envs/dmcontrol.py`
+   - `reward += step.reward`
+   - 当底层 `dm_control` 在个别步返回 `step.reward is None` 时，会触发 `TypeError`
+
+据此，本轮增加最小兼容修复：
+
+1. 将 `None reward` 视为 `0.0`
+2. 不改变其余环境封装、动作重复次数或终止逻辑
+
+该修复的目的仅是消除环境 API 差异导致的训练入口崩溃，不涉及 Hopper `v4.28` 的奖励设计或 SD 方法学调整。
+
+### 同日启动期补记：修复 `Timeout` 包装器与 `gymnasium` 的私有属性冲突
+
+在修复 `None reward` 后，`v4.28` 三种子 `50k` 第二次启动又暴露出另一条与方法学无关的兼容问题：
+
+1. `external/tdmpc2/tdmpc2/envs/wrappers/timeout.py`
+   - 旧实现使用私有计数属性 `_t`
+   - 在当前 `gymnasium` 包装器链下，该私有名访问会触发 `AttributeError`
+
+据此，本轮继续做最小修复：
+
+1. 将 episode 计数改为包装器自身显式持有的公共属性 `elapsed_steps`
+2. `reset()` 时归零，`step()` 时递增
+3. 仅替换计数状态名，不改变超时终止判定逻辑
+
+这样处理后，训练入口的时间上限行为仍与原设计一致，只是消除了底层库接口收紧带来的包装器崩溃。
+
+## 2026-04-22：继续收缩 Hopper 显式 SD 核心，去掉内部可学习修补分支
+
+在将 Hopper 主线稳定到 `v4.28` 后，又对当前显式 `SD` 核心内部的可学习参数做了一轮复核。复核结论是：当前主线已经保留了外层 `512-8` residual latent，用来吸收显式 8 维状态无法完整表达的剩余因素；在这种前提下，显式 `SD` 内部凡是“语义并不刚性、只是给骨架打补丁”的学习分支，都应优先删除，而不是继续与外层 residual 重复分工。
+
+本轮依据如下：
+
+1. `control_scale` 仍有明确物理含义，对应四个 actuator 维度的有效作用增益；
+2. `rate_damping_raw` 仍有明确物理含义，对应 `vx / vz / pitch_rate` 三个速率量的阻尼；
+3. `passive_flow / residual_flow / contact_head / zmin_head` 虽能提升局部拟合自由度，但都属于“可要可不要”的内部修补，且其功能已可由外层 `512-8` residual latent 负责；
+4. 若这些分支继续保留，就会在同一模型里同时存在“显式补丁”和“外层黑盒补丁”两套容错路径，责任边界变得不清，解释性也会下降。
+
+据此，本轮将 Hopper 显式 `SD` 核心进一步收缩为：
+
+1. 显式 8 维状态不变：`rootz / vx / vz / pitch / pitch_rate / touch_toe / touch_heel / z_min`
+2. 保留显式动力学骨架：`_explicit_rate_dynamics`
+3. 保留动作增益：`control_scale`
+4. 保留速率阻尼：`rate_damping_raw`
+5. 删除内部学习修补：
+   - `passive_flow`
+   - `residual_flow`
+   - `contact_head`
+   - `zmin_head`
+
+对应代码变更如下：
+
+1. `src/world_model/dmcontrol_hopper_sd_model.py`
+   - `_rate_dynamics` 改为仅返回 `explicit - damping`
+   - `forward` 中 `touch_toe / touch_heel / z_min` 的下一步预测改为纯几何与接触规则更新，不再叠加 learned delta
+   - `get_learned_params()` 不再导出已删除分支相关字段
+2. `external/tdmpc2/tdmpc2/common/sd_world_model.py`
+   - 实例化 `DMControlHopperSDModel` 时，不再向其传入 `sd_residual_scale / sd_passive_scale`
+
+这一步的含义不是“拒绝残差”，而是重新划清边界：
+
+1. 显式 `SD` 只负责高层、可靠、可解释的骨架；
+2. 外层 `512` 维 latent residual 继续承担复杂过渡态、局部接触细节与难以手工写出的剩余修正；
+3. 方法学上继续坚持“结构化先验给方向，黑盒残差给弹性”的主线，而不是在显式核心内部再嵌一层小黑盒。
+
+## 2026-04-22：修正 Hopper 竖直主量语义，将 `torso_z` 与 `height` 拆开
+
+在对 `v4.28` 的 `5k smoke` 官方评估轨迹逐条复核后，首先确认了当前最上游的一条硬错误：显式 `SD` 里一直把 `dm_control` observation 中的 `position[0]`（也就是 `qpos_rootz`）当成了“真实高度”，并继续用它驱动：
+
+1. `predict_height()`
+2. `predict_reward()` 中的 standing 判定
+3. `predict_viable_reward()` 中的高度门
+4. `official eval` 的 `height / max_height` 导出
+5. `_kinematic_features()` 中所有身体点的世界 z 坐标基准
+
+但对 `dm_control.suite.hopper` 的源码核对表明：
+
+1. `Hopper.get_observation()` 返回的 `position = physics.data.qpos[1:]`
+2. 其中第一个量只是 `qpos_rootz`
+3. 环境真实奖励使用的 `Physics.height()` 定义却是 `torso_z - foot_z`
+
+也就是说，当前主线把“竖直滑块位移”和“真实站立高度”混成了一个量。
+
+这条错位在轨迹中表现得非常明确：
+
+1. 视频与几何导出都显示初始状态实际在空中；
+2. 但旧版 `SD` 却在 `step 0` 就给出 `grounded_unprepared=1.0, air=0.0`
+3. 官方 `eval` 汇总里的 `max_height` 也因此错误地长期为 `0.0`
+
+据此，本轮将 Hopper 竖直语义链改为“两层量”：
+
+1. 显式状态第 0 维继续保留 8 维布局，但其物理含义改为 `torso_z`
+   - 使用 `TORSO_BASE_Z + qpos_rootz`
+   - 其中 `TORSO_BASE_Z = 1.0` 对应 `hopper.xml` 中 torso body 的基准高度
+2. `height` 不再等同于状态第 0 维，而改为派生量
+   - `height = torso_z - ground_z`
+   - 当前实现中 `ground_z = min(z_min, 0)`，用来近似环境里 torso 相对脚/地面的有效站立高度
+
+对应代码调整如下：
+
+1. `src/world_model/dmcontrol_hopper_sd_model.py`
+   - `encode_observation()`：第 0 维从旧 `qpos_rootz` 改为 `torso_z`
+   - `_kinematic_features()`：全部 body z 坐标以 `torso_z` 为世界基准重新推导
+   - `_min_body_z_from_pos()`：最小 body z 改按新的世界坐标系计算
+   - `predict_height()`：不再直接返回状态第 0 维，而改为返回派生 `height`
+   - `predict_reward()` / `predict_viable_reward()`：统一改用新的 `height`
+   - `_state_reward_features()`：新增 `torso_z` 与 `height`，并据此重算 `low_body`
+2. `external/tdmpc2/tdmpc2/trainer/online_trainer.py`
+   - 官方评估轨迹导出中补出 `torso_z`
+   - 汇总中同时保留 `initial/final_qpos_rootz` 与 `initial/final_torso_z`
+   - 顺手补出逐步 `rootx = qpos_rootx`，避免轨迹 CSV 中该列为空
+
+### 本轮最小校验
+
+本轮未立即重启长实验，而是先做了两条最小自洽检查：
+
+1. `py_compile` 通过：
+   - `src/world_model/dmcontrol_hopper_sd_model.py`
+   - `external/tdmpc2/tdmpc2/trainer/online_trainer.py`
+2. 对修正后的 `DMControlHopperSDModel` 做前向检查：
+   - 零输入观测时，`torso_z=1.0`
+   - `height=1.0`
+   - `z_min=0.1`
+   - `reward=0.0`
+3. 对从官方轨迹抽取的初始姿态做编码检查：
+   - `torso_z=1.0`
+   - `height=1.0`
+   - `z_min=0.537`
+   - `grounded=0.0`
+   - `air=1.0`
+
+这与视频观察到的“初始时处于空中”一致，说明上游竖直量的物理语义已经回到正确方向。
+
+### 当前判断
+
+这一轮修正只解决了最上游的竖直语义错误。`full_foot_support` 是否仍存在独立问题、`grounded_prepared` 是否仍长期过低，需要在新的短实验轨迹下继续复核，不能再直接沿用旧 `5k smoke` 的结论。
+
+### 同日补记：放宽接触/着地软判据，修正“永远在空中”的新偏差
+
+在竖直语义修正后的 `heightfix 5k smoke` 中，官方评估又暴露出另一条新的系统性偏差：
+
+1. `initial_rootz` 与 `max_height` 已恢复正常，说明 `torso_z / height` 主链确已修正；
+2. 但 `air_frac` 几乎变成 `1.0`，`grounded_frac` 变成 `0.0`；
+3. 多条轨迹中 `z_min` 已降到 `0.04~0.07`，肉眼已接近地面支撑，但状态特征仍将其判为“空中”。
+
+复核后确认，这一偏差集中来自 `DMControlHopperSDModel` 中用于接触/着地的软门过于严格：
+
+1. 旧参数：
+   - `CONTACT_MARGIN = 0.02`
+   - `CONTACT_SCALE = 0.02`
+2. 这意味着只有 `z_min < 0.02` 才会被明显视为 near-ground；
+3. 在修正后的真实世界坐标系中，很多低姿近地态会稳定停在 `z_min ~= 0.04~0.07`，于是被整段误判为“仍在空中”。
+
+据此，本轮仅对接触带宽做最小修订，不改奖励结构本身：
+
+1. `CONTACT_MARGIN: 0.02 -> 0.08`
+2. `CONTACT_SCALE: 0.02 -> 0.04`
+
+这样处理的目的不是“强行制造接触”，而是让“接近地面并可能开始支撑”的状态进入更合理的软门区间，从而为：
+
+1. `grounded / air`
+2. `full_foot_support`
+3. `grounded_prepared / grounded_unprepared`
+
+提供更接近实际轨迹的判定基础。
+
+### 最小检查
+
+对三类人工样本做了最小检查：
+
+1. 初始空中样本：`z_min=0.65`
+   - 结果：`grounded=0.0, air=1.0`
+2. 近地支撑样本：`z_min=0.039`
+   - 结果：`grounded≈0.51, air≈0.49`
+3. 较低但未充分接触样本：`z_min=0.067`
+   - 结果：`grounded≈0.16, air≈0.84`
+
+这说明新的软门已经满足两个目标：
+
+1. 不会把初始悬空状态误判成落地；
+2. 也不再把已经逼近地面的低姿态一律误判成“永远在空中”。
+
+### 同日补记：用 td-mpc2 200k 高分轨迹反证 `grounded_prepared / full_foot_support`
+
+为避免继续从 `5k smoke` 直接推断“着地预备判据过严”，本轮补做了一次反向验证：直接拿已经学成标准 hop 的 `td-mpc2 200k` 高分 checkpoint 做少量轨迹导出，看当前四状态代理在高质量轨迹中是否会自然激活。
+
+#### 代码修订
+
+1. `external/tdmpc2/tdmpc2/trainer/online_trainer.py`
+   - 将 Hopper 的 `official_eval` 轨迹导出从“仅 `sd_hopper` 可用”改为“所有 `hopper-hop` 都可用”。
+   - 导出特征不再依赖 agent 当前 world model，而统一调用 `DMControlHopperSDModel` 作为显式状态探针。
+   - 这样做的目的，是让 `sd_hopper` 与 `tdmpc2` 在同一套 `torso_z / z_min / grounded_prepared / full_foot_support` 口径下可直接对比。
+2. `scripts/export_hopper_eval_traces.py`
+   - 改为同样使用 Hopper 物理快照 + `DMControlHopperSDModel` 探针导出轨迹。
+   - 逐步 CSV 字段与 `official_eval` 口径对齐，补出：
+     - 几何与 `qpos/qvel` 快照；
+     - `torso_z / height / z_min`；
+     - `air / grounded / full_foot_support / grounded_prepared`；
+     - 各状态的 `*_gt_05` 二值标记；
+   - 汇总文件 `summary.csv` 直接输出各 episode 的状态占比，便于快速判断判据是否在高分轨迹中成立。
+
+#### 运行结果
+
+以 `results/tdmpc2_hopper_200k_sameprotocol_20260422_062444_seed2/models/final.full.pt` 为输入，仅导出 3 条轨迹，结果目录：
+
+`results/tdmpc2_hopper_200k_sameprotocol_20260422_062444_seed2/trace_probe_v428`
+
+三条回报分别为：
+
+1. `563.35`
+2. `567.47`
+3. `570.54`
+
+这三条均为标准高分 hop，可作为当前状态判据的高质量参照。
+
+#### 关键结论
+
+在这三条高分轨迹中，`grounded_prepared` 与 `full_foot_support` 都明显不是零：
+
+1. `episode_00`
+   - `full_foot_support_frac = 0.168`
+   - `grounded_prepared_frac = 0.074`
+   - `max_full_foot_support = 0.997`
+   - `grounded_prepared max = 0.752`
+2. `episode_01`
+   - `full_foot_support_frac = 0.166`
+   - `grounded_prepared_frac = 0.064`
+   - `max_full_foot_support = 0.998`
+   - `grounded_prepared max = 0.755`
+3. `episode_02`
+   - `full_foot_support_frac = 0.142`
+   - `grounded_prepared_frac = 0.068`
+   - `max_full_foot_support = 0.998`
+   - `grounded_prepared max = 0.799`
+
+按 step 排序查看 `episode_00` 的最高 `grounded_prepared` 片段，可见该状态对应的是：
+
+1. `full_foot_support ≈ 0.97~1.00`
+2. `grounded ≈ 0.70~0.76`
+3. `low_body = 1.0`
+4. `height ≈ 0.52~0.53`
+5. `vx ≈ 1.0~1.29`
+
+这与用户从视频中描述的“标准 hop 落地压缩蓄力”是相符的。
+
+#### 当前判断更新
+
+据此，当前不能再把 `grounded_prepared` 视为“定义可疑”的首要嫌疑项。更准确的结论是：
+
+1. 这套四状态代理在标准高分 hop 中能够被稳定激活；
+2. 因而它们在当前 `v4.28 5k` 中接近零，更可能是训练早期尚未学到，而不是判据天然失真；
+3. 后续若继续出现长期为零，应优先从训练过程与策略分布分析，而不是先改坏这套状态定义。
+
+### 同日补记：将 `0` 分与高分轨迹并排做离线验证，拆开状态、奖励与 SD 转移
+
+为避免后续继续凭单一现象判断“是状态错了、奖励错了、还是 SD 动力学跟不上”，本轮新增了一个统一分析脚本：
+
+`scripts/analyze_hopper_state_reward_sd_validation.py`
+
+该脚本对任意 Hopper 轨迹 CSV 执行三类离线验证：
+
+1. 四状态占比与主状态转移；
+2. 在真实轨迹上回放 `predict_reward / predict_shaping_reward`，比较环境奖励、显式奖励与 shaping；
+3. 用当前 `DMControlHopperSDModel` 做一步前向，与真实下一步显式状态比较误差。
+
+本轮对比了两组数据：
+
+1. `v4.28 contactfix 5k smoke` 的 10 条 `0` 分轨迹；
+2. `td-mpc2 200k` 的 3 条高分标准 hop 轨迹。
+
+#### 一、四状态闭环验证结果
+
+高分标准 hop 轨迹中，四状态闭环已经明显可见：
+
+1. 状态占比
+   - `falling_air ≈ 0.381`
+   - `grounded_unprepared ≈ 0.213`
+   - `grounded_prepared ≈ 0.086`
+   - `rising_air ≈ 0.319`
+2. 关键转移
+   - `falling_air -> grounded_unprepared`
+   - `grounded_unprepared -> grounded_prepared`
+   - `grounded_prepared -> rising_air`
+   - `rising_air -> falling_air`
+
+相比之下，`v4.28 5k` 的 `0` 分轨迹几乎卡死在 `grounded_unprepared`：
+
+1. `grounded_unprepared` 占比 `0.838`
+2. `grounded_prepared` 占比仅 `0.0016`
+3. 最主要的转移是 `grounded_unprepared -> grounded_unprepared`
+
+这说明：
+
+1. 四状态定义本身能描述成功 hop；
+2. 当前失败轨迹的问题不是“闭环不存在”，而是策略长期无法走到 `grounded_prepared` 并形成稳定起跳。
+
+#### 二、奖励设计验证结果
+
+##### 1. `v4.28 0` 分轨迹
+
+在 `0` 分轨迹上：
+
+1. 环境真实奖励均值为 `0`
+2. 显式环境对齐奖励均值约 `0.0014`
+3. 原始 shaping 均值约 `-0.00015`
+4. 即使按当前 `alpha=0.5` 缩放后，均值也仅约 `-0.00008`
+
+这表明当前 shaping 量级确实是“小幅引导”，没有篡改任务主目标。
+
+但也暴露出两个需要注意的点：
+
+1. `grounded_prepared` 状态一旦偶发出现，其 shaping 均值约 `0.0446`，明显偏正；
+2. `rising_air` 在 `0` 分轨迹中 shaping 均值反而略负，约 `-0.0054`，说明“失败起跳”阶段确实会被轻微抑制。
+
+##### 2. 高分标准 hop 轨迹
+
+在高分 hop 轨迹上：
+
+1. 环境真实奖励均值约 `1.135`
+2. 显式环境对齐奖励均值约 `1.112`
+3. 原始 shaping 均值约 `0.0233`
+4. 按 `alpha=0.5` 后约 `0.0117`
+
+这再次说明 shaping 只是小量偏置，并未主导回报。
+
+分状态看，当前奖励方向与四状态设计大体一致：
+
+1. `grounded_prepared` 上的 shaping 最强，均值约 `0.0993`
+2. `rising_air` 与 `falling_air` 也为小正值
+3. `grounded_unprepared` 为较小正值，主要起到把策略往准备态推的作用
+
+也即，当前奖励设计在“方向上”没有明显反常，至少并未鼓励失败姿态长期停留。
+
+#### 三、SD 一步预测一致性验证结果
+
+##### 1. `v4.28 0` 分轨迹
+
+在当前 `0` 分轨迹上，一步预测误差较大的维度主要是：
+
+1. `pitch_rate`：均值约 `0.975`
+2. `vz`：均值约 `0.175`
+3. `touch_toe / touch_heel`：均值约 `0.256 / 0.206`
+4. `z_min`：均值约 `0.231`
+
+其中按状态分组看：
+
+1. `falling_air` 段的 `vz / pitch_rate` 误差较高；
+2. `grounded_unprepared` 段的 `touch_toe / touch_heel / z_min` 误差较高；
+3. `grounded_prepared` 样本过少，暂不足以下结论。
+
+##### 2. 高分标准 hop 轨迹
+
+在高分 hop 轨迹上，一步预测误差进一步显示出当前 SD 的薄弱段：
+
+1. `vz`：均值约 `0.539`
+2. `pitch_rate`：均值约 `2.762`
+3. `touch_toe / touch_heel`：均值约 `0.271 / 0.255`
+4. `z_min`：均值约 `0.112`
+
+按状态分组后：
+
+1. `falling_air` 中 `vz` 误差最大，均值约 `0.721`
+2. `rising_air` 中 `pitch_rate` 误差最大，均值约 `3.943`
+3. `grounded_unprepared / grounded_prepared` 中接触量误差最高
+
+这说明当前最值得怀疑的不是四状态定义，也不是 shaping 方向，而是：
+
+1. 空中纵向速度 `vz`
+2. 角速度 `pitch_rate`
+3. 落地接触量 `touch_toe / touch_heel`
+
+这三类转移在当前显式 SD 中仍偏粗，尤其对标准 hop 的腾空与落地切换刻画不足。
+
+#### 当前综合判断
+
+截至本轮，三类对象的验证结论可暂定为：
+
+1. 状态定义
+   - 已获得正向验证；
+   - 四状态闭环能在标准 hop 中真实出现；
+   - 当前不应优先改坏这套定义。
+2. 奖励设计
+   - 方向基本正确；
+   - 量级确实只是小幅引导；
+   - 当前没有证据表明 shaping 主导了任务或把策略推向明显错误方向。
+3. SD 动力学
+   - 仍是最可疑环节；
+   - 尤其在 `vz / pitch_rate / contact` 三类转移上，对高分 hop 的一步拟合仍偏弱；
+   - 后续若要继续优化，应优先围绕这三类量的显式转移或 residual 组织方式展开，而不是先推翻四状态与奖励。
+
+### 同日补记：继续下钻 SD 动力学，定位两类硬失真
+
+在上一轮确认“最可疑的是 `vz / pitch_rate / contact`”之后，本轮继续对高分标准 hop 轨迹的最坏样本做了逐条动力学分解，重点检查：
+
+1. `DMControlHopperSDModel._explicit_rate_dynamics()`
+2. `DMControlHopperSDModel.forward()`
+3. 外层 `SDWorldModel.next()` 对显式 8 维结构态的 residual 修正幅度
+
+#### 结论一：接触冲量在当前显式动力学里被延后一拍
+
+当前 `forward()` 的顺序是：
+
+1. 先用当前 `touch_toe / touch_heel` 计算 `support`；
+2. 用该 `support` 计算 `next_vx / next_vz / next_pitch_rate`；
+3. 之后才根据 `z_min / next_pitch / next_vz` 更新 `next_touch_toe / next_touch_heel`。
+
+也就是说，接触建立对速率量的影响至少滞后一拍。
+
+这在高分 hop 的着地冲量处表现得非常明显。例如：
+
+1. 某条高分轨迹在 `falling_air` 段：
+   - 当前 `vz = -2.78`
+   - 下一步真实 `vz = +2.09`
+   - 即单步发生了强烈反弹
+2. 但当前显式模型因为本步 `support = 0`，`z_acc` 仍几乎只剩重力项，结果预测：
+   - `pred next_vz = -2.48`
+   - 完全没有产生接触冲量式反弹
+3. 同一位置真实 `next_touch_toe / next_touch_heel ≈ 0.93 / 0.996`，而模型预测仅 `0.003 / 0.194`
+
+这说明当前模型在着地瞬间把“接触建立”和“接触反作用力”拆成了两个时间步，因而必然低估落地反弹与落地制动。
+
+#### 结论二：接触几何被设计成“toe / heel 二选一”，难以表达标准 hop 的整足着地
+
+接触头目前是：
+
+1. `toe_geom = ground_proximity * sigmoid((next_pitch + 0.10) / 0.30)`
+2. `heel_geom = ground_proximity * sigmoid((0.10 - next_pitch) / 0.30)`
+
+这相当于用 `next_pitch` 作为 toe / heel 的互斥门。
+
+但在标准 hop 的落地压缩段，真实轨迹里经常出现：
+
+1. `next_touch_toe ≈ 1`
+2. `next_touch_heel ≈ 1`
+
+也即整足着地。
+
+而当前门控会因为 `pitch` 偏前或偏后，只给其中一侧较高概率，另一侧被压低。于是就会出现：
+
+1. 真实下一步 `touch_toe / touch_heel ≈ 0.99 / 0.99`
+2. 模型仅能给出 `0.13 / 0.00` 或 `0.00 / 0.19`
+
+这也是 `full_foot_support` 长期难以被显式动力学正确生成的重要原因。
+
+#### 结论三：`pitch_rate` 目前本质上是线性弹簧阻尼，无法表达腾空与着地时的快速角速度重置
+
+当前角速度动力学核心仅为：
+
+1. `pitch_acc = -2.2 * pitch - 0.70 * pitch_rate + support * (...)`
+2. 再叠加全局 `rate_damping * pitch_rate`
+
+而从已学到的参数看，`rate_damping` 已经被训练拉到非常大：
+
+1. `vx damping ≈ 3.88`
+2. `vz damping ≈ 7.10`
+3. `pitch_rate damping ≈ 11.59`
+
+对高分 hop 的最坏样本做分解可见：
+
+1. 在某条 `rising_air` 高分样本中：
+   - 当前 `pitch_rate = -16.71`
+   - 真实下一步 `pitch_rate = -2.93`
+   - 需要单步产生极大的角速度回正
+2. 但模型给出的总 `pitch_rate` 更新只足以预测到 `-12.60`
+3. 即便阻尼已经被学得很大，线性形式仍然不够，无法表达真实轨迹中的“冲量式角速度重置”
+
+这说明当前 `pitch_rate` 失真不是简单的“参数没调够”，而是表达形式本身过于平滑。
+
+#### 结论四：外层 residual 目前不足以修补这些大误差
+
+在 `SDWorldModel.next()` 中，结构态 residual 对自由维度的修正是：
+
+1. `free_delta = free_scale * tanh(raw_correction)`
+2. 其中 `vz / pitch / pitch_rate / vx` 这些 bridge 维度仅使用 `coupling_residual_scale = 0.20`
+
+这意味着即便 residual 饱和，单步对这些维度的直接修正上限也只有约 `±0.2`。
+
+但高分标准 hop 中实际需要补的误差量级是：
+
+1. `vz` 常见最坏误差 `3~5`
+2. `pitch_rate` 常见最坏误差 `10~13`
+
+因此，当前外层 residual 不是“还没学会”，而是结构上就不足以填平这些冲量型误差。
+
+#### 当前阶段判断
+
+至此，关于 SD 动力学可形成更明确的判断：
+
+1. 当前最主要的问题不是四状态定义；
+2. 也不是 shaping 奖励方向；
+3. 而是显式 SD 把 Hopper 的关键事件写成了“平滑、延后、弱修正”的动力学；
+4. 这种结构对标准 hop 中最关键的两类事件都不适配：
+   - 着地冲量；
+   - 腾空/着地时角速度的快速重置。
+
+后续若要继续优化 SD，应优先考虑：
+
+1. 让接触建立在同一步即可反作用到 `vz / pitch_rate`；
+2. 放弃单纯依赖 `pitch` 的 toe/heel 互斥接触门；
+3. 提升或重构 `vz / pitch_rate` 维度上的 residual 修正能力，而不是仅给 `±0.2` 的小修补。
+
+### 同日补记：按上述方向完成第一轮 SD 动力学修订
+
+本轮已直接落实三项代码修改，目标是先修正动力学结构性缺陷，再决定是否需要重新收紧或放松状态/奖励。
+
+#### 1. `src/world_model/dmcontrol_hopper_sd_model.py`
+
+本轮对显式动力学做了四点修订：
+
+1. 将结构态积分步长从单个物理步 `dt` 改为与环境外部观测对齐的控制步长：
+   - `step_dt = self.dt * self.ENV_ACTION_REPEAT`
+   - 原因：当前 agent 每次观测转移对应两次 `dm_control` 内部步进，显式 SD 若仍按单步积分，会系统性低估 `vz / pitch_rate` 变化量。
+2. 新增 `_contact_candidates(...)`
+   - 以 `pitch / vz / z_min` 推导“本步即将建立的接触候选”；
+   - 不再把 toe / heel 设计成纯 `pitch` 互斥；
+   - 允许在 near-ground + impact 时同时出现较高 toe / heel 值，以表达整足着地。
+3. 在 `_explicit_rate_dynamics(...)` 中直接使用 `impact_toe / impact_heel`
+   - 这样 `support / full_foot` 在速率更新时就能看到“即将接触”的候选；
+   - 不再要求接触必须滞后一拍才能作用到 `vz / pitch_rate`。
+4. 在 `forward(...)` 中加入同一步的冲量式修正
+   - `bounce`：对 imminent impact 的 `vz` 做同步反弹修正；
+   - `impact_pitch_gate`：对着地瞬间的 `pitch_rate` 做快速重置；
+   - `air_upright_gate`：对近直立空中阶段的极端角速度做更强衰减；
+   - `next_touch_toe / next_touch_heel` 更新为“至少不低于本步接触候选”，避免接触建立被混合权重再次压低。
+
+#### 2. `external/tdmpc2/tdmpc2/common/sd_world_model.py`
+
+本轮放宽了结构态 residual 在关键桥接维度上的修正能力：
+
+1. `vx_residual_scale = 0.50`
+2. `vz_residual_scale = 3.00`
+3. `pitch_residual_scale = 0.75`
+4. `pitch_rate_residual_scale = 8.00`
+
+之前 `vx / vz / pitch / pitch_rate` 共用 `0.20` 上限，这不足以覆盖高分 hop 中观察到的冲量型误差。当前做法仍保留：
+
+1. `rootz / touch_toe / touch_heel / z_min` 的 trend protection；
+2. 仅对桥接维度放大 residual，而非整体放开显式结构。
+
+#### 最小回归检查
+
+本轮未直接重启训练，而是先做两类最小检查：
+
+1. `py_compile` 通过：
+   - `src/world_model/dmcontrol_hopper_sd_model.py`
+   - `external/tdmpc2/tdmpc2/common/sd_world_model.py`
+2. 对高分标准 hop 中的两类最坏样本做局部回归：
+   - 着地反弹样本：
+     - 修改前 `pred next_vz ≈ -2.48`
+     - 修改后 `pred next_vz ≈ +0.77`
+     - 真实 `next_vz ≈ +2.09`
+   - 空中角速度衰减样本：
+     - 修改前 `pred next_pitch_rate ≈ -12.60`
+     - 修改后 `pred next_pitch_rate ≈ -4.78`
+     - 真实 `next_pitch_rate ≈ -2.93`
+
+这说明本轮修改已明显朝正确方向推动：
+
+1. 着地冲量不再完全缺失；
+2. 空中极端角速度也不再像之前那样几乎不衰减；
+3. 但接触强度与 `z_min` 仍未完全对齐，说明这只是第一轮动力学修订，还需要通过新训练轨迹继续验证。
+
+### 同日补记：动力学回归的验收口径收敛为“只查结构错误，不拿 5k 已学参数当门槛”
+
+在继续复核 `v4.28` 显式动力学时，验收口径进一步收紧为：当前阶段需要验证的是结构性错误是否已被移除，而不是要求 `5k` 量级下学到的参数已经把 Hopper 动力学完整拟合。为避免再次把“参数未学好”和“结构写错了”混在一起，本轮将回归目标限定为以下三条：
+
+1. 旧错误样本中，不再出现“同一步着地反弹已发生，但 `next_touch_toe / next_touch_heel` 仍几乎为零”的时序自相矛盾；
+2. `z_min` 的传播不再因为接触增强而被推成负值；
+3. 非落地样本不会被误判出虚假接触。
+
+据此又完成了两处最小修订：
+
+1. `forward(...)` 中更新 `next_touch_*` 时，不再单独依赖反弹后的 `next_vz` 再判一次接触，而是显式保留同一步 `impact_gate / cand_toe / cand_heel` 的落地信息，避免“反弹成功反而抹掉接触”；
+2. `next_zmin` 改为区分 airborne 与 grounded 两种传播，并在存在明显接触时将结果约束到非负范围，不再使用“接触越强，`z_min` 越负”的旧写法。
+
+随后在既有高分轨迹的旧错误样本上做结构回归，结论如下：
+
+1. 对典型 `vz_impact` 样本，当前结构层已给出明显非零的同步接触：
+   - `pred_next_touch_toe ≈ 0.473`
+   - `pred_next_touch_heel ≈ 0.564`
+   - `pred_next_zmin = 0.0`
+   这已消除了之前“反弹存在但接触几乎为零、`z_min` 变成负值”的结构矛盾。
+2. 对典型 `pitch_rise` 空中样本，当前结构层未引入新的虚假接触：
+   - `pred_next_touch_toe ≈ 0.0`
+   - `pred_next_touch_heel ≈ 0.0`
+3. 在三条高分 `td-mpc2 200k` 轨迹的逐步扫描中：
+   - `pred_next_zmin < 0` 的样本数为 `0`
+   - 对 near-ground descending 的冲击样本，`165` 条中有 `148` 条给出了 `> 0.2` 的接触预测
+   - 对明显非冲击的 airborne 样本，未出现阈值以上的虚假接触
+
+因此，当前判断更新为：
+
+1. 这轮修订已经修掉了上一轮最明确的两条结构错误：同一步落地接触丢失，以及 `z_min` 负向传播；
+2. 尚未证明显式动力学已经足够精确，也不应在此阶段要求它做到这一点；
+3. 在这一口径下，旧错误样本回归已通过，可以进入下一轮 `5k smoke`，继续检查训练轨迹中是否还有新的结构性异常暴露出来。
+
+### 同日补记：正式取消 `z_min < 0` 的历史缓冲区
+
+在随后对“反物理状态是否仍可能出现”的专项复核中，又确认了一条仍然存在的结构漏洞：虽然显式 `forward(...)` 已经把 `next_zmin` 约束到非负，但 `project_state(...)` 与 `_state_reward_features(...)` 仍保留了 `min=-0.5` 的旧下界。这意味着外层 residual 若把 `z_min` 拉成负值，结构态仍会接受该状态，并进一步把这段“穿地深度”带入后续状态判断与高度计算。
+
+该负下界没有新的方法学意义，只是早期为数值缓冲保留的历史遗留项。既然当前版本已明确要求结构化先验避免明显反物理情形，`z_min < 0` 就不应再被允许。
+
+据此，本轮仅做一处最小修订，不触碰 `touch_toe / touch_heel` 的耦合逻辑：
+
+1. 将 `project_state(...)` 中 `z_min` 的下界由 `-0.5` 改为 `0.0`；
+2. 将 `_state_reward_features(...)` 中读取 `z_min` 时的下界同步改为 `0.0`。
+
+这一步的含义是：从当前版本起，`z_min` 被明确解释为“代表点最小高度”，不再保留任何地下缓冲区。后续若继续检查接触与几何状态是否一致，应另行处理 `touch_toe / touch_heel` 与 `z_min` 的耦合，而不再借助负 `z_min` 作为容错带。
+
+### 同日补记：为 `grounded_prepared` 增加竖直速度软门，过滤着陆冲击假阳性
+
+在继续复看 `v4.28 dynfix2 5k smoke` 的官方评估轨迹后，已确认当前四状态链条本身能够被激活，但 `grounded_prepared` 仍存在一类轻度假阳性：某些“高速着陆冲击瞬间”虽然短暂满足了整足支撑和低重心，却还不应被解释为“已完成压缩蓄力”。
+
+最典型的是 `episode_01` 的峰值片段：当时 `full_foot_support` 很高，但 `vz` 仍明显为负，仍处于下砸地面的过程中。若继续沿用原定义，`grounded_prepared` 会把这种瞬间也计入“预备完成”。
+
+据此，本轮对 `grounded_prepared` 的定义只做一处最小修订，不扩张状态图：
+
+1. 保留原有三项：
+   - `grounded`
+   - `full_foot_support`
+   - `low_body`
+2. 新增一项竖直速度软门：
+   - `vertical_settle = clamp((0.40 - |vz|) / 0.40, 0, 1)`
+3. 更新后：
+   - `grounded_prepared = grounded * full_foot_support * low_body * vertical_settle`
+
+这样做的意图是：
+
+1. 保持四状态闭环的简洁性；
+2. 不把“高速着陆瞬间”误记为“已完成压缩蓄力”；
+3. 允许 `vz` 接近 `0` 的低速压缩或刚开始上抬阶段继续被视为合理的 `grounded_prepared`。
+
+### 同日补记：补充 `trace_csv -> mp4` 直接回放脚本，避免再次重跑 eval
+
+在复核 `50k official eval` 轨迹时，需要把单条保存轨迹直接渲染成 `mp4` 供人工观察。此前仓库中已有的是 `checkpoint -> replay eval -> mp4` 脚本，不适合这一需求，因为它会重新执行一次评估。
+
+为避免再次把“已保存轨迹回放”和“重新跑评估”混在一起，本轮补充：
+
+1. `scripts/render_hopper_trace_csv_mp4.py`
+
+该脚本固定面向 Hopper `official_eval/episode_csv/*.csv`：
+
+1. 直接读取保存下来的 `qpos_* / qvel_*` 序列；
+2. 逐帧写回 `dm_control` Hopper 物理状态；
+3. 直接渲染为 `mp4`；
+4. 不再调用策略，也不再重复执行评估。
+
+这样，后续若要核验某条已保存的评估轨迹是否真的出现了跃起、前冲或其他中间状态，应优先使用该脚本，而不是再用 checkpoint 回放脚本重跑一遍 eval。
+
+### 同日补记：`rising_air` 当前仍是“近地上抬”软量，不等于真正离地上升
+
+在把 `seed3 @ 50k` 的 `episode_02` 轨迹直接渲染成 `mp4` 并与对应 `episode_csv` 对照后，又确认了一条需要明确记录的语义偏差：
+
+1. 当前日志中的 `rising_air` 非零，并不意味着 Hopper 已经肉眼可辨地真正离地；
+2. 该信号目前更接近“近地上抬趋势”，而不是“明确空中上升状态”。
+
+原因在于当前定义是软量：
+
+1. `grounded = clamp((CONTACT_MARGIN - z_min) / CONTACT_MARGIN, 0, 1)`
+2. `air = 1 - grounded`
+3. `rising_air = air * upward_progress`
+
+只要 `z_min` 处于近地带中间区间，`grounded` 与 `air` 就会同时为非零；若此时 `vz > 0`，即便 Hopper 仍有脚部或身体其他部分贴地，也会得到非零的 `rising_air`。
+
+这解释了为什么在 `episode_02` 的视频中没有看到明确离地跃起，但日志里仍出现了 `rising_air > 0`：当前信号描述的是“上抬倾向”，不是“已离地上升”。
+
+据此，后续应把 `rising_air` 视为待收紧项，而不是直接拿来等同于真正的空中上升。若后续继续修订状态信号，`rising_air` 的首要方向应是：
+
+1. 提高对离地程度的要求；
+2. 避免近地擦地上抬就被记为 `air`；
+3. 让名称与实际语义重新对齐。
+
+### 同日补记：`grounded_prepared` 的下一版方向改为“整足支撑 + 膝弯曲窗口 + 竖直稳定”，并暂不热改当前主线
+
+在继续核对 `seed1 @ 50k episode_05`、`seed3 @ 50k episode_02` 与高分 `td-mpc2 200k` 轨迹后，关于 `grounded_prepared` 的判断进一步收敛：
+
+1. 仅用 `low_body` 作为“已形成起跳准备”的核心依据过宽；
+2. `qpos_knee` 的量级更接近“是否真正形成压缩蓄力”；
+3. 但 `qpos_knee` 也不能用单调“越大越好”的门，因为塌陷/折叠姿态下膝角同样可能很大。
+
+当前几条代表性轨迹给出的量级对照为：
+
+1. `seed3 @ 50k episode_02`
+   - 当前被误记为 `grounded_prepared` 的片段，`qpos_knee ≈ 0.078 ~ 0.086`
+   - 肉眼观察下几乎谈不上“压缩起跳”
+2. `seed1 @ 50k episode_05`
+   - 前段短暂得分窗口，`qpos_knee ≈ 0.646 ~ 1.425`
+   - 已有一定弯曲，但仍偏浅，不足以稳定起跳
+3. 高分 `td-mpc2 200k` 对照
+   - `prepared / full_support` 相关片段，`qpos_knee` 常落在 `~1.2 ~ 1.8`
+   - 这更接近肉眼意义上的“压缩准备”
+4. `seed1 @ 50k episode_05` 的后期塌陷段
+   - `qpos_knee` 长期约 `2.63`
+   - 明显说明膝角不能用单调增强门
+
+据此，下一版 `grounded_prepared` 更合理的核心应改为：
+
+1. `full_foot_support`
+2. `knee_window`
+3. `vertical_settle`
+
+其中：
+
+1. `low_body` 从核心条件中移除，最多只保留为弱辅助项；
+2. `knee_window` 不再是单调 `sigmoid`，而应是以 `qpos_knee ≈ 1.5` 为中心的双边窗口；
+3. 一个初步经验口径是：
+   - `< 0.5` 基本不算准备
+   - `1.2 ~ 1.8` 更像合理压缩区
+   - `> 2.0` 需警惕塌陷/折叠
+
+之所以本轮暂不立即热改主线实现，是因为当前在线结构态仍是 8 维，不包含 `qpos_knee`。若要把该信号真正用于在线状态判定，需要把显式结构态从 `8` 维扩到 `9` 维，并同步调整模型形状与脚本配置。这会改变 checkpoint 兼容性，不宜在当前三种子 `200k` 长测进行中直接切入主线。
+
+因此，本轮先将该结论作为下一版设计决策记录，待当前长测告一段落后，再进入基于 `qpos_knee` 的结构态扩展与 `grounded_prepared` 重定义。
+
+### 同日补记：固化 `v4.28` 三种子 `200k` 长测启动脚本
+
+在确认当前 `5k smoke` 已不再暴露明显硬结构错误后，本轮继续按主线 `v4.28` 口径推进长预算验证。为避免再次手写长命令引入评估周期、保存开关或 latent 配置的不一致，新增固定脚本：
+
+1. `scripts/run_hopper_v428_200k.sh`
+
+该脚本与现有 `50k` 版本保持同一训练口径，仅固定如下差异：
+
+1. `steps=200000`
+2. `eval_freq=25000`
+3. `checkpoint_freq=25000`
+4. `eval_episodes=10`
+
+其余参数保持与当前 `v4.28` 主线一致，包括：
+
+1. `sd_struct_dim=8`
+2. `sd_latent_dim=512`
+3. `sd_reward_mode=curriculum`
+4. `save_full_state=true`
+
+因此，从这一节点起，若需重跑主线 `v4.28` 的三种子 `200k` 长测，应优先调用该脚本，而不再手写训练命令。
+
+### 同日补记：中断 `v4.28` 长测后，切入 `v4.29` 的 9 维结构态与膝窗口判据
+
+在确认 `v4.28` 的三种子 `200k` 长测不再继续后，本轮不再维持 checkpoint 兼容性约束，直接进入下一版主线修订。核心目标是把先前仅记录为“下一版方向”的 `qpos_knee` 判据真正落到在线结构态与规划奖励中，并同步修正调用链。
+
+#### 1. 结构态从 8 维扩到 9 维
+
+`sd_hopper` 的显式结构态已从：
+
+1. `[torso_z, vx, vz, pitch, pitch_rate, touch_toe, touch_heel, z_min]`
+
+扩展为：
+
+1. `[torso_z, vx, vz, pitch, pitch_rate, touch_toe, touch_heel, z_min, qpos_knee]`
+
+相应地：
+
+1. `DMControlHopperSDModel.STATE_DIM` 由 `8` 改为 `9`；
+2. `encode_observation()` 直接从原始观测中读取 `qpos_knee`；
+3. `project_state()` 对 `qpos_knee` 做显式裁剪；
+4. `external/tdmpc2/tdmpc2/config.yaml` 的默认 `sd_struct_dim` 同步改为 `9`；
+5. 训练、评估、轨迹导出、离线分析脚本都同步切换到 9 维口径。
+
+#### 2. `grounded_prepared` 正式改为“整足支撑 + 膝窗口 + 竖直稳定”
+
+本轮不再把 `low_body` 作为“已形成起跳准备”的核心条件。新的核心定义为：
+
+1. `full_foot_support`
+2. `knee_window`
+3. `vertical_settle`
+
+其中：
+
+1. `knee_window` 采用双边软窗口，而不是单调增强门；
+2. 当前窗口中心仍围绕 `qpos_knee ≈ 1.5`，但下边界采用更窄、略前移的软门，使 `~1.1` 附近可弱激活、`~0.8` 仍被压低；
+3. 经验口径对应为：
+   - `~1.1` 以下明显偏弱；
+   - `1.2 ~ 1.8` 为主要准备区；
+   - `> 2.0` 逐步衰减，避免把塌陷折叠误记为准备完成。
+
+实现上，新的 `grounded_prepared` 为：
+
+1. `grounded * full_foot_support * knee_window * vertical_settle`
+
+`low_body` 仍保留为辅助诊断特征，但不再参与该状态主判据。
+
+#### 3. 奖励塑形同步改为“支撑形成 + 膝窗口形成”
+
+四状态塑形中，`grounded_unprepared` 阶段的正向引导从：
+
+1. `full_foot_gain + low_body_gain`
+
+改为：
+
+1. `full_foot_gain + knee_window_gain`
+
+这样做的原因是：
+
+1. 当前主线最明确的问题不是“重心不够低”，而是“虽然近地，但尚未形成可起跳的腿部压缩状态”；
+2. 在 `qpos_knee` 已进入结构态后，继续用 `low_body` 作为主要塑形方向会重复放大奖励过宽的问题；
+3. `launch_reward` 与 `rising_reward` 保持原有极简口径，不在这一轮额外扩张状态图。
+
+#### 4. 膝角动力学只做最小显式建模
+
+本轮没有重新引入复杂 flow 网络，而是对 `qpos_knee` 只加入最小、可解释的显式动力学：
+
+1. 在稳定整足支撑且竖直速度较小的地面阶段，膝角向压缩目标靠拢；
+2. 在上升/离地阶段，膝角向更伸展的目标回退；
+3. 更细的误差与任务相关修正，继续交给外部 `512-dim residual` 与结构残差吸收。
+
+这样做的目的，是让显式 SD 只负责“判据需要的核心因果骨架”，而不再承担过细的姿态拟合任务。
+
+#### 5. 调用链与脚本同步
+
+为避免再次出现“主模型已改，但训练入口仍按旧维度启动”的不一致，本轮同步完成了以下调整：
+
+1. `external/tdmpc2/tdmpc2/trainer/online_trainer.py`
+   - 评估轨迹导出中加入 `qpos_knee`、`knee_window`、`vertical_settle`
+2. `scripts/export_hopper_eval_traces.py`
+   - 默认 `sd_struct_dim` 改为跟随 `DMControlHopperSDModel.STATE_DIM`
+   - 默认 `sd_latent_dim` 固定为 `512`
+3. `scripts/analyze_hopper_state_reward_sd_validation.py`
+   - 离线一阶一致性分析切换到 9 维 latent keys
+4. 新增主线启动脚本：
+   - `scripts/run_hopper_v429_5k_smoke.sh`
+   - `scripts/run_hopper_v429_50k.sh`
+   - `scripts/run_hopper_v429_200k.sh`
+5. 旧的 `v428` / `v4_5k_smoke` 入口脚本不再直接承载新口径，而是改为透明转发到 `v429` 主线，避免版本名与参数口径继续漂移。
+
+#### 6. 当前结论
+
+到这一节点为止，`v4.29` 的核心变化不是“增加更多奖励项”，而是：
+
+1. 让显式结构态真正包含了“起跳准备”所需的关键观测量；
+2. 把 `grounded_prepared` 从过宽的低重心代理，收缩为更符合物理直觉的“整足支撑 + 适度膝弯曲 + 竖直稳定”；
+3. 保持四状态奖励仍为弱引导，而不是重新走回复杂阶段链奖励。
+
+下一步应先做最小 smoke 验证，确认：
+
+1. 9 维结构态调用链可正常实例化与前向；
+2. `grounded_prepared` 不再把 `qpos_knee ≈ 0.08` 的片段误记为准备完成；
+3. 新导出的评估轨迹中，`qpos_knee / knee_window / vertical_settle` 已随 CSV 一起落盘。
+
+### 同日补记：修复 `grounded / air` 软互补冲突，并用旧轨迹做修复前后对照
+
+在 `grounded_prepared` 修正完成后，继续回到前面已确认的另一个结构冲突：当前 `air` 仍由 `1 - grounded` 定义，只要 `z_min` 落在近地软带中间，就会出现“仍在接触地面，但 `air` 与 `grounded` 同时非零”的情况，进而污染 `rising_air / falling_air`。
+
+本轮对该问题采取最小修复，不改状态图、不改主动力学，只改 `_state_reward_features()` 内的状态特征计算：
+
+1. `grounded` 不再只由 `z_min` 决定，而是改为：
+   - `grounded_geom`
+   - `grounded_contact`
+   - 二者取 `max`
+2. `air` 不再使用 `1 - grounded`，而是改为：
+   - `airborne_clearance`
+   - `contact_absent`
+   - 二者相乘
+
+这意味着：
+
+1. 近地且强接触的片段，会被稳定压回 `grounded`；
+2. 只有在离地间隙足够明显、且接触确实消失时，`air` 才会上升；
+3. `rising_air / falling_air` 不再把“擦地上抬”或“接触中的下压”误记为空中态。
+
+#### 修复前后对照样本
+
+本轮直接使用已有 `50k official_eval` 与高分 `td-mpc2` 轨迹，作为修复前后的同轨迹重算对照。
+
+主要反例：
+
+1. `seed3 @ 50k episode_07`
+2. `seed3 @ 50k episode_08`
+
+修复前，这两条轨迹中大量存在：
+
+1. `air > 0.1` 且 `grounded > 0.1`
+2. `rising_air > 0.05` 但 `max(touch_toe, touch_heel) > 0.5`
+3. `falling_air > 0.05` 但接触仍明显存在
+
+修复后，重算结果为：
+
+1. `seed3 episode_07`
+   - `both_count: 488 -> 0`
+   - `rising_contact_count: 173 -> 0`
+   - `falling_contact_count: 64 -> 0`
+2. `seed3 episode_08`
+   - `both_count: 490 -> 0`
+   - `rising_contact_count: 170 -> 0`
+   - `falling_contact_count: 65 -> 0`
+
+同时保留正例核查：
+
+1. 高分 `td-mpc2 episode_01`
+
+修复后：
+
+1. 仍保留真实空中段：
+   - `air_count_gt_05 = 137`
+   - `rising_count_gt_05 = 8`
+2. 且这些 `rising_air` 样本都满足：
+   - `grounded = 0`
+   - `contact = 0`
+   - `z_min ≈ 0.088 ~ 0.096`
+
+据此可以确认：
+
+1. 这次修复确实消除了“空中与着地同时成立”的主要污染源；
+2. 并未把高分 hop 里的真实空中上升段一并抹掉；
+3. 因此，后续 `5k smoke` 应以该修订后的状态口径继续推进，而不是再沿用旧的软互补定义。
+
+## 2026-04-23：将 Hopper 结构化塑形进一步收敛为“两条主状态迁移”，并以该口径重启三种子 `50k`
+
+在连续数轮 `10k` 强结构化短测后，已确认当前奖励设计中最关键的问题不是“状态定义整体错误”，而是“哪些跃迁应被直接奖励”。本轮围绕该问题完成了两步收敛。
+
+### 1. 先用 `td-mpc2` 高分轨迹反证 `prepared` 与 `launch` 的设计
+
+使用 `results/tdmpc2_hopper_200k_sameprotocol_20260422_062444_seed2/trace_probe_v428/episode_{00,01,02}.csv`，按当前主线最新 `SD` 状态口径重算高分 hop 轨迹，可得：
+
+1. `grounded_prepared` 在三条高分轨迹中都能被明显激活：
+   - `prepared_max ≈ 0.88 ~ 0.91`
+   - `full_foot_support max ≈ 0.997 ~ 0.998`
+   - `knee_window max ≈ 0.99`
+   - `vertical_settle max ≈ 0.99`
+2. 因此，“奖励进入 `prepared`”这一设计方向与真实高质量 hop 一致；
+3. 但若把 `launch_reward` 写成“`prev_grounded_prepared * next_air * upward_progress`”或“`prev_grounded_prepared * rising_gain`”，则三条高分轨迹上几乎完全不触发；
+4. 进一步离线对比多种候选式后，唯一同时满足以下两点的 `launch` 表达为：
+   - 在 `tdmpc2` 高分 hop 轨迹上稳定触发；
+   - 在本轮低预算三条地面推进代表轨迹上保持零触发；
+   即：
+   - `prev_grounded_prepared`
+   - 乘以 `positive(prev_grounded_prepared - next_grounded_prepared)`
+   - 再乘 `next_upward_progress`
+
+这表明：在 Hopper 上，“launch”更合理的语义不是“已经空中上升”，而是“已完成准备，随后开始卸载 `prepared` 并伴随向上速度出现”。
+
+### 2. 将结构化塑形正式收缩为两条主状态迁移
+
+基于上述反证，本轮将 `predict_shaping_reward()` 进一步收缩为只围绕两条主状态迁移：
+
+1. `grounded_unprepared -> grounded_prepared`
+2. `grounded_prepared -> launch`
+
+对应实现变更如下：
+
+1. 删除中间态与局部改良塑形：
+   - 删除 `falling_reward`
+   - 删除 `prepare_reward`
+   - 删除 `rising_reward`
+2. 保留并放大“进入 `prepared`”奖励：
+   - `prepared_reward = 0.24 * prepared_gain`
+3. 将 `launch_reward` 正式定为：
+   - `0.30 * prev_grounded_prepared * prepared_release * next_upward_progress`
+   其中：
+   - `prepared_release = positive(prev_grounded_prepared - next_grounded_prepared)`
+4. 保留全局弱惩罚：
+   - `0.04 * rotation_penalty`
+   - `0.015 * air * backward_speed`
+
+这样处理的目的只有一个：避免再奖励“未预备态附近的局部改良”或“尚未确认的中间态稳定”，而只奖励与闭环最直接对应的主状态跃迁。
+
+### 3. 版本口径更新
+
+为避免与前述 `v4.29` 多轮短测混淆，本轮将当前正式训练口径记为 `v4.30`。其定义为：
+
+1. 结构态保持 `9` 维：
+   - `rootz / vx / vz / pitch / pitch_rate / touch_toe / touch_heel / z_min / qpos_knee`
+2. 总 latent 保持：
+   - `sd_latent_dim = 512`
+3. 结构化塑形只保留两条主状态迁移：
+   - `prepared_reward`
+   - `launch_reward`
+4. `launch_reward` 采用经 `td-mpc2` 高分轨迹离线反证后的“prepared 卸载 + upward progress”写法
+
+### 4. 正式实验重启
+
+在完成上述收敛后，本轮直接重启三种子 `50k` 正式实验，统一口径如下：
+
+1. `steps = 50000`
+2. `eval_freq = 25000`
+3. `checkpoint_freq = 25000`
+4. `eval_episodes = 10`
+5. `save_full_state = true`
+6. 官方 `eval` 轨迹与 `.full.pt` 继续自动保存
+7. 三条运行分别固定到空闲 GPU 上并行执行
+
+本轮重点不再是继续在 `10k` 上比较分数高低，而是观察：
+
+1. `25k / 50k` 是否首次稳定出现非零 `grounded_prepared_frac`
+2. `launch_reward` 是否能把策略从“纯地面推进”进一步拉向真实起跳链
+3. 是否仍会被 `full_foot_support` 这一判据长期卡死
+
+## 2026-04-23：根据 `50k official_eval` 视频核验，收紧 `prepared` 与 `rising_air` 的状态语义
+
+在对 `v4.31` 三种子 `50k official_eval` 的保存轨迹逐条统计后，又将以下四条 `episode_csv` 直接回放为 `mp4`，并与人工观察结果对照：
+
+1. `seed3 episode_07`：`grounded_prepared` 误判样例；
+2. `seed3 episode_00`：`rising_air` 误判样例；
+3. `seed3 episode_02`：高分但非有效 hop 样例；
+4. `seed2 episode_07`：带少量 `rising_air` 但本质仍为伏地支撑前行的样例。
+
+视频核验后，可将问题进一步收敛为两条局部漏洞，而不需要扩大为复杂的新奖励机制：
+
+### 1. `grounded_prepared` 需要排除“后仰躺平”
+
+`seed3 episode_07` 证明，后仰躺平状态仍可能同时满足：
+
+1. 整足接触；
+2. 膝部进入准备窗口；
+3. 竖直速度接近零。
+
+原判据：
+
+1. `grounded_prepared = grounded * full_foot_support * knee_window * vertical_settle`
+
+缺少姿态门控，因此会把“后仰躺平但暂时稳定”的状态误记为“可起跳准备态”。
+
+据此，本轮仅增加一个最小修补：
+
+1. 在 `grounded_prepared` 中加入“非后仰躺平”软门；
+2. 不额外扩大到前倾、翻滚等其他姿态，以保持判据最小化。
+
+### 2. `rising_air` 需要改为“明确离地且明确向上”
+
+`seed3 episode_00` 与 `seed2 episode_07` 说明，当前 `rising_air` 会把：
+
+1. 刚落地后的轻微反弹；
+2. 伏地爬行过程中的局部上抬；
+
+误记为上升态。
+
+原判据：
+
+1. `rising_air = air * upward_progress`
+
+其中 `air` 仍允许近地软量非零，因此只要出现少量向上速度，就会被点亮。
+
+据此，本轮将 `rising_air` 收紧为同时要求：
+
+1. 足部接触基本消失；
+2. 身体整体高度达到更高的离地阈值；
+3. `vz` 超过明确向上阈值。
+
+这样做的目的，是把 `rising_air` 从“近地上抬趋势”收紧为“已经明确离地且仍在上升”。
+
+### 3. 对当前非零分的重新定性
+
+视频观察同时表明：
+
+1. `seed3 episode_02` 的正分并非来自有效 hop，也并非稳定近地推进，而是“前倾扑倒后蜷缩”的无效姿态；
+2. `seed1` 对应正分样例与其表现接近；
+3. `seed2 episode_07` 虽有更长位移，但核心行为仍依靠前掌、膝盖、鼻尖支撑下的伏地前行。
+
+因此，当前 `50k` 的非零分仍不能视为已学到目标行为链；本轮修订的目的不是“堵住所有非目标运动”，而是先把两个关键状态标签的语义收紧，使后续奖励引导不再被明显误标污染。
+
+## 2026-04-24：修复 `resume_from final.full.pt` 后首轮训练的 episode 记账 bug
+
+在将 `v4.32` 的三种子 `50k` 结果继续接续到 `200k` 时，三条作业都成功从 `final.full.pt` 恢复到了：
+
+1. `step=50001`
+2. `episode=100`
+3. replay buffer 已恢复
+
+但训练循环在恢复后的首轮立即报错：
+
+1. `UnboundLocalError: local variable 'info' referenced before assignment`
+
+定位到 `external/tdmpc2/tdmpc2/trainer/online_trainer.py` 的主循环后，可知问题原因如下：
+
+1. `train()` 初始化时固定令 `done=True`，以便冷启动时先 `reset()` 再开始新 episode；
+2. 恢复训练后，循环同样会先进入 `if done:` 分支；
+3. 但此时尚未执行新的 `env.step()`，因此当前 episode 的 `info` 尚不存在；
+4. 原代码却直接把该分支当成“刚结束了一局”，访问 `info['terminated'] / info['success']` 并尝试写入上一局日志，遂触发未定义变量错误。
+
+本轮修复口径为：
+
+1. 显式引入 `last_info` 保存最近一次 `env.step()` 返回的 episode 终止信息；
+2. 仅在 `last_info is not None` 且 `_tds` 中确实已有完整 episode 片段时，才记录上一局并写入 replay buffer；
+3. 在 `reset()` 后清空 `last_info`。
+
+这样处理后：
+
+1. 冷启动路径不受影响；
+2. `resume_from` 后不会把“尚未开始的新一局”误记成已结束 episode；
+3. 接续训练可从 `50001` 正常推进。
+
+## 2026-04-24：将结构化奖励接入 reward 监督主通道
+
+在继续复盘 `v4.32` 的 `50k official_eval` 后，可以更明确地确认当前主矛盾不在于是否还要继续设计更复杂的阶段奖励，而在于现有这套已经收敛到较简洁、较可靠语义的结构化奖励，并未真正进入参数学习主通道。
+
+此前代码路径为：
+
+1. 规划阶段，`SDWorldModel.reward()` 在非训练态会把 `predict_shaping_reward()` 以 `hybrid/curriculum` 形式叠加到 learned reward 上；
+2. 训练阶段，`SDWorldModel.reward()` 在 `self.training=True` 时直接返回 learned reward logits；
+3. `TDMPC2._update()` 的 `reward_loss` 监督目标始终来自 replay buffer 中的环境真实奖励。
+
+这意味着结构化奖励此前主要影响的是规划排序，而不是 reward head 的监督信号本身。若规划时被结构化奖励吸引到的状态，无法在 reward head 中同步形成偏好，则该引导在参数更新链路中会持续被稀释。
+
+基于“尽量不改结构”的约束，本轮采用最小修订：
+
+1. 不改网络骨架，不新增 reward head；
+2. 不改 TD target，仍保持 value 学习以环境真实奖励为主；
+3. 仅将 reward 监督目标改为混合目标：
+   `reward_target = env_reward + alpha * shaping_delta`
+4. 其中 `alpha` 直接复用现有 `hybrid/curriculum` 口径，不再额外引入新的独立调度超参数。
+
+对应代码实现为：
+
+1. 在 `external/tdmpc2/tdmpc2/common/sd_world_model.py` 中新增 `shaping_reward()` 与 `mixed_reward_target()`；
+2. 在 `external/tdmpc2/tdmpc2/tdmpc2.py` 中，将 `reward_loss` 的监督目标从 `reward` 切换为 `reward_target`；
+3. 同步记录 `reward_mix_alpha`、`reward_shaping_mean/std` 与 `reward_target_mean/std`，便于后续判断混合监督是否实际生效。
+
+本轮设计意图不是让结构化奖励取代环境奖励，而是让其以小幅 shaping 增量进入 reward 学习主通道，使规划、reward head 与后续策略学习之间不再长期脱节。
+
+## 2026-04-24：将 `prepared` 的姿态门从“排除后仰”改为“要求近直立”
+
+在 `v433` 单种子 `5k` smoke 中，虽然 `grounded_prepared` 已开始在少量轨迹里短暂出现，但对 `episode_03` 与 `episode_07` 的逐帧回放表明，这两个峰值仍不是希望中的“可起跳预备态”：
+
+1. 双足接触与屈膝条件确已满足；
+2. 但躯干主体仍明显偏离直立，属于落地后的短暂压缩接触，而非可稳定释放的起跳准备姿态；
+3. 原有补丁只是在 `prepared` 中排除了更极端的后仰躺平，因此对 `pitch ≈ -1.0` 一类仍显著偏斜、但尚未达到“完全躺平”程度的姿态仍会漏过。
+
+据此，本轮不再使用“只排除后仰”的门控，而将 `prepared` 的姿态条件直接改写为“要求 `pitch` 接近竖直”：
+
+1. 删除原 `non_reclined = sigmoid((pitch - center) / scale)` 逻辑；
+2. 改为 `upright_posture = sigmoid((pitch_max - abs(pitch)) / scale)`；
+3. `grounded_prepared` 仅在双足支撑、屈膝、竖直速度已沉降且躯干姿态仍接近直立时点亮。
+
+这样做的目的，是把 `prepared` 的定义从“不是很后仰就行”收紧为“本质上仍是近直立的着地压缩态”，从而更贴近起跳前的物理含义。
+
+## 2026-04-25：核对 Hopper 原始观测口径后，修复 `any_contact_z / height / reward / trace analysis` 四处实现错误
+
+在重新逐项核对 Hopper 原始 `15` 维观测后，已确认当前主线中有若干处“不是奖励思想本身，而是实现口径漂移”导致的误判。这些问题若不先修复，后续对 `SD` 与结构化奖励的讨论会持续混入假信号。
+
+### 1. 原始观测口径再次确认
+
+`dm_control.suite.hopper` 的 state 观测保持如下结构：
+
+1. `position = qpos[1:] = [rootz, rooty, waist, hip, knee, ankle]`
+2. `velocity = qvel = [rootx_dot, rootz_dot, rooty_dot, waist_dot, hip_dot, knee_dot, ankle_dot]`
+3. `touch = log1p(sensor)`，其中两维分别对应 toe 与 heel 触地传感器
+
+其中，`rooty` 是躯干俯仰角，不是位置量；latent 第 `0` 维在 `encode_observation()` 中存储的是 `torso_z = 1 + qpos_rootz`，不是 `qpos_rootz` 本身。
+
+### 2. 已修复的实现错误
+
+本轮共修复四类实现错误：
+
+1. `z_min` 语义过载
+   - 旧实现把单一 `z_min` 同时拿来表示“足部接地相关最低点”与“任意部位触地”。
+   - 现改为：latent 内的 `z_min` 专指足部接地相关最低点；状态判定时额外引入 `any_contact_z`，由 `foot_contact_z / torso_lower_z / nose_lower_z` 取最小值得到。
+
+2. `height` 代理错误
+   - 旧实现实际上把 `height` 近似成了 `torso_z`，与 `dm_control` 中 `torso_z - foot_z(body origin)` 的定义不一致。
+   - 现改为基于 latent 内 `torso_z` 与 `foot_contact_z` 的近似形式重新计算。
+
+3. reward double shaping
+   - 训练阶段 `mixed_reward_target()` 已将 `env_reward + alpha * shaping` 作为 reward head 监督目标；
+   - 但规划/评估阶段 `SDWorldModel.reward()` 又把 shaping 再叠加了一次。
+   - 现已改为：`explicit` 模式仍直接使用显式 reward；`hybrid/curriculum` 模式在规划与评估时仅返回 learned reward head，不再二次叠加 shaping。
+
+4. trace 导出与离线分析口径错误
+   - `_state_reward_features()` 先前把 `torso_z` 与 `rootz` 导出成同一个值，导致 eval CSV 与 summary 中字段语义混乱；
+   - `analyze_hopper_state_reward_sd_validation.py` 又直接复用这些旧 `SD` 列做回算，等于把历史污染继续带入新分析。
+   - 现已改为：
+     - `torso_z` 输出真实 latent 第 `0` 维；
+     - `rootz = torso_z - 1.0`；
+     - `official_eval` 导出额外保存 `any_contact_z`；
+     - 离线分析脚本优先从 CSV 中的 `qpos / qvel / touch` 重建原始观测，再用当前 `SD` 重新编码与判态。
+
+### 3. 修复后的离线验证结果
+
+#### 3.1 `seed1 @ 50k episode_02` 的“全程 falling_air”误判已被消除
+
+对
+
+`logs/hopper-hop/1/sd_hopper_50000_v444_seed1_20260424_run1/official_eval/step_0050000/episode_csv/episode_02.csv`
+
+按当前模型、从原始 `qpos/qvel/touch` 重新编码后回算，可得：
+
+1. `falling_air` 仅约 `10` 步
+2. `grounded_failed` 约 `490` 步
+3. 不再出现“整条轨迹 `500` 步都被判为空中态”的现象
+
+这说明：`any_contact_z` 的引入确实修复了“鼻尖或躯干已贴地，但仍被按 `z_min` 当作空中”的核心误判。
+
+#### 3.2 `td-mpc2 200k` 高分标准 hop 轨迹仍暴露出新的瓶颈
+
+对
+
+`results/tdmpc2_hopper_200k_sameprotocol_20260422_062444_seed2/trace_probe_v428`
+
+用同样方式回算后，可得：
+
+1. `grounded_failed` 仍占大头，约 `0.83`
+2. `grounded_recovery` 非零，约 `0.046`
+3. `grounded_prepared` 只剩极少数峰值，约 `0.0007`
+4. `rising_air` 也几乎不再出现
+
+进一步拆 `prepared` 子门后，可见当前最主要的卡点不是足部支撑，也不是膝角窗口，而是 `vertical_settle`：
+
+1. 在 `grounded_recovery > 0.3` 的高分 hop 片段中，`full_foot_support` 平均约 `0.97`
+2. `knee_window` 也经常已进入较高区间
+3. 但 `vertical_settle` 平均仅约 `0.01`
+4. 对应帧上 `vz` 往往仍显著为正，约 `1.1 ~ 1.6`
+
+这意味着：当前 `prepared` 对“竖直速度必须已沉降”的要求仍然过严，会把标准 hop 中“已形成较完整支撑、但已开始快速上推”的阶段继续挡在 `prepared` 外。换言之，前一轮修复虽然解决了 `z_min/any_contact_z` 的错误，但 `prepared / rising_air` 的最终口径仍需再单独收敛。
+
+### 4. 当前结论
+
+截至本轮，已可较确定地区分两类问题：
+
+1. `episode_02` 一类“整条轨迹被误判为空中”的结论，属于实现错误，现已修复；
+2. `prepared / rising_air` 在高分标准 hop 上过少，则不是旧结论的简单延续，而是当前新口径下仍然存在的真实设计瓶颈，下一轮应直接围绕 `vertical_settle` 与起跳窗口的定义继续复核。
+
+## 2026-04-25：将 `prepared` 的竖直速度门改为非对称窗口，并阻断 `foot z_min` 对 airborne 判定的误主导
+
+在上一条补记完成后，继续用
+
+`results/tdmpc2_hopper_200k_sameprotocol_20260422_062444_seed2/trace_probe_v428`
+
+拆分标准 hop 轨迹的子门分布，可进一步确认两个更具体的问题：
+
+### 1. `prepared` 的主要卡点确实是旧版 `vertical_settle`
+
+对满足以下条件的“明显处于标准支撑/发力窗口”的高分 hop 帧做统计：
+
+1. `grounded > 0.8`
+2. `full_foot_support > 0.8`
+3. `knee_window > 0.6`
+4. `pitch ∈ [-0.05, 1.15]`
+
+可得：
+
+1. `vz` 中位数约 `0.70`
+2. `vz` 的 `q75` 约 `0.96`
+3. `vz` 的 `q90` 约 `1.28`
+4. 但旧 `vertical_settle = clamp((0.40 - |vz|)/0.40)` 在这些帧上几乎恒为 `0`
+
+这说明：标准 hop 的“准备/发力”阶段并不要求 `vz ≈ 0`。在稳定整足支撑与屈膝之后，很多优质轨迹会在仍未离地时就进入明显正 `vz` 的上推阶段。旧版 `vertical_settle` 实际上把这整个窗口都挡在 `prepared` 之外。
+
+据此，本轮将 `prepared` 的竖直速度门从“绝对值接近零”改为非对称窗口：
+
+1. 允许适度下压，但排除高速砸地
+2. 允许中等幅度的正 `vz`，覆盖真实起跳前的发力阶段
+3. 具体实现改为对 `vz` 使用软区间门，而不再使用 `abs(vz)` 的对称惩罚
+
+### 2. `rising_air` 不亮的根因不只是阈值过高，而是 `any_contact_z` 被 `foot z_min` 错误主导
+
+进一步检查高分 hop 的真实飞行帧时，发现许多满足下列条件的帧：
+
+1. `touch_toe ≈ 0`
+2. `touch_heel ≈ 0`
+3. `vz > 0.4`
+4. 环境 reward 已明显为正
+
+却仍被当前 `SD` 判为 grounded。追查后可知，问题并不在 `rising_air` 的速度门，而在：
+
+1. `any_contact_z` 旧实现直接取 `min(foot_contact_z, torso_lower_z, nose_lower_z)`
+2. 即使传感器完全没有足部接触，脚部几何只要靠近地面，`foot_contact_z` 仍会把 `any_contact_z` 压到接近 `0`
+3. 结果导致很多真实 airborne 帧被 `grounded_geom` 误吸回 grounded
+
+据此，本轮对 `any_contact_z` 做一处最小但关键的语义修正：
+
+1. `foot_contact_z` 只在 `support_contact` 达到一定水平时才参与 `any_contact_z`
+2. 若足部触地传感器基本为零，则 `any_contact_z` 只由 `torso_lower_z / nose_lower_z` 决定
+3. 这样既保留了“鼻尖/躯干触地时仍能识别 grounded_failed”的能力，又避免“脚部扫地式几何接近”把真实飞行误判成 grounded
+
+### 3. 修订后的离线回算结果
+
+按新口径重算高分 hop 轨迹，可得：
+
+1. `falling_air ≈ 0.411`
+2. `grounded_failed ≈ 0.289`
+3. `grounded_recovery ≈ 0.031`
+4. `grounded_prepared ≈ 0.061`
+5. `rising_air ≈ 0.208`
+
+相比上一轮：
+
+1. `prepared` 已从几乎不可见恢复到稳定非零；
+2. `rising_air` 也重新出现，且占比已进入明显可解释区间；
+3. 主导转移重新包含：
+   - `grounded_failed -> grounded_prepared`
+   - `grounded_recovery -> rising_air`
+   - `rising_air -> falling_air`
+
+这说明：本轮两项修订确实把标准 hop 所依赖的“支撑准备 -> 起跳离地 -> 空中飞行”主链重新拉回来了。
+
+### 4. 失败轨迹未被重新污染
+
+同样按新口径重算
+
+`logs/hopper-hop/1/sd_hopper_50000_v444_seed1_20260424_run1/official_eval/step_0050000/episode_csv`
+
+可得：
+
+1. `grounded_failed ≈ 0.968`
+2. `falling_air ≈ 0.032`
+3. `grounded_recovery / grounded_prepared / rising_air` 仍均为 `0`
+
+`episode_02` 仍保持：
+
+1. `falling_air ≈ 10` 步
+2. `grounded_failed ≈ 490` 步
+
+说明这次修订没有重新引入“失败轨迹被大面积误记为 prepared/rising”或“整条轨迹回退为空中态”的问题。
+
+### 5. 当前结论
+
+截至本轮，可形成更稳定的判断：
+
+1. `z_min / any_contact_z` 主链已基本修顺；
+2. `prepared` 的旧瓶颈确实主要在竖直速度门过严，而不是足部支撑或膝角窗口本身；
+3. `rising_air` 的旧瓶颈则主要在 `any_contact_z` 误把“脚部近地”当作“任意部位已接地”；
+4. 这两处修复后，标准 hop 的主状态链已重新可见，下一步可以在此基础上继续观察真实训练是否开始更容易进入这条链，而不必再回到更复杂的状态机扩张。
+
+### 同日更正：上述判据热改已撤回，不作为当前主线版本结论
+
+在与研究目标再次对齐后，已确认本条记录中的这轮 `prepared / rising_air / any_contact_z` 判据热改未经用户逐项审核，不应直接进入当前主线结论。对应代码修改已于同日撤回。
+
+因此，当前主线仍以前一版本为准，并保留如下判断：
+
+1. `double shaping`、离线分析脚本口径、`torso_z/rootz` 字段语义修正仍成立；
+2. 本条中关于“通过直接改判据已恢复标准 hop 主链”的结论不再成立；
+3. 后续若继续修改 `prepared / rising_air / grounded_failed` 的状态定义，需先基于高分轨迹逐项审核判据，再落代码。
+
+## 2026-04-24：在保持 `alpha` 不变的前提下放大 `prepared_reward`
+
+在将 `prepared` 的姿态语义收紧后，`10k` 评估轨迹显示：
+
+1. 旧的 `prepared` 假阳性基本被清掉；
+2. 但 `grounded_prepared` 与 `rising_air` 也都未再真正出现；
+3. 唯一非零分 episode 仍来自非目标路径，而不是 `grounded_unprepared -> grounded_prepared -> rising_air` 这条主链。
+
+基于这一结果，本轮不继续放大外层混合系数 `alpha`。原因是：
+
+1. 当前训练阶段的 `alpha` 在 `10k` 前一直维持 `0.5`，已不算很弱；
+2. 规划时仍会额外使用结构化 shaping，若继续抬高外层混合，容易进一步放大训练与规划之间的偏置；
+3. 当前暴露出的核心矛盾，不是“已经进入 prepared 但起跳不够强”，而是“策略仍较少进入 prepared”。
+
+因此，本轮仅做一个最小且有针对性的改动：
+
+1. 保持 `LAUNCH_REWARD_WEIGHT = 0.45` 不变；
+2. 保持惩罚项不变；
+3. 将 `PREPARED_REWARD_WEIGHT` 从 `0.24` 提高到 `0.48`。
+
+这样做的意图，是只增强 `grounded_unprepared -> grounded_prepared` 这一状态迁移的吸引，而不改变“prepared 之后再奖励真实 upward progress”这一总体逻辑。若后续轨迹中开始出现更干净的 `prepared` 片段，则说明当前瓶颈主要确实在于“进入准备态”的吸引仍偏弱。
+
+## 2026-04-24：在 `prepared` 前加入 `grounded_recovery` 中间态
+
+在继续复核高分轨迹后，问题进一步明确：当前很多能拿到环境真实奖励的轨迹，并不是通过
+
+`grounded_unprepared -> grounded_prepared -> rising_air`
+
+这条链达成，而是直接在低姿或单侧支撑模式下进入上升/前移。与此同时，前一轮把 `prepared` 的姿态门收紧到“近直立”之后，旧的假阳性虽被压掉，但 `prepared` 也变得更难进入。
+
+这说明，当前主矛盾不是 `launch_reward` 不够，而是从杂乱 grounded 姿态回到“可准备”的站起过程缺少一个显式中间层。为此，本轮在不增加复杂状态机的前提下，引入一个最小中间态：
+
+1. 新增 `grounded_recovery`
+   - 已着地；
+   - 竖直速度已沉降；
+   - 足部支撑比单侧/尖点支撑更完整；
+   - `|pitch|` 已明显回正，但尚不要求进入 `prepared` 的屈膝窗口。
+
+2. 结构化奖励链改为：
+   `grounded_unprepared -> grounded_recovery -> grounded_prepared -> rising_air`
+
+3. 奖励接线调整为：
+   - 新增 `recovery_reward`，奖励进入 `grounded_recovery`；
+   - `prepared_reward` 只在 recovery 邻域中继续给出；
+   - `launch_reward` 保持原有逻辑。
+
+4. 为保证后续诊断一致，`grounded_recovery` 也同步写入官方 eval 的轨迹 CSV 与 episode summary。
+
+这样做的目的，是显式鼓励“先站起来/回正，再准备，再起跳”这一更符合物理直觉的顺序，同时仍保持奖励设计简洁、可解释。
+
+## 2026-04-24：将 `prepared` 修订为非对称姿态窗口，先对齐标准 hop
+
+在加入 `grounded_recovery` 后，继续用 `td-mpc2` 的高分标准 hop 轨迹做离线回算时，发现 `prepared` 仍几乎不会点亮。进一步逐条检查后，可以把问题收敛到一个更具体的判据错误：
+
+1. 旧的 `prepared` 姿态门基于 `abs(pitch)`，本质上把前倾与后仰对称看待；
+2. 但标准 hop 的真实“起跳预备态”并不接近 `pitch = 0`，而是常出现在中等幅度前倾；
+3. 相反，之前在 `v433 5k` 中确认的假阳性，恰恰集中在后仰躺地、但足底偶然完整着地的时刻。
+
+离线重算得到的关键证据如下：
+
+1. `td-mpc2` 高分轨迹的 `prepared` 候选峰值出现在 `pitch ≈ 0.95 ~ 1.11`；
+2. 旧假阳性轨迹的峰值则在 `pitch ≈ -1.03 / -1.15`；
+3. 因而 `prepared` 不能再使用对称的 `abs(pitch)` 门，而应允许较宽的前倾窗口，同时对后仰侧保持明显更严的限制。
+
+据此，本轮将 `prepared` 改为非对称 corridor：
+
+1. 删除基于 `abs(pitch)` 的对称 upright 门；
+2. 新增 `PREPARED_BACK_PITCH_LOW = -0.15`、`PREPARED_FORWARD_PITCH_HIGH = 1.05`；
+3. `grounded_prepared` 改为
+   `grounded * full_foot_support * knee_window * vertical_settle * prepared_pitch_corridor`；
+4. 暂不再要求 `grounded_prepared` 必须乘 `grounded_recovery`，先保证标准 hop 自身能够被正确识别。
+
+修订后的离线验证结果如下：
+
+1. 标准 `td-mpc2` hop 轨迹中，`prepared` 峰值已提升到 `0.37 ~ 0.60`；
+2. 先前两条 `v433` 躺地假阳性轨迹中，`prepared` 峰值仍仅为 `0.0001` 与 `0.0`；
+3. 这说明当前 `prepared` 已基本满足“标准 hop 可激活、后仰躺地不过门”这一最优先要求。
+
+这一轮先到此为止。`unprepared` 与 `recovery` 是否还需调整，留待后续在新判据基础上再单独评估，避免多个因素同时变动而混淆因果。
+
+## 2026-04-24：清理 `recovery / rising_air / imagined support` 中多余的软化项
+
+在继续回看 `v435 10k` 的逐帧轨迹后，问题进一步从“状态定义是否大致正确”收敛到“哪些地方仍存在不必要的软化，从而破坏状态前提语义”。
+
+本轮系统检查后，形成了三条最小修订结论：
+
+1. `recovery` 中不应再保留额外的 `recovery_support = sigmoid((full_foot_support - c) / s)`；
+2. `rising_air` 不能只依赖“足部无接触 + 高度 + 向上速度”，还必须以真正离地的 `air` 为前提；
+3. imagined dynamics 中原先把同一个 `support_hold` 同时加到 `toe` 与 `heel` 上，存在把单侧支撑“抹平”为双侧支撑的风险。
+
+对应代码修订如下：
+
+1. `grounded_recovery` 改为
+   `grounded * full_foot_support * recovery_upright * vertical_settle`
+   不再套额外的 `recovery_support` sigmoid；
+2. `rising_air` 改为
+   `air * height_strict * upward_strict`
+   显式要求已有真正离地状态；
+3. dynamics 中将共享的 `support_hold` 拆成 `toe_support_hold` 与 `heel_support_hold`，仅延续各自原有支撑，不再凭空补齐另一侧接触。
+
+这样调整的理由是：
+
+1. `full_foot_support` 本身已经是直接、清晰的“整足支撑”代理量，不应再额外包一层人为阈值；
+2. `rising_air` 的前提应是“身体已离地”，而不是“脚没碰地但其他部位可能仍在支撑”；
+3. SD 前向推演允许适度平滑，但不应靠共享保留项虚构出原本不存在的双侧支撑。
+
+本轮不改 `prepared` 主干定义，也不再额外增加新的状态或复杂门控，保持修订范围最小。后续重点转为：在更干净的状态语义下，再判断是否需要继续增强奖励吸引。
+
+## 2026-04-24：将 grounded 三态改为互斥高层状态
+
+在用新判据回看 `v435` 的 `5k official_eval` 时，出现了一个新的概念性问题：少量步上 `grounded_recovery` 与 `grounded_prepared` 会同时为正。虽然底层代理量本来就允许连续重叠，但若奖励链被明确设计为
+
+`grounded_unprepared -> grounded_recovery -> grounded_prepared -> rising_air`
+
+则高层阶段状态本身不应长期重叠，否则会造成两类歧义：
+
+1. 同一步既被解释为“仍在恢复”，又被解释为“已经完成起跳预备”，状态顺序失去意义；
+2. `recovery_gain` 与 `prepared_gain` 会在同一步共同抬升，削弱“先恢复、再准备”的阶段信号。
+
+据此，本轮保留了连续代理量，但将 grounded 三态改为互斥高层状态：
+
+1. 先计算连续代理量 `recovery_candidate` 与 `prepared_candidate`；
+2. 若 `prepared_candidate >= 0.5`，则该步判为 `grounded_prepared`；
+3. 否则，若 `recovery_candidate >= 0.5`，则该步判为 `grounded_recovery`；
+4. 两者都未满足时，剩余 grounded 质量归入 `grounded_unprepared`。
+
+这样做的意图是：
+
+1. 底层支撑、屈膝、姿态等代理量仍保留连续信息；
+2. 但用于奖励设计与轨迹解释的高层阶段标签，重新回到互斥状态图口径。
+
+离线验证结果表明，该修订已达到预期：
+
+1. 在 `v435` 的 `episode_01` 与 `episode_03` 中，先前会同时出现的 `prepared/recovery` 已被消除；
+2. 两条轨迹里 `prepared > 0.1` 的步数仍分别保留为 `5` 与 `4`；
+3. 同时 `overlap_pos = 0`，说明高层 grounded 三态已满足互斥要求。
+
+## 2026-04-24：仅增强 `recovery -> prepared` 跃迁奖励，不改状态图
+
+在完成最近一轮 `v436 10k` smoke 逐帧复核后，当前问题已进一步收敛：状态标签本身已基本清理干净，主要矛盾不再是“状态错判”，而是“奖励吸引不足以把策略从 `grounded_recovery` 拉向 `grounded_prepared`”。
+
+这一判断基于以下现象：
+
+1. `recovery` 在少量步上已能被可靠点亮；
+2. `prepared` 在标准 hop 轨迹上可激活，但在当前 `10k` smoke 中几乎没有真正进入；
+3. `rising_air` 的误亮已基本消失，因此继续大改状态定义的收益已明显下降。
+
+据此，本轮不再修改状态判据，也不新增新的代理量，而是只在 shaping reward 中补一条最小跃迁奖励：
+
+1. 保留原有 `recovery_gain`；
+2. 保留原有 `prepared_gain`；
+3. 保留原有 `launch_reward`；
+4. 仅额外加入
+   `recovery_to_prepared_reward = w * prev_grounded_recovery * prepared_gain`。
+
+这样做的理由是：
+
+1. 奖励仍严格围绕既有高层状态图，不引入新的状态复杂度；
+2. 重点强化的是当前最缺失的一步跃迁，而不是笼统放大奖励总量；
+3. 若后续 `prepared` 首次稳定出现，则可以较清楚地归因于这一项修订。
+
+本轮对应常量设为 `RECOVERY_TO_PREPARED_REWARD_WEIGHT = 0.72`，暂不调整 `launch_reward` 与惩罚项，先做最小干预验证。
+
+## 2026-04-24：将两类明显失稳姿态转化为 planning-only 动作先验
+
+在 `v437 10k` smoke 结束后，轨迹复核表明：问题已不再主要是奖励接线，而是策略根本没有先学会从两类典型失稳姿态中恢复。
+
+`10k official_eval` 中最常见的失败模式可概括为两类：
+
+1. 后仰躺地：`grounded≈1`、`full_foot_support≈1`，但 `pitch≈-1.9~-2.1`；
+2. 前伏趴地：`grounded≈1`、`pitch≈+1.8~+2.3`，但 `full_foot_support≈0`。
+
+这说明当前“恢复”并不是一个应完全交给黑盒探索的子任务。既然这一步的基本力矩方向已经可由结构知识给出，就应将其显式编码为状态条件动作先验，而不是继续让策略在明显错误的动作方向上浪费样本。
+
+本轮先未直接写规则控制器，而是先做了两层动作符号标定：
+
+1. SD 一步/多步 probe，用于快速筛查；
+2. 真实 DMControl 环境 probe，用轨迹中的 `qpos/qvel` 复原物理状态，再对单关节常值动作做短 rollout。
+
+真实环境 probe 的代表性结果如下：
+
+1. 对后仰躺地状态，`waist-` 是唯一稳定把 `|pitch|` 往回拉的主方向；其余方向大多要么继续加重后仰，要么直接丢失整足支撑；
+2. 对前伏趴地状态，`waist+`、`hip-`、`knee+`、`ankle-` 形成更合理的回正方向组合；与之相反的符号则普遍导致 `pitch` 进一步远离目标姿态。
+
+据此，本轮采用了最保守的落地方式：
+
+1. 仅在 planning 端施加动作先验；
+2. 不修改 actor 输出；
+3. 不手写唯一动作，只收缩每个关节的允许力矩区间；
+4. 仅在两类显然失稳的状态下激活，正常状态仍保持原有自由规划。
+
+当前第一版动作先验定义如下：
+
+1. `rear_lying`：
+   `grounded>=0.8 & full_foot_support>=0.6 & pitch<=-1.5`
+   对应约束
+   `waist∈[-0.90,-0.15]`
+   `hip/knee/ankle∈[-0.35,0.25]`
+2. `prone_lying`：
+   `grounded>=0.8 & full_foot_support<=0.2 & pitch>=1.5`
+   对应约束
+   `waist∈[0.20,0.90]`
+   `hip∈[-0.70,0.10]`
+   `knee∈[0.10,0.90]`
+   `ankle∈[-0.50,0.25]`
+
+这一设计的意图是：
+
+1. 将“明显已知”的恢复方向从学习负担中剥离出来；
+2. 保留区间内的幅值与时序优化空间，避免退化为手写控制器；
+3. 用最小结构干预验证：状态条件动作先验是否能够比单纯奖励塑形更有效地把策略拉回可恢复区域。
+
+## 2026-04-24：新增 Hopper 实验操作总指南，统一固定启动与渲染口径
+
+在近期多轮 Hopper 实验推进中，反复出现的一个非方法学问题是：同一类操作虽然已有稳定口径，但命令散落在不同脚本、工作日志片段与对话上下文中，导致启动训练、检查进度、渲染轨迹时容易再次回到“临时回忆与试错”状态。
+
+为避免后续继续在重复性操作上消耗时间，本轮新增统一操作手册：
+
+1. [HOPPER_EXPERIMENT_OPERATIONS_GUIDE.md](/home/data/round/code/sd_world_model_rl/docs/HOPPER_EXPERIMENT_OPERATIONS_GUIDE.md)
+
+该文件当前固定了以下内容：
+
+1. `5k / 10k / 50k / 200k` Hopper 实验应使用的脚本与参数口径；
+2. 启动后应检查的最小集合：
+   `train.csv`、`2500.full.pt`、`eval.csv`、`official_eval`；
+3. 已保存 `trace csv -> mp4` 的稳定渲染命令；
+4. `checkpoint -> replay eval -> mp4` 与 `checkpoint -> trace csv` 的脚本入口；
+5. 在 Codex 沙箱环境下，哪些命令通常必须申请提权；
+6. 已反复踩过的错误点列表。
+
+后续原则改为：
+
+1. Hopper 相关重复性操作优先以该指南为准；
+2. 若有新的稳定口径，应先更新该文件，再在对话中使用；
+3. 不再依赖零散上下文记忆保存实验操作流程。
+
+## 2026-04-24：将固定恢复动作盒子改为“参考姿态驱动”的误差缩放先验
+
+在继续复核 `v438` 的恢复失败轨迹后，当前判断进一步收敛：问题不在于是否还要继续细分更多奖励阶段，而在于已有动作先验仍然过于静态。固定盒子虽然能限制明显错误的动作方向，但无法表达“偏离标准姿态越远，允许的恢复力度应越大；越接近标准姿态，范围应自然收窄”这一结构事实。
+
+因此，本轮不再维持：
+
+1. `rear_lying` 一组固定上下界；
+2. `prone_lying` 一组固定上下界。
+
+而是改为：
+
+1. 先固定标准 hop 的参考姿态目标，仅保留当前显式状态中可直接使用的三项：
+   - `pitch_target = 1.02`
+   - `knee_target = 1.21`
+   - `full_foot_support_target = 0.99`
+2. 在 `rear_lying / prone_lying` 两类明显失稳状态下，用当前状态与参考姿态的偏差，生成动作中心与动作宽度；
+3. planning 只在该动态范围内采样，具体幅值和时序仍交给优化器选择。
+
+### 标定依据
+
+本轮动作方向并非凭空设定，而是结合两类高分轨迹窗口完成校准：
+
+1. `td-mpc2 200k` 的后仰恢复片段
+   - 轨迹：
+     `results/tdmpc2_hopper_200k_sameprotocol_20260422_062444_seed2/trace_probe_v428/episode_00.csv`
+   - 在 `step 8-14` 的后仰回正窗口中，最稳定的信号是：
+     - `action_0` 长期显著为负；
+     - `action_3` 大多为负；
+     - `action_1` 在深后仰早期可短暂偏正，但随着姿态回正会明显转负；
+     - `action_2` 波动较大，不适合固定死符号。
+2. `td-mpc2 200k` 的前伏/俯卧恢复片段
+   - 以同一 checkpoint 重新导出：
+     `results/tdmpc2_hopper_200k_sameprotocol_20260422_062444_seed2/trace_probe_recovery_ep03_seed2/episode_03.csv`
+   - 在 `step 0-4` 的重前倾窗口中，最稳定的信号是：
+     - `action_0` 明显为正；
+     - `action_1` 多为负；
+     - `action_3` 明显为正；
+     - `action_2` 作用较弱，宜保留更宽的自由度。
+
+### 新先验形式
+
+实现上不再使用常数盒子，而改为：
+
+1. `rear_lying`
+   - 定义 `rear_progress`，表示身体从深后仰向参考姿态回正的进度；
+   - `action_0 / action_3` 随 `rear_progress` 增大而进一步朝恢复方向收紧；
+   - `action_1` 从“允许早期翻卷”逐渐过渡到“后期明显压负”；
+   - `action_2` 保持最宽范围，只在中心上做轻度引导。
+2. `prone_lying`
+   - 定义 `prone_severity`，表示前伏/俯卧的严重程度；
+   - `action_0` 维持强正向驱动；
+   - `action_1` 维持负向驱动；
+   - `action_3` 维持正向驱动；
+   - `action_2` 仅依据当前 `knee` 偏离做弱修正，不再强行规定固定符号。
+
+同时新增了两个诊断量：
+
+1. `rear_progress_mean`
+2. `prone_severity_mean`
+
+用于后续在日志中直接观察当前 planning 先验究竟主要激活在什么恢复阶段，而不是只看 `rear_prior_frac / prone_prior_frac` 的触发占比。
+
+### 当前判断
+
+这一版动作先验更符合当前路线的基本原则：
+
+1. 不手写控制器；
+2. 不把恢复子任务完全甩给黑盒探索；
+3. 只把“已知的力学方向”编码进先验；
+4. 将具体幅值、时序和跨步协调仍交给 planning / policy 学习。
+
+后续验证重点不再是“是否出现 prepared”，而是：
+
+1. `prone_lying / rear_lying` 触发后，`|pitch|` 是否更快回落；
+2. `full_foot_support` 是否更快恢复；
+3. 是否比固定盒子版本更少出现“只轻微抬身但脚始终回不到支撑位”的假恢复。
+
+## 2026-04-24：修正恢复先验的入门条件，避免被“整足双点接触”卡死
+
+在 `v439` 的 `5k smoke` 评估写盘过程中，先对已落盘的前几条 `episode_csv` 做了局部检查。结论很明确：这版不是“恢复先验触发了但效果弱”，而是后仰恢复门本身几乎没有打开。
+
+已观察到的典型现象如下：
+
+1. 多条失败轨迹中，`pitch <= -1.5` 的后仰状态持续出现，且 `grounded` 明确为高；
+2. 此时 `support_contact = max(touch_toe, touch_heel)` 经常接近 `1.0`，说明身体确实已有明确地面支撑；
+3. 但 `full_foot_support = min(touch_toe, touch_heel)` 仍长期为 `0.0`，因为真实失败姿态大多是单侧着地点，而不是前后足缘同时稳定着地；
+4. 旧版 `rear_mask` 要求 `full_foot_support >= 0.60`，于是这些明显的后仰失败姿态被全部挡在先验门外。
+
+用当前这批 `episode_csv` 按旧门与新门做计数，对比结果如下：
+
+1. 旧门下，满足后仰恢复条件的步数为 `0`；
+2. 改为“已有明确地面支撑”后，满足后仰恢复条件的步数变为 `460`；
+3. 俯卧门原本就主要由 `pitch >= 1.5` 与 `full_foot_support <= 0.20` 控制，本批轨迹下并未被这一修订削弱，满足步数仍为 `834`。
+
+据此，本轮仅做一处最小修订：
+
+1. 保持 `prepared / recovery` 的奖励态判定不变，仍由更严格的 `full_foot_support` 参与；
+2. 仅把恢复动作先验的入门条件改为基于 `support_contact`；
+3. 具体而言：
+   - `rear_mask`：由 `full_foot_support >= 0.60` 改为 `support_contact >= 0.60`
+   - `prone_mask`：补上 `support_contact >= 0.50`，避免把“几乎无支撑的空擦地状态”也误收进恢复先验
+
+这样处理的原因是：
+
+1. `prepared` 描述的是“可起跳的较完整支撑态”，继续使用整足代理是合理的；
+2. 恢复先验描述的是“明显失败姿态下，planning 应先往合理恢复动作范围收缩”，它只需要确认“身体已经在地面上、并且确有支撑可借”，不应要求已经恢复到整足稳定支撑；
+3. 因而二者不应共用同一个严格门槛。
+
+## 2026-04-24：将 `recovery` 从静态状态改为迁移事件，并补上高分轨迹回算口径
+
+在 `v440` 的 `5k smoke` 中，对 `episode_07` 的逐帧核查已进一步确认：先前被打上 `grounded_recovery` 的窗口，并不是“从前倾或后仰失败姿态主动恢复”，而只是“从空中落地后，恰好短暂处于较高足部支撑且身体较正”的被动稳定落地。
+
+这说明旧定义存在语义混淆：
+
+1. 旧版 `grounded_recovery` 只看当前状态；
+2. 只要当前帧满足“足部支撑较完整、姿态较正、速度较稳”，就会被记成恢复；
+3. 但真正的“恢复”应是一个过程，而不是一个静态姿态标签；
+4. 换言之，它应描述“前一时刻处于明显失衡的着地姿态，随后开始向可控姿态回正”的状态迁移。
+
+基于这一点，本轮做了两项修订。
+
+### 1. 取消静态 `grounded_recovery` 状态标签
+
+在 `src/world_model/dmcontrol_hopper_sd_model.py` 中：
+
+1. 不再把 `recovery` 作为 `_state_reward_features()` 内的静态 grounded 子状态；
+2. `grounded_prepared` 保持原定义；
+3. `grounded_unprepared` 改回仅由 `grounded * (1 - prepared_mask)` 给出；
+4. `grounded_recovery` 置为零张量，仅保留键名用于兼容已有日志/脚本接口。
+
+这样处理的目的，是明确将“恢复”从标签语义中拿掉，避免再次把“落地即较稳”的片段误认为恢复。
+
+### 2. 在 `predict_shaping_reward()` 中显式计算 `recovery_event(prev, next)`
+
+新的恢复事件只在以下条件同时满足时给分：
+
+1. `prev` 与 `next` 均为 grounded；
+2. `prev` 的 `|pitch|` 已超过失衡源区间下界；
+3. `next` 的 `|pitch|` 相比 `prev` 明显下降；
+4. 地面支撑有所改善，或至少 `next` 已具备较明确的支撑接触。
+
+实现上，最终采用的恢复事件为：
+
+1. `prev_grounded`
+2. `next_grounded`
+3. `prev_failed_posture`
+4. `pitch_reduction`
+5. `max(support_contact_gain, 0.5 * next_support_contact)`
+
+其中有两点是本轮回算后重新确认的：
+
+1. 不再使用 `full_foot_support` 作为恢复事件门槛
+   - 后仰/俯卧恢复参考轨迹中，大量回正过程只依赖单侧有效支撑；
+   - 若继续要求整足双点支撑，恢复事件会被系统性压成零。
+2. 不再要求 `next` 已接近竖直或速度已完全沉稳
+   - 真实恢复过程中，角度改善往往先发生，完全稳定是更晚的结果；
+   - 若把“已较直立、已沉稳”也塞进恢复定义，会再次把事件推迟到过晚阶段，丢掉真正的恢复起点。
+
+### 3. 每次修订后用高分轨迹回算的固定口径
+
+为避免新定义误伤标准 hop，本轮同时补稳了回算脚本：
+
+1. 修改 `scripts/analyze_hopper_state_reward_sd_validation.py`
+2. `dominant_state()` 在旧 trace 缺少 `grounded_recovery` 等列时，改为默认按 `0.0` 处理；
+3. 这样可直接对旧 schema 的高分轨迹重复回算，而不会因字段缺失中断。
+
+本轮用于复核的固定命令为：
+
+```bash
+PYTHONPATH=$PWD python scripts/analyze_hopper_state_reward_sd_validation.py \
+  --dataset high=results/tdmpc2_hopper_200k_sameprotocol_20260422_062444_seed2/trace_probe_v428 \
+  --dataset v440=logs/hopper-hop/3/sd_hopper_5k_v440_priorgate_smoke_20260424_run1/official_eval/step_0005000/episode_csv
+```
+
+### 4. 回算结果
+
+#### 4.1 误判样本已被压低
+
+以 `v440` 的误判轨迹：
+
+`logs/hopper-hop/3/sd_hopper_5k_v440_priorgate_smoke_20260424_run1/official_eval/step_0005000/episode_csv/episode_07.csv`
+
+按新 `recovery_event` 逐步回算，可得：
+
+1. `max_recovery_event = 0.0548`
+2. `recovery_event > 0.1` 的步数为 `0`
+
+说明这条“落地即较稳”的样本不再被当作真实恢复。
+
+#### 4.2 标准高分 hop 未被误伤
+
+对 `td-mpc2 200k` 的三条高分轨迹：
+
+`results/tdmpc2_hopper_200k_sameprotocol_20260422_062444_seed2/trace_probe_v428/episode_{00,01,02}.csv`
+
+重新回算后可得：
+
+1. `grounded_prepared` 仍有显著占比
+   - 总计 `129` 帧
+   - 三条轨迹分别为 `47 / 40 / 42` 帧
+2. `rising_air` 仍保持主要空中上升段
+   - 总计 `479` 帧
+3. `grounded_recovery` 静态占比回到 `0`
+   - 这符合本轮语义调整：恢复只作为迁移事件，不再作为状态标签。
+
+因此，本轮修订没有抹掉标准 hop 所依赖的 `prepared -> rising` 主链。
+
+#### 4.3 恢复参考轨迹开始出现非零事件，但前伏恢复仍偏弱
+
+对两条恢复参考轨迹局部回算后：
+
+1. 后仰参考轨迹可得到非零恢复事件
+   - `max_recovery_event = 0.1291`
+   - `recovery_event > 0.1` 的步数为 `2`
+2. 前伏参考轨迹已有非零恢复事件，但幅度仍偏弱
+   - `max_recovery_event = 0.0652`
+   - `recovery_event > 0.1` 的步数为 `0`
+
+当前判断是：
+
+1. 语义方向已正确；
+2. “误判样本归零、后仰恢复可触发、标准 hop 主链保留”三点已成立；
+3. 但前伏恢复事件仍偏弱，后续若继续强化“prone -> controlled support”这一路径，应优先从动作先验或恢复奖励权重入手，而不是再把 `recovery` 重新做回静态状态。
+
+## 2026-04-24：先收正前伏失败态判据，避免在 `5k` 轨迹中系统性漏检
+
+在 `v441` 的 `5k smoke` 结束后，对
+
+`logs/hopper-hop/3/sd_hopper_5k_v441_recoveryevent_smoke_20260424_run1/official_eval/step_0005000/episode_csv`
+
+做了直接统计。原先若按当前主线的前伏门：
+
+1. `grounded >= 0.8`
+2. `support_contact >= 0.5`
+3. `full_foot_support <= 0.2`
+4. `pitch >= 1.5`
+
+则整批 10 条评估轨迹只命中 `20` 步。这个数量与当前轨迹的直观观察不符。
+
+进一步仅对 `pitch` 阈值做扫描，可得：
+
+1. `pitch >= 1.5` 时，命中 `20` 步
+2. `pitch >= 1.3` 时，命中 `55` 步
+3. `pitch >= 1.2` 时，命中 `68` 步
+4. `pitch >= 1.1` 时，命中 `106` 步
+5. `pitch >= 1.0` 时，命中 `257` 步
+
+同时，对 grounded 帧的 `pitch` 分布做直方统计后可见，最大一坨实际上落在：
+
+1. `pitch in [1.0, 1.5)`：`238` 步
+2. `pitch >= 1.5`：仅约 `20` 步
+
+这表明，`5k` 预算下的大量“前伏/前趴失败态”并没有发展到极端高前倾，而是主要停留在 `1.0 ~ 1.5` 的区间。因此原先的 `1.5` 下界过严，会把大量直观上显然属于前伏主导的失败轨迹漏掉。
+
+据此，本轮先做最小修订。最初曾尝试仅放宽 `pitch` 下界，但随后结合
+
+`results/hopper_trace_renders/v441_seed3_step5000_episode04_prone_check.mp4`
+
+的逐帧观察发现，问题并不在脚部接触，而在于 `grounded` 门本身过高。该轨迹在落地后几乎全程都处于前伏，只是前期完全趴地，后期屈膝后脚部离地；若继续把“高 grounded”或“脚部支撑”作为前伏主条件，都会系统性漏检。
+
+随后继续对 `episode_09` 做视频核对后，可进一步确认：前伏或后仰这类失败态的“是否着地”，根本不应依赖足部或 `grounded` 这类偏向稳定支撑的代理，而应直接依赖 `z_min`。原因很直接：
+
+1. 失败态下，真正贴地的往往是鼻尖、躯干下缘、前掌、小腿等任意部位；
+2. 这些状态在语义上显然已经是“着地失败态”；
+3. 若继续只看足部或高 `grounded`，就会把大量明显的前伏/后仰片段漏掉。
+
+因此，本轮最终修订收敛为：
+
+1. 不动 `recovery` 迁移事件定义；
+2. 将前伏与后仰失败态的“着地判据”统一切换到 `z_min`；
+3. 即：
+   - `prone_mask = (pitch >= 0.90) & (z_min <= 0.08)`
+   - `rear_mask = (pitch <= -1.50) & (z_min <= 0.08)`
+4. 相应地：
+   - 删除前伏失败态对 `grounded` 的依赖；
+   - 删除后仰失败态对 `support_contact` 的依赖；
+   - 明确前伏/后仰首先是姿态失败态，而不是足部支撑态。
+
+按最终 `pitch + z_min` 口径，用同一批 `v441` 已保存轨迹重算，可得：
+
+1. 前伏总命中步数：`1467`
+2. 后仰总命中步数：`2302`
+
+其中与视频核对最关键的三条为：
+
+1. `episode_04`
+   - 前伏：`487`
+   - 后仰：`0`
+   - 与观察到的“落地后几乎全程前伏”一致
+2. `episode_05`
+   - 前伏：`20`
+   - 后仰：`435`
+   - 与观察到的“短暂前伏后迅速拉过头，进入长期后仰”一致
+3. `episode_09`
+   - 前伏：`479`
+   - 后仰：`0`
+   - 与观察到的“整体始终前伏，但偶有短暂离地”一致
+
+之所以继续将前伏 `pitch` 下界从 `1.10` 下调到 `0.90`，是因为对 `episode_09` 的进一步视频核对表明：
+
+1. `z_min <= 0.08` 已经覆盖了几乎全程的近地/触地状态，计数为 `481` 步；
+2. 但这些帧中，`pitch` 最大的一坨并不在 `>= 1.1`，而是在 `[0.9, 1.1)`；
+3. 具体而言：
+   - `pitch >= 1.1 and z_min <= 0.08` 仅有 `99` 步；
+   - `pitch >= 0.9 and z_min <= 0.08` 可达 `479` 步。
+
+因此，若以视频观察为准，`0.90` 比 `1.10` 更符合当前低预算失败态下的“前伏”语义。
+
+当前判断是：
+
+1. 这一步并不是“放宽奖励”，而是先把失败态识别修到与真实轨迹分布一致；
+2. 在 agent 尚未学会恢复的阶段，一条失败轨迹往往会被某一种失败模式主导，因此“前伏是否被大量识别出来”比“前伏与后仰是否同时都很多”更重要；
+3. 后续若继续做前伏恢复链的动作先验或奖励增强，应基于这一修订后的前伏判据继续推进。
+
+## 2026-04-25：按直接观测优先原则，将 Hopper 状态机收敛为六个互斥状态
+
+本轮不再沿用 `falling_air / grounded_failed / grounded_recovery / grounded_prepared / rising_air` 的五态口径，而按最新讨论重构为六个互斥状态：
+
+1. `falling_air`
+2. `grounded_rear`
+3. `grounded_prone`
+4. `grounded_upright`
+5. `grounded_prepared`
+6. `rising_air`
+
+设计原则统一为：
+
+1. 取消 `air / grounded` 作为主状态输出；
+2. 状态判定尽量直接使用原始观测，只在“是否已有任意部位着地”这一点上保留最小代理量 `z_min`；
+3. 两个空中态对称，四个地面态互斥；
+4. `prepared` 只在“整足支撑 + 躯干基本竖直 + 膝关节进入预备窗口”时点亮；
+5. `upright` 与 `prepared` 区分开：前者只要求足部已有支撑且躯干回正，后者额外要求膝关节进入预备窗口。
+
+首版阈值按当前理解先固定为：
+
+1. `z_min <= 0.03` 视为已着地
+2. `z_dot < -0.05` 视为空中下降
+3. `z_dot > 0.05` 视为空中上升
+4. `max(touch_toe, touch_heel) >= 0.30` 视为足部已有支撑
+5. `min(touch_toe, touch_heel) >= 0.30` 视为整足支撑
+6. `rooty <= -0.75` 视为后仰主导
+7. `rooty >= 0.75` 视为前伏主导
+8. `-0.45 < rooty < 0.45` 视为躯干基本竖直
+9. `1.45 <= knee <= 1.95` 作为首版 `prepared` 膝窗口
+
+代码层面的直接改动包括：
+
+1. `src/world_model/dmcontrol_hopper_sd_model.py`
+   将状态特征函数重构为六态互斥输出，并将 shaping 改为按状态迁移给分：
+   - `rear -> upright`
+   - `prone -> upright`
+   - `upright -> prepared`
+   - `prepared -> rising_air`
+   - `falling_air -> upright`
+   - `falling_air -> prepared`
+2. `external/tdmpc2/tdmpc2/trainer/online_trainer.py`
+   官方评估轨迹导出改为写入六态字段及对应统计量。
+3. `scripts/export_hopper_eval_traces.py`
+   离线导出脚本改为与主线相同的六态字段。
+4. `scripts/analyze_hopper_state_reward_sd_validation.py`
+   分析脚本改为读取六态。
+5. `scripts/probe_hopper_action_priors.py`
+   恢复动作盒分析脚本去除对旧 `grounded` 辅助态的依赖。
+
+这一轮的意图不是一次性把阈值调准，而是先把“状态语义”和“代码实现”统一到同一个最小闭环上。后续应直接用短预算轨迹验证三点：
+
+1. 六态是否真正互斥
+2. 前伏/后仰是否与视频观察一致
+3. `prepared` 是否只在短暂、合理的起跳预备窗口出现
+
+### 同日补记：将结构化奖励从“软门值相乘”收紧为“硬状态迁移触发”
+
+在继续梳理奖励设计时，已明确否定前一版 shaping 中的一个多余技巧：用
+
+1. `prev_feat["state_a"]`
+2. `next_feat["state_b"]`
+
+这样的状态门值相乘来给迁移奖励。
+
+否定理由有两点：
+
+1. 这会把“状态命中值略低”错误地解释成“应当少给奖励”，但这一点此前并无充分论证；
+2. 更关键的是，这种写法会把状态迁移和状态内软门混在一起，使奖励语义复杂化，不符合“只在判定进入目标后继状态时给奖励”的最初要求。
+
+据此，本轮将 Hopper 六状态 shaping 统一改为硬迁移指示量：
+
+1. 先由六态门值决定唯一的 `dominant_state`
+2. 仅当 `prev_state == A and next_state == B` 时，对应迁移奖励触发
+3. 触发值固定为 `1 * weight`
+4. 若某一步没有任何状态门值达到 `0.5`，则该步 dominant state 记为 `-1`，不触发 shaping
+
+当前保留的 6 项迁移为：
+
+1. `falling_air -> grounded_upright`
+2. `falling_air -> grounded_prepared`
+3. `grounded_rear -> grounded_upright`
+4. `grounded_prone -> grounded_upright`
+5. `grounded_upright -> grounded_prepared`
+6. `grounded_prepared -> rising_air`
+
+同时，`prepared -> rising_air` 中此前附带的 `forward_progress` 已去除。原因是：只要 `rising_air` 的语义本身足够正确，就不应再额外引入一个未经充分论证的“前进加成”技巧；若未来确需鼓励更远跳跃，应单独设计基于前向速度与竖直速度的明确代理量，而不是混在当前迁移奖励里。
+
+### 同日补记：复核 `height / any_contact_z / backward_speed / rotation_penalty` 四个保留量
+
+在进一步梳理“哪些代理量已经不再进入主状态判断与 shaping 主链”时，又单独复核了以下四个仍保留在代码中的量：
+
+1. `height`
+2. `any_contact_z`
+3. `backward_speed`
+4. `rotation_penalty`
+
+结论如下。
+
+1. `height`
+   继续保留。它不是冗余诊断量，而是 `predict_reward()` 中显式环境奖励重建的一部分。当前实现为：
+   - `foot_contact_z = z_min`
+   - `foot_body_z = foot_contact_z + FOOT_BODY_HEIGHT_OFFSET`
+   - `height = torso_z - foot_body_z`
+   这一定义与 Hopper 环境中“torso over foot”的站立部分语义一致，当前未发现明显错误。
+
+2. `any_contact_z`
+   继续保留，但应明确其性质：这是一个近似代理量，不是完整的“全身最低点”精确重建。当前实现只取：
+   - `foot_contact_z`
+   - `torso_lower_z`
+   - `nose_lower_z`
+   三者最小值。之所以这样做，是因为当前 9 维显式状态不再保留全部关节几何，无法从显式状态精确恢复大腿/小腿/骨盆下缘位置。该量目前只在 `predict_viable_reward()` 与评估导出中使用，不进入六状态主判定与 shaping 主链，因此暂不扩张其复杂度。
+
+3. `backward_speed`
+   计算为 `clamp(-vx / 0.50, 0, 1)`。其语义是“向后速度的归一化强度”，公式本身与变量含义一致。当前它只用于评估轨迹导出与汇总统计，不进入主状态判断、显式环境奖励或结构化 shaping。
+
+4. `rotation_penalty`
+   计算为 `clamp((abs(pitch_rate) - 3.5) / 2.5, 0, 1)`。其语义是“过快俯仰旋转的归一化强度”，公式本身与变量含义一致。当前同样只用于评估轨迹导出与汇总统计，不进入主状态判断、显式环境奖励或结构化 shaping。
+
+据此，本轮不删除其余已不在主链上的诊断量。原因是：
+
+1. 这些量当前计算开销很小；
+2. 它们仍可用于离线导出、轨迹核对与异常定位；
+3. 直接删除会增加后续阅读与诊断成本。
+
+但口径需明确：
+
+1. 六状态主判定与硬迁移 shaping 只依赖此前已确认的最小量集；
+2. 其余量若仅用于导出/诊断，不应再被误认为主算法设计的一部分；
+3. 未来若继续简化代码，应优先在不影响日志兼容与诊断能力的前提下再做收缩。

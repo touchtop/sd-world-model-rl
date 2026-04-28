@@ -173,13 +173,23 @@ class TDMPC2(torch.nn.Module):
 		"""
 		# Sample policy trajectories
 		z = self.model.encode(obs, task)
+		prior_low, prior_high, prior_stats = None, None, {}
+		if hasattr(self.model, "action_prior_bounds"):
+			prior_low, prior_high, prior_stats = self.model.action_prior_bounds(z, task)
+			if prior_low.ndim > 1:
+				prior_low = prior_low[0]
+				prior_high = prior_high[0]
 		if self.cfg.num_pi_trajs > 0:
 			pi_actions = torch.empty(self.cfg.horizon, self.cfg.num_pi_trajs, self.cfg.action_dim, device=self.device)
 			_z = z.repeat(self.cfg.num_pi_trajs, 1)
 			for t in range(self.cfg.horizon-1):
 				pi_actions[t], _ = self.model.pi(_z, task)
+				if prior_low is not None:
+					pi_actions[t] = torch.max(torch.min(pi_actions[t], prior_high), prior_low)
 				_z = self.model.next(_z, pi_actions[t], task)
 			pi_actions[-1], _ = self.model.pi(_z, task)
+			if prior_low is not None:
+				pi_actions[-1] = torch.max(torch.min(pi_actions[-1], prior_high), prior_low)
 
 		# Initialize state and parameters
 		z = z.repeat(self.cfg.num_samples, 1)
@@ -198,6 +208,11 @@ class TDMPC2(torch.nn.Module):
 			r = torch.randn(self.cfg.horizon, self.cfg.num_samples-self.cfg.num_pi_trajs, self.cfg.action_dim, device=std.device)
 			actions_sample = mean.unsqueeze(1) + std.unsqueeze(1) * r
 			actions_sample = actions_sample.clamp(-1, 1)
+			if prior_low is not None:
+				actions_sample = torch.max(
+					torch.min(actions_sample, prior_high.view(1, 1, -1)),
+					prior_low.view(1, 1, -1),
+				)
 			actions[:, self.cfg.num_pi_trajs:] = actions_sample
 			if self.cfg.multitask:
 				actions = actions * self.model._action_masks[task]
@@ -226,6 +241,8 @@ class TDMPC2(torch.nn.Module):
 		a, std = actions[0], std[0]
 		if not eval_mode:
 			a = a + std * torch.randn(self.cfg.action_dim, device=std.device)
+		if prior_low is not None:
+			a = torch.max(torch.min(a, prior_high), prior_low)
 		self._prev_mean.copy_(mean)
 		self._last_plan_metrics = {
 			"plan_value_mean": float(value.mean().item()),
@@ -234,6 +251,8 @@ class TDMPC2(torch.nn.Module):
 			"plan_elite_value_std": float(elite_value.std(unbiased=False).item()),
 			"plan_std_mean": float(std.mean().item()),
 			"plan_nonfinite_frac": float(nonfinite_frac.item()),
+			"plan_prior_rear_frac": float(prior_stats.get("rear_prior_frac", 0.0)),
+			"plan_prior_prone_frac": float(prior_stats.get("prone_prior_frac", 0.0)),
 		}
 		return a.clamp(-1, 1)
 
@@ -291,7 +310,15 @@ class TDMPC2(torch.nn.Module):
 	def _update(self, obs, action, reward, terminated, task=None):
 		# Compute targets
 		with torch.no_grad():
+			reward_mix_info = {}
+			z_target = self.model.encode(obs[:-1], task)
 			next_z = self.model.encode(obs[1:], task)
+			if hasattr(self.model, 'mixed_reward_target'):
+				reward_target, reward_mix_info = self.model.mixed_reward_target(
+					reward, z_target, action, task, next_z=next_z,
+				)
+			else:
+				reward_target = reward
 			td_targets = self._td_target(next_z, reward, terminated, task)
 
 		# Prepare for update
@@ -301,10 +328,18 @@ class TDMPC2(torch.nn.Module):
 		zs = torch.empty(self.cfg.horizon+1, self.cfg.batch_size, self.cfg.latent_dim, device=self.device)
 		z = self.model.encode(obs[0], task)
 		zs[0] = z
-		consistency_loss = 0
+		consistency_loss = torch.zeros((), device=self.device)
+		struct_consistency_loss = torch.zeros((), device=self.device)
+		resid_consistency_loss = torch.zeros((), device=self.device)
 		for t, (_action, _next_z) in enumerate(zip(action.unbind(0), next_z.unbind(0))):
 			z = self.model.next(z, _action, task)
 			consistency_loss = consistency_loss + F.mse_loss(z, _next_z) * self.cfg.rho**t
+			if hasattr(self.model, '_split_latent'):
+				pred_struct, pred_resid = self.model._split_latent(z)
+				true_struct, true_resid = self.model._split_latent(_next_z)
+				struct_consistency_loss = struct_consistency_loss + F.mse_loss(pred_struct, true_struct) * self.cfg.rho**t
+				if pred_resid is not None and true_resid is not None:
+					resid_consistency_loss = resid_consistency_loss + F.mse_loss(pred_resid, true_resid) * self.cfg.rho**t
 			zs[t+1] = z
 
 		# Predictions
@@ -316,12 +351,14 @@ class TDMPC2(torch.nn.Module):
 
 		# Compute losses
 		reward_loss, value_loss = 0, 0
-		for t, (rew_pred_unbind, rew_unbind, td_targets_unbind, qs_unbind) in enumerate(zip(reward_preds.unbind(0), reward.unbind(0), td_targets.unbind(0), qs.unbind(1))):
-			reward_loss = reward_loss + math.soft_ce(rew_pred_unbind, rew_unbind, self.cfg).mean() * self.cfg.rho**t
+		for t, (rew_pred_unbind, rew_target_unbind, td_targets_unbind, qs_unbind) in enumerate(zip(reward_preds.unbind(0), reward_target.unbind(0), td_targets.unbind(0), qs.unbind(1))):
+			reward_loss = reward_loss + math.soft_ce(rew_pred_unbind, rew_target_unbind, self.cfg).mean() * self.cfg.rho**t
 			for _, qs_unbind_unbind in enumerate(qs_unbind.unbind(0)):
 				value_loss = value_loss + math.soft_ce(qs_unbind_unbind, td_targets_unbind, self.cfg).mean() * self.cfg.rho**t
 
 		consistency_loss = consistency_loss / self.cfg.horizon
+		struct_consistency_loss = struct_consistency_loss / self.cfg.horizon
+		resid_consistency_loss = resid_consistency_loss / self.cfg.horizon
 		reward_loss = reward_loss / self.cfg.horizon
 		if self.cfg.episodic:
 			termination_loss = F.binary_cross_entropy_with_logits(termination_pred, terminated)
@@ -398,6 +435,8 @@ class TDMPC2(torch.nn.Module):
 				pass
 		info = TensorDict({
 			"consistency_loss": consistency_loss,
+			"struct_consistency_loss": struct_consistency_loss,
+			"resid_consistency_loss": resid_consistency_loss,
 			"reward_loss": reward_loss,
 			"value_loss": value_loss,
 			"termination_loss": termination_loss,
@@ -408,6 +447,8 @@ class TDMPC2(torch.nn.Module):
 			"td_target_std": td_targets.std(unbiased=False),
 			"q_mean": q_values.mean(),
 			"q_std": q_values.std(unbiased=False),
+			"reward_target_mean": reward_target.mean(),
+			"reward_target_std": reward_target.std(unbiased=False),
 			"reward_pred_mean": reward_pred_values.mean(),
 			"reward_pred_std": reward_pred_values.std(unbiased=False),
 		}, batch_size=torch.Size([]))
@@ -416,6 +457,8 @@ class TDMPC2(torch.nn.Module):
 		info.update(pi_info)
 		if extra_info:
 			info.update(TensorDict(extra_info, batch_size=torch.Size([])))
+		if reward_mix_info:
+			info.update(TensorDict(reward_mix_info, batch_size=torch.Size([])))
 		info = info.detach()
 		return {
 			k: v.mean().item() if torch.is_tensor(v) else v

@@ -204,13 +204,13 @@ class OnlineTrainer(Trainer):
 				obs = self.env.reset()
 				self._tds = [self.to_td(obs)]
 
-				if self._step > self.cfg.seed_steps:
-					action = self.agent.act(obs, t0=len(self._tds)==1)
-				else:
-					action = self.env.rand_act()
-				obs, reward, done, info = self.env.step(action)
-				last_info = info
-				self._tds.append(self.to_td(obs, action, reward, info['terminated']))
+			if self._step > self.cfg.seed_steps:
+				action = self.agent.act(obs, t0=len(self._tds)==1)
+			else:
+				action = self.env.rand_act()
+			obs, reward, done, info = self.env.step(action)
+			last_info = info
+			self._tds.append(self.to_td(obs, action, reward, info['terminated']))
 
 			updates_this_step = 0
 			if hasattr(self.agent.model, '_reward_curriculum_step'):

@@ -1,4 +1,6 @@
+import csv
 from collections import defaultdict, deque
+from pathlib import Path
 
 import gymnasium as gym
 import numpy as np
@@ -56,11 +58,68 @@ class DMControlWrapper:
 		action = action.astype(self.action_spec_dtype)
 		for _ in range(2):
 			step = self.env.step(action)
-			reward += step.reward
+			reward += 0.0 if step.reward is None else step.reward
 		return self._obs_to_array(step.observation), reward, False, defaultdict(float)
 	
 	def render(self, width=384, height=384, camera_id=None):
 		return self.env.physics.render(height, width, camera_id or self.camera_id)
+
+
+class HopperStageResetWrapper(gym.Wrapper):
+	def __init__(self, env, pool_csv: str, seed: int):
+		super().__init__(env)
+		self.env = env
+		self._rng = np.random.default_rng(seed)
+		self._reset_pool = self._load_reset_pool(pool_csv)
+		if not self._reset_pool:
+			raise ValueError(f'Empty hopper stage reset pool: {pool_csv}')
+		self._last_reset_row = None
+
+	@staticmethod
+	def _load_reset_pool(pool_csv: str):
+		path = Path(pool_csv)
+		with path.open(newline='', encoding='utf-8') as f:
+			rows = list(csv.DictReader(f))
+		parsed = []
+		for row in rows:
+			qpos = np.array([
+				float(row['qpos_rootx']),
+				float(row['qpos_rootz']),
+				float(row['qpos_rooty']),
+				float(row['qpos_waist']),
+				float(row['qpos_hip']),
+				float(row['qpos_knee']),
+				float(row['qpos_ankle']),
+			], dtype=np.float64)
+			qvel = np.array([
+				float(row['qvel_rootx']),
+				float(row['qvel_rootz']),
+				float(row['qvel_rooty']),
+				float(row['qvel_waist']),
+				float(row['qvel_hip']),
+				float(row['qvel_knee']),
+				float(row['qvel_ankle']),
+			], dtype=np.float64)
+			parsed.append({
+				'stage': row.get('stage', ''),
+				'state_name': row.get('state_name', ''),
+				'source_csv': row.get('source_csv', ''),
+				'step': int(row.get('step', 0)),
+				'qpos': qpos,
+				'qvel': qvel,
+			})
+		return parsed
+
+	def reset(self):
+		_ = self.env.reset()
+		row = self._reset_pool[int(self._rng.integers(len(self._reset_pool)))]
+		physics = self.env.unwrapped.physics
+		physics.data.qpos[:] = row['qpos']
+		physics.data.qvel[:] = row['qvel']
+		physics.forward()
+		self._last_reset_row = row
+		obs = self.env.unwrapped.task.get_observation(physics)
+		return self.env._obs_to_array(obs)
 
 
 class Pixels(gym.Wrapper):
@@ -105,6 +164,9 @@ def make_env(cfg):
 					 visualize_reward=False)
 	env = action_scale.Wrapper(env, minimum=-1., maximum=1.)
 	env = DMControlWrapper(env, domain)
+	stage_pool = getattr(cfg, 'hopper_stage_reset_pool_csv', None)
+	if stage_pool:
+		env = HopperStageResetWrapper(env, stage_pool, seed=int(cfg.seed))
 	if cfg.obs == 'rgb':
 		env = Pixels(env, cfg)
 	env = Timeout(env, max_episode_steps=500)
