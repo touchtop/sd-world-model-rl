@@ -32,7 +32,7 @@ Intent:
 - continue a proven 10k pureenv_sdinit run to a 200k total-step budget
 - keep TD-MPC2 reward learning on environment reward only
 - disable shaping / curriculum mixing / action prior
-- keep sd_latent_dim=17 so planning uses explicit SD state only
+- keep sd_latent_dim=512 so planning uses explicit SD state plus learned residual subspace
 - preserve internal transition residual and supervised SD initialization settings
 EOF
 
@@ -63,7 +63,11 @@ exec "$PYTHON_BIN" -u "$ROOT/external/tdmpc2/tdmpc2/train.py" \
   mlp_dim=256 \
   num_q=3 \
   sd_struct_dim=17 \
-  sd_latent_dim=17 \
+  sd_latent_dim=512 \
+  sd_struct_loss_scale_mode=batch_std \
+  sd_struct_loss_scale_floor=0.1 \
+  sd_latent_consistency_struct_weight=1.0 \
+  sd_latent_consistency_resid_weight=1.0 \
   sd_use_transition_residual=true \
   sd_transition_residual_scale=4.0 \
   sd_reward_mode=learned \

@@ -47,6 +47,7 @@ class OnlineTrainer(Trainer):
 			updates_this_step=updates_this_step,
 			optim=self.agent.optim.state_dict(),
 			pi_optim=self.agent.pi_optim.state_dict(),
+			sd_optim=self.agent.sd_optim.state_dict() if getattr(self.agent, 'sd_optim', None) is not None else None,
 			scale=self.agent.scale.state_dict(),
 			prev_mean=self.agent._prev_mean.detach().cpu(),
 		)
@@ -83,6 +84,7 @@ class OnlineTrainer(Trainer):
 			'detach_Qs': self.agent.model._detach_Qs.state_dict() if hasattr(self.agent.model, '_detach_Qs') else None,
 			'optim': self.agent.optim.state_dict(),
 			'pi_optim': self.agent.pi_optim.state_dict(),
+			'sd_optim': self.agent.sd_optim.state_dict() if getattr(self.agent, 'sd_optim', None) is not None else None,
 			'scale': self.agent.scale.state_dict(),
 			'prev_mean': self.agent._prev_mean.detach().cpu(),
 			'step': int(self._step),
@@ -108,6 +110,8 @@ class OnlineTrainer(Trainer):
 			self.agent.model._detach_Qs.load_state_dict(state['detach_Qs'])
 		self.agent.optim.load_state_dict(state['optim'])
 		self.agent.pi_optim.load_state_dict(state['pi_optim'])
+		if state.get('sd_optim') is not None and getattr(self.agent, 'sd_optim', None) is not None:
+			self.agent.sd_optim.load_state_dict(state['sd_optim'])
 		self.agent.scale.load_state_dict(state['scale'])
 		self.agent._prev_mean.copy_(state['prev_mean'].to(device))
 		self._step = int(state['step'])

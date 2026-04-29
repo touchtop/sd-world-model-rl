@@ -37,6 +37,7 @@
 v5 当前推荐脚本：
 
 - [run_hopper_v5_5k_smoke.sh](/home/data/round/code/sd_world_model_rl/scripts/run_hopper_v5_5k_smoke.sh)
+- [run_hopper_v5_5k_pureenv_sdinit_online_sup.sh](/home/data/round/code/sd_world_model_rl/scripts/run_hopper_v5_5k_pureenv_sdinit_online_sup.sh)
 
 用法：
 
@@ -60,6 +61,52 @@ bash scripts/run_hopper_v5_5k_smoke.sh 0 sd_hopper_5k_v5densepose_recover010_smo
 - `save_eval_traces=true`
 - `sd_struct_dim=17`
 - `sd_latent_dim=512`
+
+纯环境奖励 / supervised SD init / online SD supervision 脚本：
+
+用法：
+
+```bash
+bash scripts/run_hopper_v5_5k_pureenv_sdinit_online_sup.sh <gpu_id> <exp_name> <seed>
+```
+
+示例：
+
+```bash
+bash scripts/run_hopper_v5_5k_pureenv_sdinit_online_sup.sh \
+  1 sd_hopper_5k_pureenv_sdinit_online_sup_seed3_20260429_run1 3
+```
+
+固定口径：
+
+- `steps=5000`
+- `eval_freq=2500`
+- `checkpoint_freq=2500`
+- `eval_episodes=10`
+- `save_full_state=true`
+- `save_eval_traces=true`
+- `sd_struct_dim=17`
+- `sd_latent_dim=512`
+- `sd_use_transition_residual=true`
+- `sd_transition_residual_scale=4.0`
+- `sd_reward_mode=learned`
+- `sd_action_prior_enabled=false`
+- `sd_height_loss_coef=0.0`
+- `sd_online_supervision_enabled=true`
+- `sd_online_supervision_one_step_weight=1.0`
+- `sd_online_supervision_rollout_weight=1.0`
+- `sd_online_supervision_omega_weight=0.25`
+- `sd_online_supervision_contact_weight=0.25`
+- `sd_online_supervision_phase_weight=2.0`
+- `sd_latent_consistency_struct_weight=1.0`
+- `sd_latent_consistency_resid_weight=1.0`
+
+含义：
+
+- 保持纯环境奖励闭环口径不变
+- 继续使用当前最佳 supervised SD checkpoint 初始化
+- 在共享 `SD transition core` 上追加独立在线监督更新
+- 用于验证在线监督支路能否稳定接入、落盘并写出训练统计
 
 历史 v429 脚本：
 
@@ -177,7 +224,7 @@ bash scripts/run_hopper_v5_10k_pureenv_sdinit.sh \
 - `save_full_state=true`
 - `save_eval_traces=true`
 - `sd_struct_dim=17`
-- `sd_latent_dim=17`
+- `sd_latent_dim=512`
 - `sd_use_transition_residual=true`
 - `sd_transition_residual_scale=4.0`
 - `sd_reward_mode=learned`
@@ -440,6 +487,7 @@ v5 当前推荐脚本：
 
 - [run_hopper_v5_50k.sh](/home/data/round/code/sd_world_model_rl/scripts/run_hopper_v5_50k.sh)
 - [run_hopper_v5_50k_alpha5_seed2.sh](/home/data/round/code/sd_world_model_rl/scripts/run_hopper_v5_50k_alpha5_seed2.sh)
+- [run_hopper_v5_50k_pureenv_sdinit_online_sup.sh](/home/data/round/code/sd_world_model_rl/scripts/run_hopper_v5_50k_pureenv_sdinit_online_sup.sh)
 
 用法：
 
@@ -492,6 +540,53 @@ bash scripts/run_hopper_v5_50k_alpha5_seed2.sh 0 sd_hopper_50000_v5densepose_alp
 - `sd_reward_curriculum_alpha_min=0.5`
 - `sd_reward_curriculum_start=10000`
 - `sd_reward_curriculum_end=30000`
+
+纯环境奖励 / supervised SD init / online SD supervision 长训脚本：
+
+用法：
+
+```bash
+bash scripts/run_hopper_v5_50k_pureenv_sdinit_online_sup.sh <gpu_id> <exp_name> <seed>
+```
+
+示例：
+
+```bash
+bash scripts/run_hopper_v5_50k_pureenv_sdinit_online_sup.sh \
+  0 sd_hopper_50000_pureenv_sdinit_online_sup_seed1_20260429_run1 1
+```
+
+固定口径：
+
+- `steps=50000`
+- `eval_freq=25000`
+- `checkpoint_freq=25000`
+- `eval_episodes=10`
+- `save_full_state=true`
+- `save_eval_traces=true`
+- `sd_struct_dim=17`
+- `sd_latent_dim=512`
+- `sd_use_transition_residual=true`
+- `sd_transition_residual_scale=4.0`
+- `sd_reward_mode=learned`
+- `sd_action_prior_enabled=false`
+- `sd_height_loss_coef=0.0`
+- `sd_online_supervision_enabled=true`
+- `sd_online_supervision_one_step_weight=1.0`
+- `sd_online_supervision_rollout_weight=1.0`
+- `sd_online_supervision_omega_weight=0.25`
+- `sd_online_supervision_contact_weight=0.25`
+- `sd_online_supervision_phase_weight=2.0`
+- `sd_latent_consistency_struct_weight=1.0`
+- `sd_latent_consistency_resid_weight=1.0`
+- `sd_supervised_init_from=<best_supervised_short_horizon_ckpt>`
+
+含义：
+
+- 保持纯环境奖励闭环口径不变
+- 继续使用当前最佳 supervised SD checkpoint 初始化
+- 在共享 `SD transition core` 上持续施加在线监督
+- 用于与旧 `pureenv_sdinit` 长训做干净对照，判断在线监督是否改善关键相位误差与闭环行为
 
 旧主线脚本：
 
@@ -577,7 +672,7 @@ bash scripts/run_hopper_v5_100k_pureenv_sdinit.sh 3 sd_hopper_100k_pureenv_sdini
 - `save_full_state=true`
 - `save_eval_traces=true`
 - `sd_struct_dim=17`
-- `sd_latent_dim=17`
+- `sd_latent_dim=512`
 - `sd_use_transition_residual=true`
 - `sd_transition_residual_scale=4.0`
 - `sd_reward_mode=learned`
@@ -670,7 +765,7 @@ bash scripts/run_hopper_v5_200k_pureenv_sdinit_resume.sh \
 - `save_full_state=true`
 - `save_eval_traces=true`
 - `sd_struct_dim=17`
-- `sd_latent_dim=17`
+- `sd_latent_dim=512`
 - `sd_use_transition_residual=true`
 - `sd_transition_residual_scale=4.0`
 - `sd_reward_mode=learned`
@@ -699,6 +794,7 @@ nvidia-smi --query-gpu=index,memory.used,utilization.gpu --format=csv,noheader,n
 
 - `bash scripts/run_hopper_v429_5k_smoke.sh ...`
 - `bash scripts/run_hopper_v437_10k_smoke.sh ...`
+- `bash scripts/run_hopper_v5_5k_pureenv_sdinit_online_sup.sh ...`
 - `bash scripts/run_hopper_v5_50k.sh ...`
 - `bash scripts/run_hopper_v5_100k.sh ...`
 - `bash scripts/run_hopper_v429_50k.sh ...`
@@ -948,11 +1044,13 @@ python scripts/probe_hopper_action_priors.py \
 
 - 沙箱内 `torch.cuda.is_available()` 常为假
 - GPU 训练必须在沙箱外跑
+- 在 Codex 中应优先使用“提权 + PTY 会话”方式保活训练进程
 
 典型命令：
 
 - `bash scripts/run_hopper_v429_5k_smoke.sh ...`
 - `bash scripts/run_hopper_v437_10k_smoke.sh ...`
+- `bash scripts/run_hopper_v5_5k_pureenv_sdinit_online_sup.sh ...`
 - `bash scripts/run_hopper_v429_50k.sh ...`
 - `bash scripts/run_hopper_v429_200k.sh ...`
 
@@ -996,6 +1094,7 @@ pgrep -af "train.py|<exp_name>"
 7. 在 Codex 中，GPU 训练、`nvidia-smi`、`pgrep`、Hopper 渲染通常都要提权。
 8. 不要把“脚本已打印开头几行”当作实验已成功启动。
 9. 不要漏记 PTY 会话编号；后续进度检查必须能追溯到具体会话。
+10. 在 Codex 沙箱内，不要用 `nohup ... &` 这类后台方式替代正式 GPU 启动；优先提权后以 PTY 会话启动，再按 `train.csv -> 2500.full.pt -> eval.csv -> official_eval` 顺序核对。
 
 ## 十三、建议工作流
 
@@ -1004,13 +1103,14 @@ pgrep -af "train.py|<exp_name>"
 1. 查 GPU：
    `nvidia-smi ...`
 2. 选脚本：
-   `run_hopper_v429_5k_smoke.sh / run_hopper_v437_10k_smoke.sh / run_hopper_v5_50k.sh / run_hopper_v5_100k.sh / run_hopper_v429_50k.sh / run_hopper_v429_200k.sh`
+   `run_hopper_v429_5k_smoke.sh / run_hopper_v437_10k_smoke.sh / run_hopper_v5_5k_pureenv_sdinit_online_sup.sh / run_hopper_v5_50k.sh / run_hopper_v5_100k.sh / run_hopper_v429_50k.sh / run_hopper_v429_200k.sh`
 3. 指定新的 `exp_name`
-4. 启动后立即检查：
+4. 若在 Codex 中执行，先提权并以 PTY 会话启动
+5. 启动后立即检查：
    `train.csv`
    `2500.full.pt`
    若为 PTY 启动，还要记录会话编号
-5. 到评估步数后再检查：
+6. 到评估步数后再检查：
    `eval.csv`
    `official_eval`
 ### 检查评估

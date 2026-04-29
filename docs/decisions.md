@@ -67,3 +67,45 @@
 3. 同分布 replay 诊断与动作排序诊断，
 
 而不是先投入更大规模闭环训练。
+
+## 决策 4
+
+**决策**  
+第一版在线 `SD` 监督支路先采用“单一共享 transition core + 独立优化器 + 1-step 与当前视界 rollout 监督”的最小实现。
+
+**背景**  
+方法论上已经确定，不应引入两个相互竞争的 dynamics 头；但若一次性同时改 replay 接口、长视界监督和 planner 接线，变量会过多，难以判断训练异常究竟来自目标设计还是工程实现。
+
+**选项**  
+1. 直接实现长视界、多采样路径的完整在线监督版本。  
+2. 先保持当前 replay 采样接口不变，仅在共享 `SD transition core` 上追加独立在线监督更新。  
+3. 改为双 dynamics 头，分别服务 RL 与监督拟合。
+
+**结论**  
+采用选项 2。
+
+**影响**  
+当前实现具有以下边界：
+
+1. 监督视界先限制为 `1-step + 3-step`；
+2. 关键相位优先覆盖 `landing / takeoff / near_contact / high_omega`；
+3. 后续如需 `5-step` 或更长视界，应单独修改 replay 采样接口，而不是在本轮最小实现中混入。
+
+## 决策 5
+
+**决策**  
+Hopper 主线保留 `sd_latent_dim=512`，并将 TD-MPC2 主 `consistency_loss` 拆成结构态块与 learned residual latent 块，默认按块等权合成。
+
+**背景**  
+显式 17 维 `SD` 结构态不应被要求完整覆盖 Hopper 的所有复杂动力机制，因此需要保留 learned residual latent 作为补偿子空间。但如果继续对完整 512 维 latent 直接做统一均方误差，495 维 residual 块会因维度数量远大于 17 维结构态而主导一致性损失。
+
+**选项**  
+1. 将 `sd_latent_dim` 固定为 `17`，完全关闭外层 residual latent。  
+2. 保留 `sd_latent_dim=512`，但仍按完整 latent 维度直接做统一均方误差。  
+3. 保留 `sd_latent_dim=512`，将结构态块和 residual 块分开计损失，并用显式块级权重合成。
+
+**结论**  
+采用选项 3。默认设置为 `sd_latent_consistency_struct_weight=1.0` 与 `sd_latent_consistency_resid_weight=1.0`。
+
+**影响**  
+该决策保留 residual latent 对未建模动力机制的补偿能力，同时避免高维 residual 因维度数量自然压过显式结构态。结构态块内部不使用人工固定通道系数，而是通过 `sd_struct_loss_scale_mode=batch_std` 依据 replay batch 目标结构态的逐通道标准差归一化；`sd_struct_loss_scale_floor=0.1` 仅作为数值稳定下限。

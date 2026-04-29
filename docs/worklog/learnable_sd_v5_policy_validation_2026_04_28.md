@@ -2,7 +2,7 @@
 
 ## 目标
 
-在当前 `pure-env + sd_latent_dim=17 + internal transition residual + supervised init` 主线上，补齐一项此前缺失的关键验证：
+在当时的 `pure-env + sd_latent_dim=17 + internal transition residual + supervised init` 诊断口径上，补齐一项此前缺失的关键验证：
 
 > 当前 `SD dynamics` 在随机动作监督数据上表现较好，但在 TD-MPC2 policy 真正访问到的 replay 分布上，误差是否显著恶化；若恶化，在线 RL 微调是否已经开始修正这种 distribution shift。
 

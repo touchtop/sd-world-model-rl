@@ -23,7 +23,7 @@
 3. 当前最佳监督初始化 checkpoint 为 [hopper_sd_supervised.pt](/home/data/round/code/sd_world_model_rl/results/hopper_sd_supervised/run_20260428_smoke_contactfix5_resid4_featctx_shortloss010_cpu/hopper_sd_supervised.pt)；
 4. 当前推荐闭环实验口径脚本为 [run_hopper_v5_5k_pureenv_sdinit.sh](/home/data/round/code/sd_world_model_rl/scripts/run_hopper_v5_5k_pureenv_sdinit.sh) 与 [run_hopper_v5_100k_pureenv_sdinit.sh](/home/data/round/code/sd_world_model_rl/scripts/run_hopper_v5_100k_pureenv_sdinit.sh)；
 5. 当前闭环验证不再混入 shaping，`sd_reward_mode=learned`，仅保留环境奖励监督；
-6. 当前闭环推荐 `sd_latent_dim=17`，即关闭外层 latent residual，只保留 `DMControlHopperSDModel` 内部的 `transition residual`。
+6. 当前闭环主线推荐 `sd_latent_dim=512`，即保留外层 learned residual latent，同时保留 `DMControlHopperSDModel` 内部的 `transition residual`。
 
 这里需要明确区分两类“残差”：
 
@@ -32,7 +32,7 @@
 2. 内层 `DMControlHopperSDModel` 的一步物理转移残差：
    `transition_residual_head`
 
-当前活跃主线只保留第 2 类。由于 `sd_latent_dim=17`，当前闭环口径中 `SDWorldModel.resid_dim = 0`，外层 latent residual 实际关闭。
+当前活跃主线同时保留两类残差。外层 learned residual latent 用于补足显式 17 维结构态无法完整表达的规划相关因素；内层 `transition_residual_head` 用于对一步物理转移的局部系统误差进行受限修正。为避免外层高维 residual 掩盖显式结构态，TD-MPC2 的一致性损失中结构态块与 residual 块默认按块等权，而不是按维度数加权。
 
 ## 3. 设计目标
 
@@ -274,9 +274,9 @@
 `SDWorldModel` 是 TD-MPC2 的正式 world model 适配层。当前关键事实是：
 
 1. `encode(obs) -> z` 直接调用 `DMControlHopperSDModel.encode_observation()`；
-2. `next(z, a) -> z'` 直接调用 `DMControlHopperSDModel.forward()`；
-3. 在当前活跃口径 `sd_latent_dim=17` 下，`z` 就是 17 维结构态本身；
-4. 因此当前规划和训练 rollout 都在显式 SD 状态空间内进行，不再带外层 latent residual 子空间。
+2. `next(z, a) -> z'` 先调用 `DMControlHopperSDModel.forward()` 推进 17 维结构态，再由外层 learned residual heads 推进残差子空间；
+3. 在当前活跃口径 `sd_latent_dim=512` 下，`z` 由 17 维显式结构态和 495 维 learned residual latent 组成；
+4. 因此当前规划和训练 rollout 同时使用显式 SD 状态空间与残差子空间，但一致性损失按结构态块和残差块合成，避免 residual 仅因维度更高而主导训练。
 
 ### 8.2 reward / Q / pi / termination
 
@@ -310,17 +310,17 @@
 2. `_residual_dynamics`
 3. `_struct_residual`
 
-但当前 active line 明确设置：
+当前 active line 明确设置：
 
 1. `sd_struct_dim=17`
-2. `sd_latent_dim=17`
+2. `sd_latent_dim=512`
 
 因此：
 
-1. `resid_dim = 0`
-2. 外层 latent residual 头全部关闭
+1. `resid_dim = 495`
+2. 外层 learned residual latent 头启用
 
-这也是当前文档需要特别强调的一点：当前主线的“残差”专指 `DMControlHopperSDModel` 内部的 transition residual，而不是旧的外层 latent residual。
+这也是当前文档需要特别强调的一点：当前主线同时使用外层 learned residual latent 与 `DMControlHopperSDModel` 内部 transition residual。前者补足结构态未显式表达的规划相关因素，后者修正一步结构态转移中的局部系统误差。
 
 ## 9. 独立监督拟合脚本
 
@@ -536,7 +536,7 @@
 截至 `2026-04-28`，对 Hopper SD 主线最准确的工程结论是：
 
 1. 当前活跃实现是 `contactfix5` 主干加受限内部 `transition residual`；
-2. 当前闭环主线禁用了外层 latent residual，`sd_latent_dim=17`；
+2. 当前闭环主线保留外层 learned residual latent，`sd_latent_dim=512`；
 3. residual 只修 `vx / vz / omega`，没有破坏显式几何闭环；
 4. residual 输入已从裸 `state + action` 升级为“结构上下文 + 接触特征 + 主干提议量”；
 5. `short_rollout_weight=0.10` 的监督口径是当前最优折中；

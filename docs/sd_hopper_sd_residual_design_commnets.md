@@ -3,7 +3,7 @@
 这版工作已经可以进入 TD-MPC2 框架做系统性闭环训练验证，但还不适合直接作为“已经证明有效”的最终模型。
 当前最合理的下一步不是继续设计自定义奖励，而是把这版 SD transition core 接入 TD-MPC2，配合一组严格 ablation 与诊断实验，检验它是否真的提升 model-based RL 的样本效率和规划质量。
 
-你们把研究重心从“结构化奖励塑形”转回“显式 SD dynamics 的刻画与状态推演能力”，这个方向是对的。文档中也明确说明当前主线已经取消 shaping、使用 reward_mode=learned，并且在闭环推荐口径中设置 sd_latent_dim=17，关闭外层 latent residual，只保留 DMControlHopperSDModel 内部受限的 transition residual。这个设计比早先的高维 residual + shaping + action prior 混合系统更干净，更适合验证“结构化知识显式建模”的价值。
+你们把研究重心从“结构化奖励塑形”转回“显式 SD dynamics 的刻画与状态推演能力”，这个方向是对的。该段评论对应早先的 no-residual 诊断口径：当时闭环推荐口径中设置 `sd_latent_dim=17`，关闭外层 latent residual，只保留 `DMControlHopperSDModel` 内部受限的 transition residual。此后主线已恢复为 `sd_latent_dim=512`，即保留 17 维显式结构态与 learned residual latent。
 
 1. 总体评价
 
@@ -438,7 +438,7 @@ explicit official reward approximation
 
 不建议继续大幅增加外层 latent residual
 
-早先 v5 方案里外层 residual latent 是 495 维，高维 residual 很容易掩盖 SD 结构贡献。当前 sd_latent_dim=17 更适合当前研究目标。旧版本中外层 17 + 495 latent、结构残差和硬迁移 shaping 同时存在，实验解释会更困难。
+早先 v5 方案里外层 residual latent 是 495 维，高维 residual 如果按维度直接参与统一均方误差，容易掩盖 SD 结构贡献。因此当时将 `sd_latent_dim=17` 作为更干净的诊断口径。当前主线恢复 `sd_latent_dim=512` 后，需通过结构态块与 residual 块按块加权来避免同一问题。
 
 除非你们后续明确转向“性能优先、不强调解释”，否则我建议继续保持当前 17 维结构态主线。
 

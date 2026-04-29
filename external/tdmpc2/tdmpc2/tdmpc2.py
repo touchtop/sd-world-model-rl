@@ -36,6 +36,16 @@ class TDMPC2(torch.nn.Module):
 			_mod = getattr(self.model, _attr, None)
 			if _mod is not None and isinstance(_mod, torch.nn.Module):
 				self.optim.add_param_group({'params': list(_mod.parameters()), 'lr': self.cfg.lr})
+		self.sd_optim = None
+		if bool(getattr(self.cfg, 'sd_online_supervision_enabled', False)) and hasattr(self.model, '_dynamics'):
+			sd_lr = getattr(self.cfg, 'sd_online_supervision_lr', None)
+			if sd_lr is None:
+				sd_lr = self.cfg.lr
+			self.sd_optim = torch.optim.Adam(
+				self.model._dynamics.parameters(),
+				lr=float(sd_lr),
+				capturable=True,
+			)
 		self.pi_optim = torch.optim.Adam(self.model._pi.parameters(), lr=self.cfg.lr, eps=1e-5, capturable=True)
 		self.model.eval()
 		self.scale = RunningScale(cfg)
@@ -307,6 +317,141 @@ class TDMPC2(torch.nn.Module):
 		discount = self.discount[task].unsqueeze(-1) if self.cfg.multitask else self.discount
 		return reward + discount * (1-terminated) * self.model.Q(next_z, action, task, return_type='min', target=True)
 
+	def _sd_struct_loss_scales(self, target):
+		"""Return per-channel scales for SD-structure losses from target batch statistics."""
+		mode = str(getattr(self.cfg, 'sd_struct_loss_scale_mode', 'batch_std'))
+		floor = float(getattr(self.cfg, 'sd_struct_loss_scale_floor', 0.1))
+		if mode == 'none':
+			return torch.ones(target.shape[-1], dtype=target.dtype, device=target.device)
+		if mode != 'batch_std':
+			raise ValueError(f'Unknown sd_struct_loss_scale_mode: {mode}')
+		flat = target.detach().reshape(-1, target.shape[-1])
+		scales = flat.std(dim=0, unbiased=False)
+		return scales.clamp_min(floor)
+
+	def _sd_struct_mse(self, pred, target, weights=None, scales=None):
+		if scales is None:
+			scales = self._sd_struct_loss_scales(target)
+		while scales.ndim < pred.ndim:
+			scales = scales.unsqueeze(0)
+		err = ((pred - target) / scales) ** 2
+		if weights is None:
+			return err.mean()
+		while weights.ndim < err.ndim:
+			weights = weights.unsqueeze(-1)
+		denom = weights.sum() * pred.shape[-1] + 1e-6
+		return (err * weights).sum() / denom
+
+	def _sd_latent_consistency_mse(self, pred_z, target_z):
+		if not hasattr(self.model, '_split_latent'):
+			return F.mse_loss(pred_z, target_z)
+		pred_struct, pred_resid = self.model._split_latent(pred_z)
+		true_struct, true_resid = self.model._split_latent(target_z)
+		struct_loss = self._sd_struct_mse(pred_struct, true_struct)
+		if pred_resid is None or true_resid is None:
+			return struct_loss
+		resid_loss = F.mse_loss(pred_resid, true_resid)
+		struct_weight = float(getattr(self.cfg, 'sd_latent_consistency_struct_weight', 1.0))
+		resid_weight = float(getattr(self.cfg, 'sd_latent_consistency_resid_weight', 1.0))
+		denom = struct_weight + resid_weight
+		if denom <= 0:
+			return struct_loss
+		return (struct_weight * struct_loss + resid_weight * resid_loss) / denom
+
+	def _sd_transition_weights(self, struct_now, struct_next):
+		dyn = self.model._dynamics
+		flat_now = struct_now.reshape(-1, struct_now.shape[-1])
+		flat_next = struct_next.reshape(-1, struct_next.shape[-1])
+		with torch.no_grad():
+			feat_now = dyn._state_reward_features(flat_now)
+			feat_next = dyn._state_reward_features(flat_next)
+			grounded_now = feat_now["any_contact_z"] <= dyn.STATE_GROUND_EPS
+			grounded_next = feat_next["any_contact_z"] <= dyn.STATE_GROUND_EPS
+			landing = (feat_now["airborne_true"] >= 0.5) & grounded_next
+			takeoff = grounded_now & (feat_next["airborne_true"] >= 0.5)
+			near_contact = (feat_now["any_contact_z"] > dyn.STATE_GROUND_EPS) & (feat_now["any_contact_z"] <= 0.10)
+			high_omega = feat_now["pitch_rate"].abs() >= dyn.STATE_UPRIGHT_OMEGA_MAX
+			critical = landing | takeoff | near_contact | high_omega
+			phase_weight = float(getattr(self.cfg, 'sd_online_supervision_phase_weight', 1.0))
+			weights = torch.ones_like(feat_now["pitch_rate"])
+			if phase_weight > 1.0:
+				weights = torch.where(critical, torch.full_like(weights, phase_weight), weights)
+		return (
+			weights.reshape(struct_now.shape[:-1]),
+			critical.to(dtype=struct_now.dtype).reshape(struct_now.shape[:-1]),
+		)
+
+	def _update_sd_supervision(self, obs, action):
+		if self.sd_optim is None or not hasattr(self.model, '_dynamics'):
+			return {}
+		if isinstance(obs, TensorDict):
+			return {}
+		dyn = self.model._dynamics
+		horizon = action.shape[0]
+		true_struct = dyn.encode_observation(obs.reshape(-1, obs.shape[-1])).reshape(
+			obs.shape[0], obs.shape[1], dyn.STATE_DIM,
+		)
+		true_now = true_struct[:-1]
+		true_next = true_struct[1:]
+		pred_next = torch.stack([dyn(true_struct[t], action[t]) for t in range(horizon)], dim=0)
+
+		step_weights, critical_mask = self._sd_transition_weights(true_now, true_next)
+		struct_scales = self._sd_struct_loss_scales(true_next)
+		one_step_loss = self._sd_struct_mse(pred_next, true_next, step_weights, scales=struct_scales)
+
+		omega_idx = dyn.PITCH_RATE_IDX
+		contact_slice = slice(dyn.TOE_TOUCH_IDX, dyn.HEEL_TOUCH_IDX + 1)
+		omega_loss = self._sd_struct_mse(
+			pred_next[..., omega_idx:omega_idx+1],
+			true_next[..., omega_idx:omega_idx+1],
+			step_weights,
+			scales=struct_scales[omega_idx:omega_idx+1],
+		)
+		contact_loss = self._sd_struct_mse(
+			pred_next[..., contact_slice],
+			true_next[..., contact_slice],
+			step_weights,
+			scales=struct_scales[contact_slice],
+		)
+
+		rollout_pred = true_struct[0]
+		for t in range(horizon):
+			rollout_pred = dyn(rollout_pred, action[t])
+		rollout_target = true_struct[horizon]
+		rollout_weights, rollout_critical = self._sd_transition_weights(
+			true_struct[0:1], rollout_target.unsqueeze(0),
+		)
+		rollout_loss = self._sd_struct_mse(
+			rollout_pred.unsqueeze(0),
+			rollout_target.unsqueeze(0),
+			rollout_weights,
+			scales=struct_scales,
+		)
+
+		total_sd_loss = (
+			float(getattr(self.cfg, 'sd_online_supervision_one_step_weight', 1.0)) * one_step_loss
+			+ float(getattr(self.cfg, 'sd_online_supervision_rollout_weight', 1.0)) * rollout_loss
+			+ float(getattr(self.cfg, 'sd_online_supervision_omega_weight', 0.0)) * omega_loss
+			+ float(getattr(self.cfg, 'sd_online_supervision_contact_weight', 0.0)) * contact_loss
+		)
+
+		self.sd_optim.zero_grad(set_to_none=True)
+		total_sd_loss.backward()
+		sd_grad_norm = torch.nn.utils.clip_grad_norm_(dyn.parameters(), self.cfg.grad_clip_norm)
+		self.sd_optim.step()
+		self.sd_optim.zero_grad(set_to_none=True)
+
+		return {
+			"sd_online_supervision_loss": total_sd_loss.detach(),
+			"sd_online_one_step_loss": one_step_loss.detach(),
+			"sd_online_rollout_loss": rollout_loss.detach(),
+			"sd_online_omega_loss": omega_loss.detach(),
+			"sd_online_contact_loss": contact_loss.detach(),
+			"sd_online_critical_frac": critical_mask.mean().detach(),
+			"sd_online_rollout_critical_frac": rollout_critical.mean().detach(),
+			"sd_online_grad_norm": sd_grad_norm.detach(),
+		}
+
 	def _update(self, obs, action, reward, terminated, task=None):
 		# Compute targets
 		with torch.no_grad():
@@ -333,11 +478,11 @@ class TDMPC2(torch.nn.Module):
 		resid_consistency_loss = torch.zeros((), device=self.device)
 		for t, (_action, _next_z) in enumerate(zip(action.unbind(0), next_z.unbind(0))):
 			z = self.model.next(z, _action, task)
-			consistency_loss = consistency_loss + F.mse_loss(z, _next_z) * self.cfg.rho**t
+			consistency_loss = consistency_loss + self._sd_latent_consistency_mse(z, _next_z) * self.cfg.rho**t
 			if hasattr(self.model, '_split_latent'):
 				pred_struct, pred_resid = self.model._split_latent(z)
 				true_struct, true_resid = self.model._split_latent(_next_z)
-				struct_consistency_loss = struct_consistency_loss + F.mse_loss(pred_struct, true_struct) * self.cfg.rho**t
+				struct_consistency_loss = struct_consistency_loss + self._sd_struct_mse(pred_struct, true_struct) * self.cfg.rho**t
 				if pred_resid is not None and true_resid is not None:
 					resid_consistency_loss = resid_consistency_loss + F.mse_loss(pred_resid, true_resid) * self.cfg.rho**t
 			zs[t+1] = z
@@ -410,6 +555,9 @@ class TDMPC2(torch.nn.Module):
 		# Update target Q-functions
 		self.model.soft_update_target_Q()
 
+		# Update shared SD transition core with an explicit replay-supervision step.
+		sd_supervision_info = self._update_sd_supervision(obs, action)
+
 		# Return training statistics
 		self.model.eval()
 		q_values = math.two_hot_inv(qs, self.cfg)
@@ -459,6 +607,8 @@ class TDMPC2(torch.nn.Module):
 			info.update(TensorDict(extra_info, batch_size=torch.Size([])))
 		if reward_mix_info:
 			info.update(TensorDict(reward_mix_info, batch_size=torch.Size([])))
+		if sd_supervision_info:
+			info.update(TensorDict(sd_supervision_info, batch_size=torch.Size([])))
 		info = info.detach()
 		return {
 			k: v.mean().item() if torch.is_tensor(v) else v

@@ -9,7 +9,7 @@
 本文档吸收以下事实前提：
 
 1. 当前活跃实现已回到纯环境奖励口径，`sd_reward_mode=learned`；
-2. 当前闭环推荐 `sd_latent_dim=17`，关闭外层 latent residual；
+2. 当前闭环主线推荐 `sd_latent_dim=512`，保留外层 learned residual latent，用于补足显式 SD 结构态未覆盖的动力机制；
 3. 当前最强证据仍来自监督拟合，而不是闭环 RL；
 4. 当前不再建议恢复自定义结构化 reward shaping；
 5. 下一阶段应转向严格的诊断与 ablation，而不是继续混合更多机制。
@@ -99,7 +99,7 @@
 后续所有 Hopper SD 验证应遵循以下原则：
 
 1. 保持 `pure-env` 口径，不重新引入 shaping；
-2. 保持 `sd_latent_dim=17`，避免外层高维 latent residual 重新掩盖显式结构贡献；
+2. 保持 `sd_latent_dim=512`，但在一致性损失中将 17 维结构态块与 learned residual latent 块按块加权，避免高维 residual 仅因维度数更多而掩盖显式结构贡献；
 3. 先补短平快诊断，再拉长 50k/100k 闭环预算；
 4. 所有闭环结论必须来自对照实验，不允许只汇报单条 full model 结果；
 5. 所有关键结论都要区分：

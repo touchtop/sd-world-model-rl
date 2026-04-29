@@ -22,12 +22,14 @@
 
 1. `world_model_kind=sd_hopper`
 2. `sd_struct_dim=17`
-3. `sd_latent_dim=17`
+3. `sd_latent_dim=512`
 4. `sd_use_transition_residual=true`
 5. `sd_transition_residual_scale=4.0`
 6. `sd_reward_mode=learned`
 7. `sd_action_prior_enabled=false`
 8. 不使用旧的结构化奖励塑形
+9. `consistency_loss` 中的结构态与残差态默认按块等权，而不是按维度数加权
+10. SD 结构态一致性损失使用 batch 目标标准差做逐通道归一化
 
 对应脚本为：
 
@@ -45,6 +47,10 @@
 5. `height_loss`（当前配置中基本关闭）
 
 这意味着在线训练优化的是“对当前 TD-MPC2 闭环有用的 world model”，而不是“平均动力学误差最小的 SD 拟合器”。
+
+截至 `2026-04-29` 的修复版本中，若 `world_model_kind=sd_hopper`，`consistency_loss` 不再直接对完整 512 维 latent 做统一均方误差，而是先拆成 17 维显式结构态与 learned residual latent 两个块。结构态块按当前 batch 中目标结构态的逐通道标准差进行归一化，并设置标量下限防止近常量通道数值爆炸；残差块保留普通均方误差。两个块默认等权合成，由 `sd_latent_consistency_struct_weight=1.0` 与 `sd_latent_consistency_resid_weight=1.0` 控制。
+
+这一处理保留了 learned residual latent 对未建模动力机制的补偿作用，但避免 495 维残差块仅因维度更多而在 `consistency_loss` 中压过 17 维结构态。结构态的 batch 标准差归一化用于避免 `omega / qdot / vz` 等大尺度通道主导梯度，使 `H / touch_toe / touch_heel / z_min` 等接触相位相关通道在优化目标中保持可见。
 
 ### 诊断方法
 
@@ -85,3 +91,56 @@
    3. `landing / takeoff / near_contact / high_omega` 相位加权误差。
 
 这样可以在不污染 planner 接口的前提下，显式维护 `SD` 的短视界保真度。
+
+### 当前已落地的最小实现
+
+截至 `2026-04-29`，上述方向已先落地最小版本，其实现位于 [tdmpc2.py](/home/data/round/code/sd_world_model_rl/external/tdmpc2/tdmpc2/tdmpc2.py)。
+
+实现原则如下：
+
+1. 不新增第二个 dynamics 头；
+2. 继续复用当前 `SDWorldModel._dynamics` 作为唯一 transition core；
+3. 在 TD-MPC2 每次 `_update()` 的主模型更新与 target-Q 更新之后，再执行一次独立的 `sd_optim` 监督更新；
+4. 监督数据直接来自当前 replay batch 的真实 `obs, action, obs_next`。
+
+### 当前在线监督支路的损失构成
+
+当前最小在线监督支路由以下部分组成：
+
+1. `sd_online_one_step_loss`：基于真实结构态的 `1-step` 转移误差；
+2. `sd_online_rollout_loss`：基于同一 batch 的短视界 rollout 误差；
+3. `sd_online_omega_loss`：对 `pitch_rate / omega` 通道的附加监督；
+4. `sd_online_contact_loss`：对 `touch_toe, touch_heel` 接触通道的附加监督。
+
+总损失为：
+
+1. `sd_online_supervision_one_step_weight * one_step_loss`
+2. `+ sd_online_supervision_rollout_weight * rollout_loss`
+3. `+ sd_online_supervision_omega_weight * omega_loss`
+4. `+ sd_online_supervision_contact_weight * contact_loss`
+
+上述 `one_step_loss`、`rollout_loss`、`omega_loss` 与 `contact_loss` 均使用同一批目标结构态的逐通道标准差做尺度归一化。相位加权用于提高 `landing / takeoff / near_contact / high_omega` 的样本权重，通道尺度归一化用于校正不同物理量单位和数值范围造成的梯度偏置，二者作用不同。
+
+当前尺度口径为：`sd_struct_loss_scale_mode=batch_std`，`sd_struct_loss_scale_floor=0.1`。即每个 replay batch 内先按目标结构态估计通道标准差，再用 `0.1` 作为统一下限。该尺度来自当前训练分布的目标统计量，不是手工指定的固定物理通道系数。
+
+### 当前 rollout 监督视界
+
+当前最小实现先支持：
+
+1. `1-step`
+2. `3-step`
+
+原因不是方法论限制，而是当前 [buffer.py](/home/data/round/code/sd_world_model_rl/external/tdmpc2/tdmpc2/common/buffer.py) 的 `sample()` 只返回 `horizon+1` 长度窗口，而当前 Hopper 训练配置中 `horizon=3`。因此，在不改采样接口的前提下，当前最自然、最干净的最小实现就是 `1-step + 3-step`。
+
+若后续需要显式加入 `5-step` 监督，应同步修改 replay 采样窗口长度或额外增加独立监督采样路径。
+
+### 当前关键相位加权
+
+当前在线监督不是完全均匀加权，而是对以下相位提高权重：
+
+1. `landing`
+2. `takeoff`
+3. `near_contact`
+4. `high_omega`
+
+其动机是：这些相位对 TD-MPC2 的动作排序与短视界规划最敏感，而它们也是此前 replay 诊断中误差最顽固的部分。
