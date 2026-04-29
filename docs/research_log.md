@@ -48,6 +48,21 @@ Hopper `pureenv_sdinit_online_sup` 三种子 `50k` 正式对照 `run3` 已全部
 
 - [learnable_sd_v5_objective_decoupling_2026_04_29.md](/home/data/round/code/sd_world_model_rl/docs/worklog/learnable_sd_v5_objective_decoupling_2026_04_29.md)
 
+## 2026-04-30
+
+在比较当前 `pureenv_sdinit_online_sup` 与上一组同样去除奖励塑形的 `pureenv_sdinit` 后，确认当前在线 `SD` 监督版本在强 seed3 上低于上一组 `75k` 结果。该结果提示：平均结构态预测监督并不必然改善 TD-MPC2 的动作排序与闭环收益，单纯提高 `sd_online_supervision_lr` 也不一定能解决目标错配。
+
+据此开始准备下一版本 planning-aware `SD` 目标。第一步已加入默认关闭的样本加权入口：
+
+1. `sd_online_planning_weight_enabled=false`
+2. `sd_online_planning_weight_mode=td_positive`
+3. `sd_online_planning_weight_coef=1.0`
+4. `sd_online_planning_weight_max=5.0`
+
+该入口在启用时使用 TD 目标或奖励目标对在线 `SD` 监督样本加权，使结构态监督优先关注对 planner 更可能有价值的 replay 片段。权重按 batch 内 signal 均值归一化，避免启用该机制后等价于整体放大 `SD` 学习率。当前实现仍保留物理监督锚点，不直接把 `SD` 目标改成最大化回报；完整 action-ranking consistency loss 将作为后续扩展。详细记录见：
+
+- [learnable_sd_v5_planning_aware_sd_2026_04_30.md](/home/data/round/code/sd_world_model_rl/docs/worklog/learnable_sd_v5_planning_aware_sd_2026_04_30.md)
+
 相关方法文档与决策文档同步建立：
 
 - [methods.md](/home/data/round/code/sd_world_model_rl/docs/methods.md)

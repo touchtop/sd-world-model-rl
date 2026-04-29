@@ -48,6 +48,17 @@
 4. 自 `2026-04-29` 修复版本起，主 `consistency_loss` 的 SD 结构态部分与在线 SD 监督损失均使用 batch 目标结构态标准差归一化。
 5. 主 `consistency_loss` 中的结构态块与 residual latent 块默认按块等权，避免 495 维残差块仅因维度数量压过 17 维显式结构态。
 
+### 下一版本 planning-aware SD 权重配置
+
+截至 `2026-04-30`，配置文件新增以下默认关闭的 planning-aware 权重参数：
+
+1. `sd_online_planning_weight_enabled=false`
+2. `sd_online_planning_weight_mode=td_positive`
+3. `sd_online_planning_weight_coef=1.0`
+4. `sd_online_planning_weight_max=5.0`
+
+默认关闭意味着既有 `pureenv_sdinit_online_sup` 实验不受影响。启用该开关后，在线 `SD` 监督损失会根据 TD 目标或奖励目标对样本加权，用于验证 planning signal 是否能缓解平均结构态监督与闭环规划目标之间的错配。权重在 batch 内按均值归一化，并用 `sd_online_planning_weight_max` 截断，以降低启用该机制后因有效学习率变化造成的混淆。
+
 ### 当前监督初始化 checkpoint
 
 用于当前 `pure-env + sdinit` 主线的监督初始化 checkpoint 为：

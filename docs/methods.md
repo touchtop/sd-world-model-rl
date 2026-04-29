@@ -144,3 +144,20 @@
 4. `high_omega`
 
 其动机是：这些相位对 TD-MPC2 的动作排序与短视界规划最敏感，而它们也是此前 replay 诊断中误差最顽固的部分。
+
+### 下一版本：planning-aware SD 权重入口
+
+截至 `2026-04-30`，下一版本已加入默认关闭的 planning-aware 样本权重入口。该入口不直接改变 planner，也不把 `SD` 训练目标改成最大化回报，而是在现有结构态监督锚点上，根据 TD 目标或奖励目标对 replay 样本加权。
+
+新增配置为：
+
+1. `sd_online_planning_weight_enabled=false`
+2. `sd_online_planning_weight_mode=td_positive`
+3. `sd_online_planning_weight_coef=1.0`
+4. `sd_online_planning_weight_max=5.0`
+
+可选模式包括 `td_positive`、`td_abs`、`reward_positive` 与 `reward_abs`。启用后，权重会同时作用于 `1-step` 结构态监督和当前短视界 rollout 监督。权重按当前 batch 的 planning signal 均值归一化，即 `sd_online_planning_weight_coef=1.0` 时，未截断前的平均权重约为 `1`，避免该机制退化为整体提高 `SD` 学习率。若正值模式下当前 batch 没有正 signal，则回退为均匀权重。
+
+该入口用于验证：相比平均状态预测误差，按 planning signal 重加权的 `SD` 监督是否更能改善动作排序和闭环样本效率。
+
+该版本仍不是完整的 action-ranking consistency loss。完整排序目标需要额外构造动作 bank，并用真实短 rollout 或高保真离线诊断得到动作优劣标签；当前权重入口只是为该方向提供低风险的第一步。

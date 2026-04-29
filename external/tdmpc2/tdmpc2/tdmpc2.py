@@ -381,7 +381,39 @@ class TDMPC2(torch.nn.Module):
 			critical.to(dtype=struct_now.dtype).reshape(struct_now.shape[:-1]),
 		)
 
-	def _update_sd_supervision(self, obs, action):
+	def _sd_planning_weights(self, td_targets=None, reward_target=None, expected_shape=None):
+		if not bool(getattr(self.cfg, 'sd_online_planning_weight_enabled', False)):
+			return None
+		mode = str(getattr(self.cfg, 'sd_online_planning_weight_mode', 'td_positive'))
+		source = td_targets if mode.startswith('td_') else reward_target
+		if source is None:
+			return None
+		with torch.no_grad():
+			if mode in ('td_positive', 'reward_positive'):
+				score = source.detach().clamp_min(0)
+			elif mode in ('td_abs', 'reward_abs'):
+				score = source.detach().abs()
+			else:
+				raise ValueError(f'Unknown sd_online_planning_weight_mode: {mode}')
+			if score.ndim > 0 and score.shape[-1] == 1:
+				score = score.squeeze(-1)
+			if expected_shape is not None and score.shape != expected_shape:
+				expected_numel = 1
+				for dim in expected_shape:
+					expected_numel *= int(dim)
+				if score.numel() != expected_numel:
+					raise ValueError(
+						f'sd planning weights shape {tuple(score.shape)} cannot match {tuple(expected_shape)}'
+					)
+				score = score.reshape(expected_shape)
+			scale = score.mean()
+			if scale.item() <= 1e-6:
+				return torch.ones_like(score)
+			coef = float(getattr(self.cfg, 'sd_online_planning_weight_coef', 1.0))
+			weights = 1.0 + coef * (score / scale - 1.0)
+			return weights.clamp(min=0.0, max=float(getattr(self.cfg, 'sd_online_planning_weight_max', 5.0)))
+
+	def _update_sd_supervision(self, obs, action, td_targets=None, reward_target=None):
 		if self.sd_optim is None or not hasattr(self.model, '_dynamics'):
 			return {}
 		if isinstance(obs, TensorDict):
@@ -396,6 +428,13 @@ class TDMPC2(torch.nn.Module):
 		pred_next = torch.stack([dyn(true_struct[t], action[t]) for t in range(horizon)], dim=0)
 
 		step_weights, critical_mask = self._sd_transition_weights(true_now, true_next)
+		planning_weights = self._sd_planning_weights(
+			td_targets=td_targets,
+			reward_target=reward_target,
+			expected_shape=step_weights.shape,
+		)
+		if planning_weights is not None:
+			step_weights = step_weights * planning_weights
 		struct_scales = self._sd_struct_loss_scales(true_next)
 		one_step_loss = self._sd_struct_mse(pred_next, true_next, step_weights, scales=struct_scales)
 
@@ -421,6 +460,8 @@ class TDMPC2(torch.nn.Module):
 		rollout_weights, rollout_critical = self._sd_transition_weights(
 			true_struct[0:1], rollout_target.unsqueeze(0),
 		)
+		if planning_weights is not None:
+			rollout_weights = rollout_weights * planning_weights.mean(dim=0, keepdim=True)
 		rollout_loss = self._sd_struct_mse(
 			rollout_pred.unsqueeze(0),
 			rollout_target.unsqueeze(0),
@@ -449,6 +490,11 @@ class TDMPC2(torch.nn.Module):
 			"sd_online_contact_loss": contact_loss.detach(),
 			"sd_online_critical_frac": critical_mask.mean().detach(),
 			"sd_online_rollout_critical_frac": rollout_critical.mean().detach(),
+			"sd_online_planning_weight_mean": (
+				planning_weights.mean().detach()
+				if planning_weights is not None
+				else torch.zeros((), device=self.device)
+			),
 			"sd_online_grad_norm": sd_grad_norm.detach(),
 		}
 
@@ -556,7 +602,7 @@ class TDMPC2(torch.nn.Module):
 		self.model.soft_update_target_Q()
 
 		# Update shared SD transition core with an explicit replay-supervision step.
-		sd_supervision_info = self._update_sd_supervision(obs, action)
+		sd_supervision_info = self._update_sd_supervision(obs, action, td_targets=td_targets, reward_target=reward_target)
 
 		# Return training statistics
 		self.model.eval()

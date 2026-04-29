@@ -42,6 +42,10 @@ sd_online_supervision_rollout_weight: 1.0
 sd_online_supervision_omega_weight: 0.25
 sd_online_supervision_contact_weight: 0.25
 sd_online_supervision_phase_weight: 2.0
+sd_online_planning_weight_enabled: false
+sd_online_planning_weight_mode: td_positive
+sd_online_planning_weight_coef: 1.0
+sd_online_planning_weight_max: 5.0
 hopper_stage_reset_pool_csv: null
 init_from: null
 sd_supervised_init_from: null

@@ -108,6 +108,34 @@ bash scripts/run_hopper_v5_5k_pureenv_sdinit_online_sup.sh \
 - 在共享 `SD transition core` 上追加独立在线监督更新
 - 用于验证在线监督支路能否稳定接入、落盘并写出训练统计
 
+planning-aware SD 5k smoke 脚本：
+
+用法：
+
+```bash
+bash scripts/run_hopper_v5_5k_pureenv_sdinit_planning_sd.sh <gpu_id> <exp_name> <seed>
+```
+
+示例：
+
+```bash
+bash scripts/run_hopper_v5_5k_pureenv_sdinit_planning_sd.sh \
+  1 sd_hopper_5k_pureenv_sdinit_planning_sd_seed3_20260430_run1 3
+```
+
+相对 online supervision 版本，额外启用：
+
+- `sd_online_planning_weight_enabled=true`
+- `sd_online_planning_weight_mode=td_positive`
+- `sd_online_planning_weight_coef=1.0`
+- `sd_online_planning_weight_max=5.0`
+
+含义：
+
+- 保持纯环境奖励、监督初始化、共享 transition core 与在线 `SD` 监督口径不变
+- 使用 TD 目标对在线 `SD` 监督样本做均值归一化重加权
+- 用于检查 planning-aware 样本权重是否改善早期训练统计、关键相位轨迹与闭环得分
+
 历史 v429 脚本：
 
 脚本：

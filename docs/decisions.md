@@ -109,3 +109,22 @@ Hopper 主线保留 `sd_latent_dim=512`，并将 TD-MPC2 主 `consistency_loss` 
 
 **影响**  
 该决策保留 residual latent 对未建模动力机制的补偿能力，同时避免高维 residual 因维度数量自然压过显式结构态。结构态块内部不使用人工固定通道系数，而是通过 `sd_struct_loss_scale_mode=batch_std` 依据 replay batch 目标结构态的逐通道标准差归一化；`sd_struct_loss_scale_floor=0.1` 仅作为数值稳定下限。
+
+## 决策 6
+
+**决策**  
+下一版本先实现默认关闭的 planning-aware `SD` 样本权重入口，而不是直接把 `SD` 训练目标改为完整动作排序一致性损失。
+
+**背景**  
+当前 `pureenv_sdinit_online_sup` 与上一组 `pureenv_sdinit` 对比显示，平均结构态预测监督未必能提升强 seed 的闭环收益，说明 `SD` 保真目标与 planner 动作排序目标之间仍存在错配。但完整动作排序一致性损失需要额外构造动作 bank、真实短 rollout 标签或离线动作优劣诊断，工程变量较多。
+
+**选项**  
+1. 继续只优化平均结构态预测误差。  
+2. 先根据 TD 目标或奖励目标对在线 `SD` 监督样本进行均值归一化重加权。  
+3. 立即实现完整 action-ranking consistency loss。
+
+**结论**  
+采用选项 2。该入口默认关闭，仅在显式实验脚本中启用；启用后，权重按 batch 内 planning signal 均值归一化，并用 `sd_online_planning_weight_max` 截断。
+
+**影响**  
+该决策提供了低风险的第一步验证：若 planning-weighted `SD` 监督改善样本效率，则说明目标错配至少部分来自样本重要性；若无明显改善，则后续应转向完整动作排序一致性目标，而不是继续提高 `sd_online_supervision_lr`。
