@@ -102,16 +102,38 @@ class OnlineTrainer(Trainer):
 		"""Restore complete state saved by `save_full_state`."""
 		state = torch.load(fp, map_location='cpu', weights_only=False)
 		device = self.agent.device
+
+		def _optimizer_group_count(payload):
+			if isinstance(payload, dict):
+				return len(payload.get('param_groups', []))
+			return 'unknown'
+
 		model_sd = state['model']
 		self.agent.model.load_state_dict(model_sd)
 		if state.get('target_Qs') is not None and hasattr(self.agent.model, '_target_Qs'):
 			self.agent.model._target_Qs.load_state_dict(state['target_Qs'])
 		if state.get('detach_Qs') is not None and hasattr(self.agent.model, '_detach_Qs'):
 			self.agent.model._detach_Qs.load_state_dict(state['detach_Qs'])
-		self.agent.optim.load_state_dict(state['optim'])
+		try:
+			self.agent.optim.load_state_dict(state['optim'])
+		except (ValueError, KeyError, RuntimeError) as exc:
+			old_groups = _optimizer_group_count(state.get('optim'))
+			new_groups = _optimizer_group_count(self.agent.optim.state_dict())
+			print(
+				'Warning: skipped main optimizer state restore due to state mismatch '
+				f'(old_param_groups={old_groups}, new_param_groups={new_groups}): {exc}'
+			)
 		self.agent.pi_optim.load_state_dict(state['pi_optim'])
 		if state.get('sd_optim') is not None and getattr(self.agent, 'sd_optim', None) is not None:
-			self.agent.sd_optim.load_state_dict(state['sd_optim'])
+			try:
+				self.agent.sd_optim.load_state_dict(state['sd_optim'])
+			except (ValueError, KeyError, RuntimeError) as exc:
+				old_groups = _optimizer_group_count(state.get('sd_optim'))
+				new_groups = _optimizer_group_count(self.agent.sd_optim.state_dict())
+				print(
+					'Warning: skipped SD optimizer state restore due to state mismatch '
+					f'(old_param_groups={old_groups}, new_param_groups={new_groups}): {exc}'
+				)
 		self.agent.scale.load_state_dict(state['scale'])
 		self.agent._prev_mean.copy_(state['prev_mean'].to(device))
 		self._step = int(state['step'])

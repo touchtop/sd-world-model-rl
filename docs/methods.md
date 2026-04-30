@@ -52,6 +52,12 @@
 
 这一处理保留了 learned residual latent 对未建模动力机制的补偿作用，但避免 495 维残差块仅因维度更多而在 `consistency_loss` 中压过 17 维结构态。结构态的 batch 标准差归一化用于避免 `omega / qdot / vz` 等大尺度通道主导梯度，使 `H / touch_toe / touch_heel / z_min` 等接触相位相关通道在优化目标中保持可见。
 
+截至 `2026-04-30` 的接口修复版本中，若显式启用 `sd_online_supervision_enabled=true`，共享 `SD transition core` 即 `model._dynamics` 不再放入 TD-MPC2 主优化器 `self.optim`，而只由 `sd_optim` 管理。主优化器继续更新 encoder、reward、Q、policy 以外的 residual heads 等 TD-MPC2 侧参数；`sd_optim` 单独更新 `_dynamics`。这样可以避免同一组 `_dynamics` 参数被两个 Adam 优化器分别维护动量和二阶矩，从而消除优化器状态错位。随后进一步补充 `sd_detach_core_in_main_loss=true` 默认口径：启用 online supervision 时，`model.next()` 中 `_dynamics` 生成的 `next_struct_base` 在主 consistency 路径中只作为 residual 合成基座使用，不再参与主损失反传。由此，主 `consistency_loss` 不再训练 `SD core`，而主要训练外层 residual heads 与 TD-MPC2 下游头；`SD core` 的训练来源是独立在线 `SD` 监督。
+
+该版本还固定了两项接口口径。第一，趋势保护维度不再使用固定的绝对最小修正下限，`sd_trend_protect_min_correction` 默认改为 `0.0`，避免在 `ROOTZ / ZMIN` 等小信号段引入单位错配的虚假漂移。第二，`sd_reward_mode=learned` 时，`mixed_reward_target()` 也统一返回已经乘以 `sd_env_reward_scale` 的环境奖励目标，避免 learned、hybrid、curriculum 模式之间出现静默尺度不一致。
+
+结构态 residual 仍被保留，因为其设计目的正是补偿系统动力学 core 难以完整表达的 Hopper 复杂动力机制。为避免 residual 失去可审计性，当前版本将 `sd_struct_residual_scale`、`sd_vx_residual_scale`、`sd_vz_residual_scale`、`sd_pitch_residual_scale`、`sd_pitch_rate_residual_scale`、`sd_knee_residual_scale` 显式配置化，并新增默认关闭的 `sd_struct_residual_penalty_coef`。该正则项作用于 `tanh(raw_struct_residual)` 的平方均值，用于后续显式消融“残差补偿”与“残差覆盖 SD core”的边界；当前默认关闭，以避免在未完成 smoke 与消融前把新的超参数混入主线对照。训练日志新增 `struct_residual_activity=mean(abs(tanh(raw_struct_residual)))`，用于在 smoke 阶段判断 residual 是否过强。
+
 ### 诊断方法
 
 当前优先采用以下诊断：
@@ -100,8 +106,10 @@
 
 1. 不新增第二个 dynamics 头；
 2. 继续复用当前 `SDWorldModel._dynamics` 作为唯一 transition core；
-3. 在 TD-MPC2 每次 `_update()` 的主模型更新与 target-Q 更新之后，再执行一次独立的 `sd_optim` 监督更新；
-4. 监督数据直接来自当前 replay batch 的真实 `obs, action, obs_next`。
+3. 启用 online supervision 时，`SDWorldModel._dynamics` 只由 `sd_optim` 管理，不再同时由 TD-MPC2 主优化器管理；
+4. 启用 online supervision 时，主 consistency 路径默认 detach `_dynamics` 输出，使 `consistency_loss` 不再训练 `SD core`；
+5. 在 TD-MPC2 每次 `_update()` 的主模型更新与 target-Q 更新之后，再执行一次独立的 `sd_optim` 监督更新；
+6. 监督数据直接来自当前 replay batch 的真实 `obs, action, obs_next`。
 
 ### 当前在线监督支路的损失构成
 
@@ -148,6 +156,8 @@
 ### 下一版本：planning-aware SD 权重入口
 
 截至 `2026-04-30`，下一版本已加入默认关闭的 planning-aware 样本权重入口。该入口不直接改变 planner，也不把 `SD` 训练目标改成最大化回报，而是在现有结构态监督锚点上，根据 TD 目标或奖励目标对 replay 样本加权。
+
+本阶段方法论名称暂定为 `Decision-Oriented System-Dynamics-Guided World Model`，中文为“面向决策的系统动力学引导世界模型”。该名称用于强调：`SD` 指系统动力学（System Dynamics），其来源是系统工程和系统仿真中的建模思想；这里的 `SD` 不是为了构建环境动力学的完备副本，而是提供一种有系统动力学归纳偏置的状态抽象，使 world model 在候选动作排序、关键相位判断和闭环控制上更有用。相应地，评价口径不应只依赖平均状态预测误差，还应包含动作排序质量、规划稳定性和闭环样本效率。
 
 新增配置为：
 

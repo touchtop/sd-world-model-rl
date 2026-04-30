@@ -87,14 +87,14 @@ class SDWorldModel(nn.Module):
 
 		self.register_buffer('log_std_min', torch.tensor(cfg.log_std_min))
 		self.register_buffer('log_std_dif', torch.tensor(cfg.log_std_max) - self.log_std_min)
-		self.struct_residual_scale = 0.10
-		self.vx_residual_scale = 0.50
-		self.vz_residual_scale = 3.00
-		self.pitch_residual_scale = 0.75
-		self.pitch_rate_residual_scale = 8.00
-		self.knee_residual_scale = 0.35
-		self.trend_protect_max_scale = 0.20
-		self.trend_protect_min_correction = 0.02
+		self.struct_residual_scale = float(getattr(cfg, 'sd_struct_residual_scale', 0.10))
+		self.vx_residual_scale = float(getattr(cfg, 'sd_vx_residual_scale', 0.50))
+		self.vz_residual_scale = float(getattr(cfg, 'sd_vz_residual_scale', 3.00))
+		self.pitch_residual_scale = float(getattr(cfg, 'sd_pitch_residual_scale', 0.75))
+		self.pitch_rate_residual_scale = float(getattr(cfg, 'sd_pitch_rate_residual_scale', 8.00))
+		self.knee_residual_scale = float(getattr(cfg, 'sd_knee_residual_scale', 0.35))
+		self.trend_protect_max_scale = float(getattr(cfg, 'sd_trend_protect_max_scale', 0.20))
+		self.trend_protect_min_correction = float(getattr(cfg, 'sd_trend_protect_min_correction', 0.0))
 		self._trend_protected_idx = (
 			DMControlHopperSDModel.ROOTZ_IDX,
 			DMControlHopperSDModel.TOE_TOUCH_IDX,
@@ -187,6 +187,19 @@ class SDWorldModel(nn.Module):
 			return z_struct
 		return torch.cat([z_struct, z_resid], dim=-1)
 
+	def struct_residual_stats(self, z, a):
+		if self.resid_dim <= 0 or self._struct_residual is None:
+			zero = torch.zeros((), device=z.device, dtype=z.dtype)
+			return zero, zero
+		z_flat, _ = self._flatten_batch(z)
+		a_flat, _ = self._flatten_batch(a)
+		correction = torch.tanh(self._struct_residual(torch.cat([z_flat, a_flat], dim=-1)))
+		return correction.square().mean(), correction.abs().mean()
+
+	def struct_residual_penalty(self, z, a):
+		penalty, _ = self.struct_residual_stats(z, a)
+		return penalty
+
 
 	def encode(self, obs, task):
 		assert task is None
@@ -204,6 +217,11 @@ class SDWorldModel(nn.Module):
 		a_flat, _ = self._flatten_batch(a)
 		z_struct, z_resid = self._split_latent(z_flat)
 		next_struct_base = self._dynamics(z_struct, a_flat)
+		if (
+			bool(getattr(self.cfg, 'sd_online_supervision_enabled', False))
+			and bool(getattr(self.cfg, 'sd_detach_core_in_main_loss', True))
+		):
+			next_struct_base = next_struct_base.detach()
 		if self.resid_dim > 0:
 			hybrid = torch.cat([z_flat, a_flat], dim=-1)
 			raw_correction = self._struct_residual(hybrid)
@@ -302,7 +320,7 @@ class SDWorldModel(nn.Module):
 				"reward_shaping_mean": 0.0,
 				"reward_shaping_std": 0.0,
 			}
-			return env_reward, info
+			return self._restore_batch(reward_flat, leading), info
 		shaping_delta = self.shaping_reward(z, a, task, next_z=next_z)
 		shaping_flat, _ = self._flatten_batch(shaping_delta)
 		alpha = self._reward_mix_alpha()

@@ -27,6 +27,11 @@
 7. 因此只要发生官方评估，就会自动在
    `official_eval/step_XXXXXXXX/`
    下保存轨迹 csv 和汇总。
+8. 自 `2026-04-30` 接口修复后，启用
+   `sd_online_supervision_enabled=true` 时，`SD transition core`
+   只由 `sd_optim` 管理，不再同时进入 TD-MPC2 主优化器。
+9. 当前正在运行的旧进程不会自动吸收代码修复；验证修复效果必须使用新的
+   `exp_name` 启动新实验。
 
 ## 二、标准启动脚本
 
@@ -135,6 +140,42 @@ bash scripts/run_hopper_v5_5k_pureenv_sdinit_planning_sd.sh \
 - 保持纯环境奖励、监督初始化、共享 transition core 与在线 `SD` 监督口径不变
 - 使用 TD 目标对在线 `SD` 监督样本做均值归一化重加权
 - 用于检查 planning-aware 样本权重是否改善早期训练统计、关键相位轨迹与闭环得分
+
+planning-aware SD 100k 三种子脚本：
+
+脚本：
+
+- [run_hopper_v5_100k_pureenv_sdinit_planning_sd.sh](/home/data/round/code/sd_world_model_rl/scripts/run_hopper_v5_100k_pureenv_sdinit_planning_sd.sh)
+
+用法：
+
+```bash
+bash scripts/run_hopper_v5_100k_pureenv_sdinit_planning_sd.sh <gpu_id> <exp_name> <seed>
+```
+
+示例：
+
+```bash
+bash scripts/run_hopper_v5_100k_pureenv_sdinit_planning_sd.sh \
+  1 sd_hopper_100k_pureenv_sdinit_planning_sd_seed1_20260430_run1 1
+```
+
+固定口径：
+
+- `target_steps=100000`
+- `steps=100500`
+- `eval_freq=25000`
+- `checkpoint_freq=25000`
+- `eval_episodes=10`
+- `save_full_state=true`
+- `save_eval_traces=true`
+- 其余 `SD` 与 planning-aware 参数沿用 5k smoke
+
+含义：
+
+- 目标仍按 `100k` 训练预算比较；
+- 实际多跑 `500` 步，用于等待 `100k` 评估触发到达 episode 边界，减少末端 `eval.csv` 和 `official_eval/step_0100000/` 漏写；
+- 若需精确评估 `models/100000.pt`，仍应按第九节从 checkpoint 导出 eval 轨迹。
 
 历史 v429 脚本：
 

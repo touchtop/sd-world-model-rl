@@ -23,6 +23,9 @@
 10. `sd_struct_loss_scale_floor=0.1`
 11. `sd_latent_consistency_struct_weight=1.0`
 12. `sd_latent_consistency_resid_weight=1.0`
+13. `sd_trend_protect_min_correction=0.0`
+14. `sd_struct_residual_penalty_coef=0.0`
+15. `sd_detach_core_in_main_loss=true`
 
 ### 当前在线 SD 监督支路默认配置
 
@@ -43,10 +46,34 @@
 说明如下：
 
 1. 默认仍关闭该支路，以保证旧实验脚本不会因默认行为改变而失真；
-2. 一旦显式启用，将为共享 `SD transition core` 增加独立 `Adam` 监督更新；
-3. 当前最小实现依赖 replay batch 的 `horizon+1` 采样窗口，因此实际监督视界为 `1-step + 3-step`。
-4. 自 `2026-04-29` 修复版本起，主 `consistency_loss` 的 SD 结构态部分与在线 SD 监督损失均使用 batch 目标结构态标准差归一化。
-5. 主 `consistency_loss` 中的结构态块与 residual latent 块默认按块等权，避免 495 维残差块仅因维度数量压过 17 维显式结构态。
+2. 一旦显式启用，共享 `SD transition core` 即 `model._dynamics` 将从 TD-MPC2 主优化器中移除，只由独立 `sd_optim` 管理；
+3. `sd_detach_core_in_main_loss=true` 时，启用 online supervision 后主 consistency 路径不再训练 `SD core`，而由独立在线 `SD` 监督训练 `_dynamics`；
+4. 当前最小实现依赖 replay batch 的 `horizon+1` 采样窗口，因此实际监督视界为 `1-step + 3-step`。
+5. 自 `2026-04-29` 修复版本起，主 `consistency_loss` 的 SD 结构态部分与在线 SD 监督损失均使用 batch 目标结构态标准差归一化。
+6. 主 `consistency_loss` 中的结构态块与 residual latent 块默认按块等权，避免 495 维残差块仅因维度数量压过 17 维显式结构态。
+
+### 当前 residual 与趋势保护配置
+
+截至 `2026-04-30`，`SDWorldModel.next()` 中外层结构态 residual 与趋势保护参数均已显式配置化。默认值如下：
+
+1. `sd_struct_residual_scale=0.10`
+2. `sd_vx_residual_scale=0.50`
+3. `sd_vz_residual_scale=3.00`
+4. `sd_pitch_residual_scale=0.75`
+5. `sd_pitch_rate_residual_scale=8.00`
+6. `sd_knee_residual_scale=0.35`
+7. `sd_struct_residual_penalty_coef=0.0`
+8. `sd_detach_core_in_main_loss=true`
+9. `sd_trend_protect_max_scale=0.20`
+10. `sd_trend_protect_min_correction=0.0`
+
+说明如下：
+
+1. residual 保留为主线设计，因为显式系统动力学结构态不被要求完整覆盖 Hopper 的所有动力机制；
+2. `sd_struct_residual_penalty_coef` 默认关闭，仅作为后续 residual 覆盖风险消融入口；
+3. `struct_residual_activity=mean(abs(tanh(raw_struct_residual)))` 已写入训练日志，用于 smoke 阶段判断 residual 是否过强；
+4. `sd_trend_protect_min_correction=0.0` 取消此前绝对最小修正下限，避免在小位移、小接触变化阶段引入单位错配；
+5. `sd_vz_residual_scale=3.00` 与 `sd_pitch_rate_residual_scale=8.00` 当前仍保持历史默认值，原因是 residual 是主线设计的一部分，默认收紧会改变实验变量。下一轮 smoke 应同时观察 `struct_consistency_loss / resid_consistency_loss`、`struct_residual_activity` 与闭环得分，再决定是否将默认值收紧到如 `vz=1.0`、`pitch_rate=3.0`。
 
 ### 下一版本 planning-aware SD 权重配置
 

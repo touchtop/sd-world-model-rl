@@ -50,6 +50,26 @@ Hopper `pureenv_sdinit_online_sup` 三种子 `50k` 正式对照 `run3` 已全部
 
 ## 2026-04-30
 
+在 `pureenv_sdinit_online_sup` 三种子 `100k` 结束后，对补跑的 `official_eval/step_0100000` 结果进行姿态复核。三种子均值为 `18.74`，高于外部 TD-MPC2 官方 CSV 中 `hopper-hop` 100k 三种子均值 `13.63`，但优势主要来自 seed3。轨迹层面，agent 已经出现从倒地或低姿态中抬升并短暂接近站立的动作，尤其 seed2 `episode_03` 在宽松姿态判据下有最长连续 `18` 帧的接近直立片段。该轨迹已按操作指南渲染为：
+
+- [sd_online_sup_100k_seed2_ep03_most_upright.mp4](/home/data/round/code/sd_world_model_rl/results/hopper_trace_renders/sd_online_sup_100k_seed2_ep03_most_upright.mp4)
+
+该现象表明当前 `SD` 优化方向并非只强化贴地爬行，而是已经开始支持“起身/姿态转正”的可规划动作结构。后续版本因此继续采用 planning-aware `SD` 监督方向。
+
+据此新增 `100k` planning-aware `SD` 三种子启动脚本：
+
+- [run_hopper_v5_100k_pureenv_sdinit_planning_sd.sh](/home/data/round/code/sd_world_model_rl/scripts/run_hopper_v5_100k_pureenv_sdinit_planning_sd.sh)
+
+该脚本沿用 `5k` planning-aware smoke 已验证配置，保持纯环境奖励、supervised `SD` 初始化、共享 `SD transition core`、在线 `SD` 监督、TD-positive planning-aware 样本重加权和 `sd_latent_dim=512`。训练目标仍为 `100k`，但实际 `steps` 设置为 `100500`，用于给 `100k` 评估触发留出一个 Hopper episode 的边界缓冲，减少末端 `eval.csv` 与 `official_eval/step_0100000/` 漏写。
+
+随后按该脚本启动 planning-aware `SD` 三种子 `100k` 正式实验：
+
+- seed1: `sd_hopper_100k_pureenv_sdinit_planning_sd_seed1_20260430_run1`，GPU 1，PID 2706767，会话 74704；
+- seed2: `sd_hopper_100k_pureenv_sdinit_planning_sd_seed2_20260430_run1`，GPU 2，PID 2708360，会话 35611；
+- seed3: `sd_hopper_100k_pureenv_sdinit_planning_sd_seed3_20260430_run1`，GPU 3，PID 2711933，会话 54319。
+
+三条线均已确认加载 supervised `SD` checkpoint，参数显示 `steps=100500`、`eval_freq=25000`、`checkpoint_freq=25000`、`save_full_state=true`、`save_eval_traces=true`，并在 `2500` step 写出 `2500.pt` 与 `2500.full.pt`。
+
 在比较当前 `pureenv_sdinit_online_sup` 与上一组同样去除奖励塑形的 `pureenv_sdinit` 后，确认当前在线 `SD` 监督版本在强 seed3 上低于上一组 `75k` 结果。该结果提示：平均结构态预测监督并不必然改善 TD-MPC2 的动作排序与闭环收益，单纯提高 `sd_online_supervision_lr` 也不一定能解决目标错配。
 
 据此开始准备下一版本 planning-aware `SD` 目标。第一步已加入默认关闭的样本加权入口：
@@ -62,6 +82,10 @@ Hopper `pureenv_sdinit_online_sup` 三种子 `50k` 正式对照 `run3` 已全部
 该入口在启用时使用 TD 目标或奖励目标对在线 `SD` 监督样本加权，使结构态监督优先关注对 planner 更可能有价值的 replay 片段。权重按 batch 内 signal 均值归一化，避免启用该机制后等价于整体放大 `SD` 学习率。当前实现仍保留物理监督锚点，不直接把 `SD` 目标改成最大化回报；完整 action-ranking consistency loss 将作为后续扩展。详细记录见：
 
 - [learnable_sd_v5_planning_aware_sd_2026_04_30.md](/home/data/round/code/sd_world_model_rl/docs/worklog/learnable_sd_v5_planning_aware_sd_2026_04_30.md)
+
+随后对该发现的高层含义进行了整理：`SD` 世界模型不应被定位为对环境动力学的完备复刻，而应被定位为“足以支撑正确决策的结构化抽象”。该口径与人类智能中的世界理解相近，即有限表征并不追求完美复现世界，而是服务于行动选择、关键状态辨别和后果预期。为避免“偏置”被误解为有害统计偏差，并准确反映 `SD` 来源于系统工程和系统仿真中的系统动力学（System Dynamics），本阶段术语暂定为 `Decision-Oriented System-Dynamics-Guided World Model`，中文为“面向决策的系统动力学引导世界模型”。
+
+同时记录一项未来理论方向：若该工作进一步上升到方法论创新，核心难点可能在于从数学和统计层面论证 `SD` 刻画精度何时已经足以支撑决策，而不是单纯追求对真实环境的完备拟合。该问题需要刻画模型误差、价值误差、动作排序误差与闭环策略表现之间的关系，并区分 replay 分布、规划 imagined 分布和真实闭环访问分布。当前阶段仍以经验性训练规划支撑能力为主，该理论充分性问题暂作为后续工作方向记录。
 
 相关方法文档与决策文档同步建立：
 
@@ -76,3 +100,27 @@ Hopper `pureenv_sdinit_online_sup` 三种子 `50k` 正式对照 `run3` 已全部
 同时，补充固定了一条更高层的方法论澄清：`RL` 规划目标与 `SD` 状态推演精度既不能被当成完全相同，也不能被当成彼此无关。二者在“未来状态演化必须可被可靠刻画”这一点上存在内在统一性，但在损失刻画上又分别强调平均保真度与任务相关误差。因此，当前在线 `SD` 监督支路的意义，不是预设二者天然一致，而是尝试在共享 `transition core` 上显式建立这种统一，并检验同一个动力学核心能否同时满足推演保真度与规划可用性两侧要求。详细文字已补入：
 
 - [learnable_sd_v5_objective_decoupling_2026_04_29.md](/home/data/round/code/sd_world_model_rl/docs/worklog/learnable_sd_v5_objective_decoupling_2026_04_29.md)
+
+随后根据外部专家对当前 `SDWorldModel` 与 TD-MPC2 接口的静态审查，完成一轮接口修复与文档补录。主要修复包括：
+
+1. 启用 `sd_online_supervision_enabled=true` 时，`model._dynamics` 不再同时归属于 TD-MPC2 主优化器与 `sd_optim`，而是只由 `sd_optim` 管理，避免同一参数被两个 Adam 优化器用不同动量状态更新；
+2. `sd_trend_protect_min_correction` 从原先隐含的绝对下限 `0.02` 改为显式配置，默认值为 `0.0`，避免 `ROOTZ / ZMIN` 等小信号米制维度被强制产生单位错配的虚假漂移；
+3. `sd_reward_mode=learned` 的 reward target 统一返回已经乘以 `sd_env_reward_scale` 的环境奖励，避免 learned、hybrid、curriculum 路径之间出现静默尺度不一致；
+4. 结构态 residual 继续保留为主线设计，但各通道 residual cap 已显式配置化，并新增默认关闭的 `sd_struct_residual_penalty_coef`，用于后续检查 residual 是否过度覆盖系统动力学 core；
+5. full checkpoint 恢复逻辑补充 optimizer 参数组不兼容时的兼容路径，以支持本轮优化器归属变化后的旧 checkpoint 恢复。
+
+本轮没有取消 residual，也没有把 `sd_latent_dim` 改回 `17`，因为当前设计仍要求“17 维显式系统动力学结构态 + learned residual latent”共同表达 Hopper 的复杂动力机制。在线 `SD` 监督仍锚定 `_dynamics` 本体，外层 residual heads 由 TD-MPC2 主损失更新；该分工用于区分系统动力学 core 的保真锚点与 residual 对规划相关未建模机制的补偿。详细记录见：
+
+- [learnable_sd_v5_tdmpc2_interface_review_2026_04_30.md](/home/data/round/code/sd_world_model_rl/docs/worklog/learnable_sd_v5_tdmpc2_interface_review_2026_04_30.md)
+
+同时同步更新：
+
+- [methods.md](/home/data/round/code/sd_world_model_rl/docs/methods.md)
+- [decisions.md](/home/data/round/code/sd_world_model_rl/docs/decisions.md)
+- [reproducibility.md](/home/data/round/code/sd_world_model_rl/docs/reproducibility.md)
+
+根据复审意见继续补充一个小补丁。启用 `sd_online_supervision_enabled=true` 时，新增默认口径 `sd_detach_core_in_main_loss=true`：`SDWorldModel.next()` 中 `_dynamics` 输出的 `next_struct_base` 在主 consistency 路径中 detach 后参与 residual 合成。该修复使主 `consistency_loss` 不再给 `_dynamics` 计算随后被丢弃的梯度，语义上也更明确地表示：`SD core` 由独立在线 `SD` 监督训练，主 consistency 主要训练外层 residual heads 与 TD-MPC2 下游头。
+
+同时新增 `struct_residual_activity=mean(abs(tanh(raw_struct_residual)))` 训练指标，用于下一轮 smoke 判断结构态 residual 是否长期高强度兜底。当前仍未直接收紧 `sd_vz_residual_scale=3.0` 与 `sd_pitch_rate_residual_scale=8.0`，原因是残差补偿是主线设计的一部分，直接收紧会与优化器归属修复形成混杂变量。下一次 5k 或 10k smoke 应明确观察 `struct_consistency_loss / resid_consistency_loss`、`struct_residual_activity`、在线 `SD` loss 趋势和闭环得分，再决定是否将默认 residual scale 收紧到如 `vz=1.0`、`pitch_rate=3.0` 并配合 `sd_struct_residual_penalty_coef=0.05` 做消融。
+
+此外，full checkpoint 恢复中的 optimizer state 兼容路径已扩展为捕获 `(ValueError, KeyError, RuntimeError)`，并在告警中记录旧参数组数与新参数组数，以便定位接口修复前后 optimizer 参数组变化导致的恢复差异。

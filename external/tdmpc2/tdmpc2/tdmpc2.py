@@ -23,21 +23,37 @@ class TDMPC2(torch.nn.Module):
 		world_model_kind = getattr(cfg, 'world_model_kind', 'tdmpc2')
 		world_model_cls = SDWorldModel if world_model_kind == 'sd_hopper' else WorldModel
 		self.model = world_model_cls(cfg).to(self.device)
-		self.optim = torch.optim.Adam([
-			{'params': self.model._encoder.parameters(), 'lr': self.cfg.lr*self.cfg.enc_lr_scale},
-			{'params': self.model._dynamics.parameters()},
-			{'params': self.model._reward.parameters()},
-			{'params': self.model._termination.parameters() if self.cfg.episodic else []},
-			{'params': self.model._Qs.parameters()},
-			{'params': self.model._task_emb.parameters() if self.cfg.multitask else []
-			 }
-		], lr=self.cfg.lr, capturable=True)
+		self._sd_online_supervision_enabled = (
+			bool(getattr(self.cfg, 'sd_online_supervision_enabled', False))
+			and hasattr(self.model, '_dynamics')
+		)
+		optim_groups = []
+		self._main_optim_params = []
+
+		def _add_optim_group(params, lr=None):
+			params = list(params)
+			if not params:
+				return
+			group = {'params': params}
+			if lr is not None:
+				group['lr'] = lr
+			optim_groups.append(group)
+			self._main_optim_params.extend(params)
+
+		_add_optim_group(self.model._encoder.parameters(), lr=self.cfg.lr*self.cfg.enc_lr_scale)
+		if not self._sd_online_supervision_enabled:
+			_add_optim_group(self.model._dynamics.parameters())
+		_add_optim_group(self.model._reward.parameters())
+		_add_optim_group(self.model._termination.parameters() if self.cfg.episodic else [])
+		_add_optim_group(self.model._Qs.parameters())
+		_add_optim_group(self.model._task_emb.parameters() if self.cfg.multitask else [])
 		for _attr in ('_residual_encoder', '_residual_dynamics', '_struct_residual'):
 			_mod = getattr(self.model, _attr, None)
 			if _mod is not None and isinstance(_mod, torch.nn.Module):
-				self.optim.add_param_group({'params': list(_mod.parameters()), 'lr': self.cfg.lr})
+				_add_optim_group(_mod.parameters(), lr=self.cfg.lr)
+		self.optim = torch.optim.Adam(optim_groups, lr=self.cfg.lr, capturable=True)
 		self.sd_optim = None
-		if bool(getattr(self.cfg, 'sd_online_supervision_enabled', False)) and hasattr(self.model, '_dynamics'):
+		if self._sd_online_supervision_enabled:
 			sd_lr = getattr(self.cfg, 'sd_online_supervision_lr', None)
 			if sd_lr is None:
 				sd_lr = self.cfg.lr
@@ -580,17 +596,32 @@ class TDMPC2(torch.nn.Module):
 			except Exception:
 				height_loss = 0.0
 
+		struct_residual_penalty = torch.zeros((), device=self.device)
+		struct_residual_activity = torch.zeros((), device=self.device)
+		struct_residual_penalty_coef = float(getattr(self.cfg, 'sd_struct_residual_penalty_coef', 0.0))
+		if hasattr(self.model, 'struct_residual_stats'):
+			if struct_residual_penalty_coef > 0:
+				struct_residual_penalty, struct_residual_activity = self.model.struct_residual_stats(
+					_zs.detach(), action.detach(),
+				)
+			else:
+				with torch.no_grad():
+					struct_residual_penalty, struct_residual_activity = self.model.struct_residual_stats(
+						_zs.detach(), action.detach(),
+					)
+
 		total_loss = (
 			self.cfg.consistency_coef * consistency_loss +
 			self.cfg.reward_coef * reward_loss +
 			self.cfg.termination_coef * termination_loss +
 			self.cfg.value_coef * value_loss +
-			height_coef * height_loss
+			height_coef * height_loss +
+			struct_residual_penalty_coef * struct_residual_penalty
 		)
 
 		# Update model
 		total_loss.backward()
-		grad_norm = torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.cfg.grad_clip_norm)
+		grad_norm = torch.nn.utils.clip_grad_norm_(self._main_optim_params, self.cfg.grad_clip_norm)
 		self.optim.step()
 		self.optim.zero_grad(set_to_none=True)
 		self.model.sync_detach_Q()
@@ -635,6 +666,8 @@ class TDMPC2(torch.nn.Module):
 			"value_loss": value_loss,
 			"termination_loss": termination_loss,
 			"height_loss": height_loss if torch.is_tensor(height_loss) else torch.tensor(float(height_loss)),
+			"struct_residual_penalty": struct_residual_penalty,
+			"struct_residual_activity": struct_residual_activity,
 			"total_loss": total_loss,
 			"grad_norm": grad_norm,
 			"td_target_mean": td_targets.mean(),
