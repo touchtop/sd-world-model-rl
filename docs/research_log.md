@@ -162,3 +162,45 @@ Hopper `pureenv_sdinit_online_sup` 三种子 `50k` 正式对照 `run3` 已全部
 - [learnable_sd_v5_exploration_bias_review_2026_05_01.md](/home/round/code/sd-world-model-rl/sd_world_model_rl/docs/worklog/learnable_sd_v5_exploration_bias_review_2026_05_01.md)
 
 建议下一条最小对照不修改 TD-MPC2 主训练框架，而是关闭 `sd_online_planning_weight_enabled`，保留 `sd_online_supervision_phase_weight=2.0`、`sd_online_supervision_omega_weight=0.25`、`sd_online_supervision_contact_weight=0.25` 等机制关键相位监督。该方案保持原 replay、Q/reward loss、actor update 与 MPPI 探索路径不变，只移除 critic-dependent 的 `SD` 样本加权，以检验是否可以避免 `SD` 学习被当前局部策略分布牵引。
+
+同日补充记录本地 `resume100k` 接续线。planning-aware `SD` 三种子 `100k` 实验均已写出 `official_eval/step_0100000` 与 `final.full.pt`。其中 seed1 的 `100k` eval 均值为 `73.09`，10 条评估轨迹均为中等得分；seed2 的 `100k` eval 为 `0.0`，10 条评估轨迹全部失败；seed3 的 `100k` eval 均值为 `76.86`，呈现 5 条高分与 5 条近零的两极化分布。
+
+姿态复核显示，seed1 与 seed3 的高分轨迹均出现较多“高度与躯干角接近直立”的片段，但在加入脚尖与脚跟同时触地的充分支撑判据后，稳定站立窗口仍非常短或不存在。该结果提示当前策略主要学到单点支撑或弹跳式前进，而不是稳定的脚底充分支撑步态。后续分析应将“近直立姿态”与“充分支撑站立”明确区分，避免仅凭高度和躯干角过度解释。
+
+为继续观察更长训练预算下该行为是否会向稳定步态转化，新增 planning-aware `SD` `200k` 接续脚本：
+
+- [run_hopper_v5_200k_pureenv_sdinit_planning_sd_resume.sh](/home/data/round/code/sd_world_model_rl/scripts/run_hopper_v5_200k_pureenv_sdinit_planning_sd_resume.sh)
+
+该脚本从 `final.full.pt` 恢复模型、优化器、buffer、计数器与 `SD` checkpoint 状态，保持 `100k` planning-aware `SD` 三种子脚本的纯环境奖励、supervised `SD` 初始化、在线 `SD` 监督、TD-positive planning-aware 样本重加权与 residual 设置。目标预算为 `200k`，实际 `steps=200500`，用于在 `200k` 评估触发后等待 episode 边界写出 `eval.csv` 与 `official_eval/step_0200000`。
+
+启动接续实验时发现，`resume_from` 若以相对路径传入，会在 Hydra 切换到实验工作目录后失效。因此脚本已将相对 `resume_from` 自动规范化为仓库根目录下的绝对路径。初始 `run1` 目录仅完成初始化后失败，正式接续使用新的 `run2` 实验目录。
+
+正式启动的三种子 `200k` 接续实验如下：
+
+- seed1: `sd_hopper_200k_pureenv_sdinit_planning_sd_seed1_resume100k_20260501_run2`，GPU 1，PID `3992464`；
+- seed2: `sd_hopper_200k_pureenv_sdinit_planning_sd_seed2_resume100k_20260501_run2`，GPU 2，PID `3996683`；
+- seed3: `sd_hopper_200k_pureenv_sdinit_planning_sd_seed3_resume100k_20260501_run2`，GPU 3，PID `3997601`。
+
+三条线均已从对应 `100k` 的 `final.full.pt` 恢复到 `step=100501`、`episode=201`、`total_updates=100500`，buffer 恢复为约 `100701` 步和 `201` 个 episode。由于旧 `100k` checkpoint 来自优化器归属修复前版本，主优化器状态恢复时出现参数组数量不一致并按兼容逻辑跳过；`SD` optimizer 未报告恢复错误。该接续因此等价于“模型、buffer、计数器和 `SD` optimizer 恢复，主优化器重新初始化为新参数组口径”。
+
+截至本地检查，`175k` 官方评估已全部写出，三种子结果为 seed1 `151.66`、seed2 `180.49`、seed3 `84.01`，均值 `138.72`，总体标准差 `40.44`。其中 seed2 的 `175k` official eval 10 条 episode 全部超过 `150`，均值为 `180.49`，最低 `159.12`，最高 `198.92`；但姿态复核显示，高分仍主要来自向前推进和短暂腾空/弹跳，而非稳定充分支撑步态。seed2 `episode_06` 在 step 50 附近出现 1 帧较明确的充分支撑近直立姿态，`torso_z=0.777`、`pitch=0.322`、脚尖/脚跟接触约 `0.98/0.99`、`full_foot_support=0.98`。该轨迹已渲染为：
+
+- [seed2_175k_eval_episode06_full_support.mp4](/home/data/round/code/sd_world_model_rl/results/hopper_trace_renders/seed2_175k_eval_episode06_full_support.mp4)
+
+当前训练仍在继续向 `200k` 推进。最近检查时 seed1 约到 `183.6k`，seed2 约到 `182.8k`，seed3 约到 `181.2k`。seed1 训练回报稳定但上限偏低，seed2 已稳定进入 `190-200` 分段并出现超过 `200` 的训练 episode，seed3 具备最高分能力但仍呈现高分与 `0` 分交替的两极化。`plan_nonfinite_frac` 持续为 `0`，未观察到数值异常。
+
+随后根据探索压缩复审结论和公平对比需求，停止当前 `resume100k run2` 三种子 `200k` 接续实验，转向新修订方案。停止前该组实验已完整写出 `175k` eval，且已保留所有日志、checkpoint 与官方评估轨迹；停止操作仅终止训练进程，不删除任何已落盘产物。
+
+新方案新增脚本：
+
+- [run_hopper_v5_100k_pureenv_sdinit_mech_sd_budget.sh](/home/data/round/code/sd_world_model_rl/scripts/run_hopper_v5_100k_pureenv_sdinit_mech_sd_budget.sh)
+
+该脚本保留纯环境奖励、supervised `SD` 初始化、共享 `SD transition core`、独立在线 `SD` 监督、相位/接触/角速度机制监督和 residual 结构，但关闭 `sd_online_planning_weight_enabled`，不再用当前 critic 的 `td_positive` 信号对在线 `SD` 监督样本加权。为提高与 TD-MPC2 的比较公平性，planner 搜索预算由旧 planning-aware 脚本的 `num_samples=128`、`num_elites=16`、`num_pi_trajs=16`、`iterations=3` 恢复到半默认以上口径：`num_samples=256`、`num_elites=32`、`num_pi_trajs=24`、`iterations=6`。该设置仍低于 TD-MPC2 默认 `512/64/24/6`，但已显著减少搜索预算过低对结论的混杂。
+
+按该新脚本启动三种子 `100k` 正式实验：
+
+- seed1: `sd_hopper_100k_pureenv_sdinit_mech_sd_budget_seed1_20260501_run1`，GPU 1，PID `1530618`；
+- seed2: `sd_hopper_100k_pureenv_sdinit_mech_sd_budget_seed2_20260501_run1`，GPU 2，PID `1530791`；
+- seed3: `sd_hopper_100k_pureenv_sdinit_mech_sd_budget_seed3_20260501_run1`，GPU 3，PID `1530698`。
+
+启动后确认三条线均已创建实验目录并写出 `train.csv`、`models/2500.pt` 与 `models/2500.full.pt`。首批记录到 `step=2500`，均处于 seed data / 预训练前阶段，`total_updates=0`，训练链路和 checkpoint 落盘正常。

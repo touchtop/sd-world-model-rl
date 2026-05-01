@@ -177,6 +177,83 @@ bash scripts/run_hopper_v5_100k_pureenv_sdinit_planning_sd.sh \
 - 实际多跑 `500` 步，用于等待 `100k` 评估触发到达 episode 边界，减少末端 `eval.csv` 和 `official_eval/step_0100000/` 漏写；
 - 若需精确评估 `models/100000.pt`，仍应按第九节从 checkpoint 导出 eval 轨迹。
 
+mechanism-oriented SD 100k 三种子脚本：
+
+脚本：
+
+- [run_hopper_v5_100k_pureenv_sdinit_mech_sd_budget.sh](/home/data/round/code/sd_world_model_rl/scripts/run_hopper_v5_100k_pureenv_sdinit_mech_sd_budget.sh)
+
+用法：
+
+```bash
+bash scripts/run_hopper_v5_100k_pureenv_sdinit_mech_sd_budget.sh <gpu_id> <exp_name> <seed>
+```
+
+示例：
+
+```bash
+bash scripts/run_hopper_v5_100k_pureenv_sdinit_mech_sd_budget.sh \
+  1 sd_hopper_100k_pureenv_sdinit_mech_sd_budget_seed1_20260501_run1 1
+```
+
+相对 planning-aware SD 100k 版本，固定修订为：
+
+- `sd_online_planning_weight_enabled=false`
+- `sd_action_prior_enabled=false`
+- `sd_online_supervision_phase_weight=2.0`
+- `sd_online_supervision_omega_weight=0.25`
+- `sd_online_supervision_contact_weight=0.25`
+- `num_samples=256`
+- `num_elites=32`
+- `num_pi_trajs=24`
+- `iterations=6`
+
+含义：
+
+- 保留纯环境奖励、supervised `SD` 初始化、共享 `SD transition core` 与独立在线 `SD` 监督；
+- 移除 critic-dependent 的 `td_positive` 样本重加权，使 `SD` 监督回退到机制关键相位口径；
+- 将 planner 从原先 `128/16/16/3` 恢复到半默认以上的搜索预算，减少与 TD-MPC2 对比时由搜索预算过低引入的混杂；
+- 仍按 `100k` 目标预算比较，实际 `steps=100500`，用于等待 `100k` 评估触发到达 episode 边界。
+
+planning-aware SD 200k 接续脚本：
+
+脚本：
+
+- [run_hopper_v5_200k_pureenv_sdinit_planning_sd_resume.sh](/home/data/round/code/sd_world_model_rl/scripts/run_hopper_v5_200k_pureenv_sdinit_planning_sd_resume.sh)
+
+用法：
+
+```bash
+bash scripts/run_hopper_v5_200k_pureenv_sdinit_planning_sd_resume.sh \
+  <gpu_id> <exp_name> <seed> <resume_from_full_pt>
+```
+
+示例：
+
+```bash
+bash scripts/run_hopper_v5_200k_pureenv_sdinit_planning_sd_resume.sh \
+  1 sd_hopper_200k_pureenv_sdinit_planning_sd_seed1_resume100k_20260501_run1 \
+  1 logs/hopper-hop/1/sd_hopper_100k_pureenv_sdinit_planning_sd_seed1_20260430_run1/models/final.full.pt
+```
+
+固定口径：
+
+- `target_steps=200000`
+- `steps=200500`
+- `eval_freq=25000`
+- `checkpoint_freq=25000`
+- `eval_episodes=10`
+- `save_full_state=true`
+- `save_eval_traces=true`
+- 从 `final.full.pt` 恢复模型、优化器、buffer、计数器与 SD checkpoint 状态
+- 其余 `SD` 与 planning-aware 参数沿用 100k 三种子脚本
+
+含义：
+
+- 目标按 `200k` 训练预算比较；
+- 实际多跑 `500` 步，用于等待 `200k` 评估触发到达 episode 边界，减少末端 `eval.csv` 和 `official_eval/step_0200000/` 漏写；
+- 接续目录必须使用新的 `exp_name`，不得复用 100k 目录。
+
 历史 v429 脚本：
 
 脚本：
