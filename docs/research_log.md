@@ -124,3 +124,41 @@ Hopper `pureenv_sdinit_online_sup` 三种子 `50k` 正式对照 `run3` 已全部
 同时新增 `struct_residual_activity=mean(abs(tanh(raw_struct_residual)))` 训练指标，用于下一轮 smoke 判断结构态 residual 是否长期高强度兜底。当前仍未直接收紧 `sd_vz_residual_scale=3.0` 与 `sd_pitch_rate_residual_scale=8.0`，原因是残差补偿是主线设计的一部分，直接收紧会与优化器归属修复形成混杂变量。下一次 5k 或 10k smoke 应明确观察 `struct_consistency_loss / resid_consistency_loss`、`struct_residual_activity`、在线 `SD` loss 趋势和闭环得分，再决定是否将默认 residual scale 收紧到如 `vz=1.0`、`pitch_rate=3.0` 并配合 `sd_struct_residual_penalty_coef=0.05` 做消融。
 
 此外，full checkpoint 恢复中的 optimizer state 兼容路径已扩展为捕获 `(ValueError, KeyError, RuntimeError)`，并在告警中记录旧参数组数与新参数组数，以便定位接口修复前后 optimizer 参数组变化导致的恢复差异。
+
+按操作指南启动并完成一次新接口修复后的 planning-aware `SD` 5k smoke 测试。实验名为 `sd_hopper_5k_pureenv_sdinit_planning_sd_seed3_20260430_fixsmoke1`，seed 为 `3`，GPU 为 `0`，PTY 会话为 `56013`，训练进程 PID 为 `4183709`。启动前确认四张 GPU 均为空闲，并确认 supervised `SD` 初始化 checkpoint 已复制到：
+
+- `results/hopper_sd_supervised/run_20260428_smoke_contactfix5_resid4_featctx_shortloss010_cpu/hopper_sd_supervised.pt`
+
+本次训练严格使用 `run_hopper_v5_5k_pureenv_sdinit_planning_sd.sh` 脚本，仅用 `PYTHON_BIN=/home/round/.conda/envs/sd-mcts/bin/python` 覆盖当前机器不存在的指南默认 Python 路径。训练已正常结束，`2500.pt`、`2500.full.pt`、`5000.pt`、`5000.full.pt`、`final.pt`、`final.full.pt` 均已落盘；`eval.csv`、`eval_full.csv` 以及 `official_eval/step_0002500/`、`official_eval/step_0005000/` 的 10 条 episode csv 与 `eval_episode_summary.csv` 均已写出。
+
+初步结果显示，工程链路符合预期：`sd_online_planning_weight_mean` 在训练更新阶段保持为 `1.0`，`plan_nonfinite_frac=0.0`，未观察到规划非有限值或明显梯度异常。`5000` step 处 `consistency_loss=0.1260`、`struct_consistency_loss=0.2431`、`resid_consistency_loss=0.00887`、`struct_residual_activity=0.5522`、`sd_online_supervision_loss=1.6751`。闭环收益仍接近零，`eval.csv` 中 `2500` 与 `5000` 的平均 episode reward 分别为 `0.000684` 与 `0.001119`，`official_eval` 中未出现成功 episode。因此，该 smoke 支持“最新修订可稳定启动、训练、评估并落盘”的工程结论，但尚不能支持 planning-aware 权重已改善早期闭环行为的结论。下一步若继续评估行为信号，应使用同一口径扩展到 `10k` 或启动正式三种子对照，而不是仅依据 5k return 做性能判断。
+
+随后依据上述 smoke 的工程稳定性，直接启动新接口修复后的 planning-aware `SD` 三种子 `100k` 正式实验，不再追加 `10k` 单种子 smoke。启动前确认 GPU 0-3 均为空闲、supervised `SD` checkpoint 存在，且三个新 `exp_name` 未复用。三条运行均使用 `run_hopper_v5_100k_pureenv_sdinit_planning_sd.sh`，仅通过 `PYTHON_BIN=/home/round/.conda/envs/sd-mcts/bin/python` 覆盖当前机器 Python 路径；其余参数沿用脚本固定口径，即 `steps=100500`、`eval_freq=25000`、`checkpoint_freq=25000`、`save_full_state=true`、`save_eval_traces=true`、`sd_online_planning_weight_enabled=true`、`sd_online_planning_weight_mode=td_positive`。
+
+资源分配与进程记录如下：
+
+- seed1: `sd_hopper_100k_pureenv_sdinit_planning_sd_seed1_20260430_fixrun1`，GPU 0，PTY 会话 `3530`，PID `4193823`；
+- seed2: `sd_hopper_100k_pureenv_sdinit_planning_sd_seed2_20260430_fixrun1`，GPU 1，PTY 会话 `5173`，PID `4194066`；
+- seed3: `sd_hopper_100k_pureenv_sdinit_planning_sd_seed3_20260430_fixrun1`，GPU 2，PTY 会话 `21013`，PID `355`。
+
+三条线均已确认加载 supervised `SD` checkpoint，`train.csv` 已持续写出 `500 / 1000 / 1500 / 2000 / 2500`，并且 `models/2500.pt` 与 `models/2500.full.pt` 均已落盘。启动后 GPU 占用约为 GPU0 `567 MiB / 18%`、GPU1 `567 MiB / 20%`、GPU2 `567 MiB / 22%`、GPU3 空闲。当前三条线已进入 seed data 之后的预训练阶段；后续应按操作指南在 `25000 / 50000 / 75000 / 100000` 评估节点检查 `eval.csv` 与 `official_eval/step_XXXXXXXX/` 是否完整写出。
+
+三种子 `100k` 正式实验已完成首个 `25k` 官方评估节点并继续运行。三条线均已写出 `models/25000.full.pt`、`eval.csv` 与 `official_eval/step_0025000/`。`25k` 官方评估均值如下：
+
+- seed1: `0.0806`
+- seed2: `0.0260`
+- seed3: `5.7233`
+
+训练质量信号显示三条线的 `consistency_loss` 与结构态一致性损失均相较早期下降，未出现规划非有限值。seed3 当前表现最强，`25k` 前近期训练 episode reward 均值约 `4.18`，最近 20 个 episode 中 `9` 个非零，且 `plan_value_mean` 近期约 `2.59`；seed1 与 seed2 的官方评估仍接近零，近期训练 reward 均值分别约 `0.036` 与 `0.028`。该阶段结果说明：新接口修复后的 planning-aware 版本在工程上稳定，并在 seed3 上已出现早期 planning/value 与闭环收益信号，但三种子之间差异仍较大，不能仅凭 `25k` 判断整体改进成立。后续重点观察 `50k` 是否出现 seed1/seed2 追上，或 seed3 信号是否持续放大。
+
+## 2026-05-01
+
+对当前 Hopper planning-aware `SD` 三种子长跑结果和 TD-MPC2 训练代码进行了专项审查，重点分析“`SD` 状态推演变准后是否可能反而压缩探索并强化局部最优”的假设。审查确认，原 TD-MPC2 的探索机制仍主要来自 MPPI 随机动作采样、policy prior 轨迹、elite Gumbel 选择、执行动作噪声和 actor entropy；当前实验未启用 `sd_action_prior_enabled`，因此不存在动作盒直接裁剪探索的问题。更可疑的机制是当前 planning-aware 版本显式启用了 `sd_online_planning_weight_enabled=true` 与 `sd_online_planning_weight_mode=td_positive`，该机制只作用于在线 `SD` 监督，但会将 `SD core` 的拟合精度分配偏向当前 critic/replay 已经认为正向的样本。
+
+日志层面，三种子评估均值从 `100k=28.32` 上升到 `125k=62.20`，但 `150k=60.27` 未继续上升，其中 seed3 从 `125k=108.53` 回落到 `150k=57.24`。姿态复核显示，`125k` seed3 已出现单帧严格 `grounded_upright`，但仍未形成连续 `grounded_prepared` 或稳定 `grounded_upright -> grounded_prepared -> rising_air` 链条。这支持如下解释：当前实现没有否定“面向决策的系统动力学引导世界模型”这一方法论，但将“任务相关”简单近似为“当前 TD-positive”可能过早强化了局部高分行为盆地。
+
+专项审查结论已整理为：
+
+- [learnable_sd_v5_exploration_bias_review_2026_05_01.md](/home/round/code/sd-world-model-rl/sd_world_model_rl/docs/worklog/learnable_sd_v5_exploration_bias_review_2026_05_01.md)
+
+建议下一条最小对照不修改 TD-MPC2 主训练框架，而是关闭 `sd_online_planning_weight_enabled`，保留 `sd_online_supervision_phase_weight=2.0`、`sd_online_supervision_omega_weight=0.25`、`sd_online_supervision_contact_weight=0.25` 等机制关键相位监督。该方案保持原 replay、Q/reward loss、actor update 与 MPPI 探索路径不变，只移除 critic-dependent 的 `SD` 样本加权，以检验是否可以避免 `SD` 学习被当前局部策略分布牵引。
