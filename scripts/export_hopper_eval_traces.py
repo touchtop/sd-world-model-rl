@@ -48,6 +48,8 @@ def parse_args():
     p.add_argument("--sd_reward_curriculum_start", type=int, default=10000)
     p.add_argument("--sd_reward_curriculum_end", type=int, default=30000)
     p.add_argument("--sd_max_resid_scale", type=float, default=5.0)
+    p.add_argument("--sd_use_transition_residual", action="store_true")
+    p.add_argument("--sd_transition_residual_scale", type=float, default=1.0)
     p.add_argument("--sd_stage_mode", default="full")
     p.add_argument("--dropout", type=float, default=0.01)
     p.add_argument("--device", default="cuda:0")
@@ -85,6 +87,8 @@ def build_cfg(args):
         "sd_reward_curriculum_start": args.sd_reward_curriculum_start,
         "sd_reward_curriculum_end": args.sd_reward_curriculum_end,
         "sd_max_resid_scale": args.sd_max_resid_scale,
+        "sd_use_transition_residual": args.sd_use_transition_residual,
+        "sd_transition_residual_scale": args.sd_transition_residual_scale,
         "sd_stage_mode": args.sd_stage_mode,
     }
     for k, v in overrides.items():
@@ -169,6 +173,7 @@ def hopper_probe_features(probe, obs_np):
         "falling_air": float(feat["falling_air"][0].item()),
         "grounded_rear": float(feat["grounded_rear"][0].item()),
         "grounded_prone": float(feat["grounded_prone"][0].item()),
+        "grounded_hop": float(feat["grounded_hop"][0].item()) if "grounded_hop" in feat else 0.0,
         "grounded_upright": float(feat["grounded_upright"][0].item()),
         "grounded_prepared": float(feat["grounded_prepared"][0].item()),
         "rising_air": float(feat["rising_air"][0].item()),
@@ -223,6 +228,7 @@ def main():
             row["falling_air_gt_05"] = 1.0 if features["falling_air"] >= 0.5 else 0.0
             row["grounded_rear_gt_05"] = 1.0 if features["grounded_rear"] >= 0.5 else 0.0
             row["grounded_prone_gt_05"] = 1.0 if features["grounded_prone"] >= 0.5 else 0.0
+            row["grounded_hop_gt_05"] = 1.0 if features["grounded_hop"] >= 0.5 else 0.0
             row["grounded_upright_gt_05"] = 1.0 if features["grounded_upright"] >= 0.5 else 0.0
             row["grounded_prepared_gt_05"] = 1.0 if features["grounded_prepared"] >= 0.5 else 0.0
             row["rising_air_gt_05"] = 1.0 if features["rising_air"] >= 0.5 else 0.0
@@ -265,6 +271,7 @@ def main():
             "falling_air_frac": mean_of(rows, "falling_air_gt_05"),
             "grounded_rear_frac": mean_of(rows, "grounded_rear_gt_05"),
             "grounded_prone_frac": mean_of(rows, "grounded_prone_gt_05"),
+            "grounded_hop_frac": mean_of(rows, "grounded_hop_gt_05"),
             "grounded_upright_frac": mean_of(rows, "grounded_upright_gt_05"),
             "grounded_prepared_frac": mean_of(rows, "grounded_prepared_gt_05"),
             "rising_air_frac": mean_of(rows, "rising_air_gt_05"),
@@ -275,11 +282,14 @@ def main():
         })
         print(f"episode={ep_idx:02d} reward={ep_reward:.6f} len={t} csv={csv_path}")
 
-    summary_path = args.out_dir / "summary.csv"
-    with open(summary_path, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=list(summary_rows[0].keys()))
-        writer.writeheader()
-        writer.writerows(summary_rows)
+    summary_paths = [args.out_dir / "summary.csv"]
+    if args.out_dir.name == "episode_csv":
+        summary_paths.append(args.out_dir.parent / "eval_episode_summary.csv")
+    for summary_path in summary_paths:
+        with open(summary_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=list(summary_rows[0].keys()))
+            writer.writeheader()
+            writer.writerows(summary_rows)
 
 
 if __name__ == "__main__":

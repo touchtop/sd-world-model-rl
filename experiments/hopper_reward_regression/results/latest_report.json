@@ -1,0 +1,279 @@
+{
+  "summary": {
+    "total": 7,
+    "passed": 7,
+    "failed": 0
+  },
+  "state_cases": [
+    {
+      "name": "fake_rear_now_prone",
+      "relative_csv": "logs/hopper-hop/3/sd_hopper_100000_v5densepose_recover010_seed3_20260426_run1/official_eval/step_0100000/episode_csv/episode_01.csv",
+      "step": 98,
+      "expected_state": 2,
+      "note": "前伏抬身片段，旧口径会误记为 rear。"
+    },
+    {
+      "name": "true_rear_stays_rear",
+      "relative_csv": "logs/hopper-hop/3/sd_hopper_100000_v5densepose_recover010_seed3_20260426_run1/official_eval/step_0100000/episode_csv/episode_02.csv",
+      "step": 50,
+      "expected_state": 1,
+      "note": "真正整体后仰的失败片段，应保持 rear。"
+    },
+    {
+      "name": "upright_sample_kept_upright",
+      "relative_csv": "logs/hopper-hop/2/sd_hopper_50000_v5densepose_alpha5to05_seed2_20260426_run1/official_eval/step_0050000/episode_csv/episode_09.csv",
+      "step": 11,
+      "expected_state": 3,
+      "note": "短暂直立样例，应继续判为 upright。"
+    },
+    {
+      "name": "rear_landing_with_legs_airborne_is_rear",
+      "relative_csv": "logs/hopper-hop/3/sd_hopper_10k_v5geomrear_smoke_20260426_run1/official_eval/step_0005000/episode_csv/episode_06.csv",
+      "step": 11,
+      "expected_state": 1,
+      "note": "后仰躺地但腿脚悬空的着地片段，应判为 rear 而不是 prone。"
+    },
+    {
+      "name": "stable_rear_with_legs_airborne_stays_rear",
+      "relative_csv": "logs/hopper-hop/3/sd_hopper_10k_v5geomrear_smoke_20260426_run1/official_eval/step_0005000/episode_csv/episode_06.csv",
+      "step": 100,
+      "expected_state": 1,
+      "note": "后仰躺地稳定阶段，不应因脚悬空而在 rear/prone 间抖动。"
+    }
+  ],
+  "transition_cases": [
+    {
+      "name": "prone_to_upright_positive_reward",
+      "relative_csv": "logs/hopper-hop/2/sd_hopper_50000_v5densepose_alpha5to05_seed2_20260426_run1/official_eval/step_0025000/episode_csv/episode_02.csv",
+      "prev_step": 10,
+      "next_step": 11,
+      "expected_prev_state": 2,
+      "expected_next_state": 3,
+      "reward_assertion": "gt",
+      "reward_threshold": 0.05,
+      "note": "命中 prone->upright 后，shaping 应为正。"
+    },
+    {
+      "name": "falling_to_prone_not_positive",
+      "relative_csv": "logs/hopper-hop/3/sd_hopper_100000_v5densepose_recover010_seed3_20260426_run1/official_eval/step_0100000/episode_csv/episode_01.csv",
+      "prev_step": 9,
+      "next_step": 10,
+      "expected_prev_state": 0,
+      "expected_next_state": 2,
+      "reward_assertion": "le",
+      "reward_threshold": 0.0,
+      "note": "falling->prone 不是目标迁移，不应拿正向里程碑奖励。"
+    }
+  ],
+  "results": [
+    {
+      "kind": "state",
+      "name": "fake_rear_now_prone",
+      "passed": true,
+      "expected_state": 2,
+      "observed_state": 2,
+      "step": 98,
+      "relative_csv": "logs/hopper-hop/3/sd_hopper_100000_v5densepose_recover010_seed3_20260426_run1/official_eval/step_0100000/episode_csv/episode_01.csv",
+      "note": "前伏抬身片段，旧口径会误记为 rear。",
+      "features": {
+        "state_id": 2,
+        "pitch": -0.4058983325958252,
+        "nose_minus_foot_x": 0.4251779615879059,
+        "nose_minus_anchor_x": 0.2543465495109558,
+        "posture_anchor_x": -0.20199449360370636,
+        "body_contact_x": -0.3728259205818176,
+        "nose_minus_support_x": 0.44728490710258484,
+        "hip_minus_support_x": 0.4146750867366791,
+        "full_foot_support": 0.0,
+        "body_collision": 0.0,
+        "upright_quality_gate": 0.0,
+        "prepared_quality_gate": 0.0
+      }
+    },
+    {
+      "kind": "state",
+      "name": "true_rear_stays_rear",
+      "passed": true,
+      "expected_state": 1,
+      "observed_state": 1,
+      "step": 50,
+      "relative_csv": "logs/hopper-hop/3/sd_hopper_100000_v5densepose_recover010_seed3_20260426_run1/official_eval/step_0100000/episode_csv/episode_02.csv",
+      "note": "真正整体后仰的失败片段，应保持 rear。",
+      "features": {
+        "state_id": 1,
+        "pitch": -1.5463941097259521,
+        "nose_minus_foot_x": -0.3762885630130768,
+        "nose_minus_anchor_x": -0.2216375321149826,
+        "posture_anchor_x": 0.08948369324207306,
+        "body_contact_x": 0.049985114485025406,
+        "nose_minus_support_x": -0.39402028918266296,
+        "hip_minus_support_x": -0.2118813395500183,
+        "full_foot_support": 0.0,
+        "body_collision": 1.0,
+        "upright_quality_gate": 0.0,
+        "prepared_quality_gate": 0.0
+      }
+    },
+    {
+      "kind": "state",
+      "name": "upright_sample_kept_upright",
+      "passed": true,
+      "expected_state": 3,
+      "observed_state": 3,
+      "step": 11,
+      "relative_csv": "logs/hopper-hop/2/sd_hopper_50000_v5densepose_alpha5to05_seed2_20260426_run1/official_eval/step_0050000/episode_csv/episode_09.csv",
+      "note": "短暂直立样例，应继续判为 upright。",
+      "features": {
+        "state_id": 3,
+        "pitch": -0.2916116714477539,
+        "nose_minus_foot_x": 0.0680525004863739,
+        "nose_minus_anchor_x": 0.013311494141817093,
+        "posture_anchor_x": 0.0580214224755764,
+        "body_contact_x": 0.0032804161310195923,
+        "nose_minus_support_x": 0.02283966913819313,
+        "hip_minus_support_x": -0.03411843627691269,
+        "full_foot_support": 0.9745150208473206,
+        "body_collision": 0.0,
+        "upright_quality_gate": 1.0,
+        "prepared_quality_gate": 0.0
+      }
+    },
+    {
+      "kind": "state",
+      "name": "rear_landing_with_legs_airborne_is_rear",
+      "passed": true,
+      "expected_state": 1,
+      "observed_state": 1,
+      "step": 11,
+      "relative_csv": "logs/hopper-hop/3/sd_hopper_10k_v5geomrear_smoke_20260426_run1/official_eval/step_0005000/episode_csv/episode_06.csv",
+      "note": "后仰躺地但腿脚悬空的着地片段，应判为 rear 而不是 prone。",
+      "features": {
+        "state_id": 1,
+        "pitch": -1.371351957321167,
+        "nose_minus_foot_x": 0.006355874240398407,
+        "nose_minus_anchor_x": -0.09163136780261993,
+        "posture_anchor_x": -0.017908163368701935,
+        "body_contact_x": 0.049008842557668686,
+        "nose_minus_support_x": 0.05107254534959793,
+        "hip_minus_support_x": 0.20962092280387878,
+        "full_foot_support": 0.0,
+        "body_collision": 1.0,
+        "upright_quality_gate": 0.0,
+        "prepared_quality_gate": 0.0
+      }
+    },
+    {
+      "kind": "state",
+      "name": "stable_rear_with_legs_airborne_stays_rear",
+      "passed": true,
+      "expected_state": 1,
+      "observed_state": 1,
+      "step": 100,
+      "relative_csv": "logs/hopper-hop/3/sd_hopper_10k_v5geomrear_smoke_20260426_run1/official_eval/step_0005000/episode_csv/episode_06.csv",
+      "note": "后仰躺地稳定阶段，不应因脚悬空而在 rear/prone 间抖动。",
+      "features": {
+        "state_id": 1,
+        "pitch": -1.7655094861984253,
+        "nose_minus_foot_x": -0.0003400743007659912,
+        "nose_minus_anchor_x": -0.11302110552787781,
+        "posture_anchor_x": -0.041678622364997864,
+        "body_contact_x": -0.19622065126895905,
+        "nose_minus_support_x": 0.043931543827056885,
+        "hip_minus_support_x": 0.24768643081188202,
+        "full_foot_support": 0.0,
+        "body_collision": 1.0,
+        "upright_quality_gate": 0.0,
+        "prepared_quality_gate": 0.0
+      }
+    },
+    {
+      "kind": "transition",
+      "name": "prone_to_upright_positive_reward",
+      "passed": true,
+      "expected_prev_state": 2,
+      "observed_prev_state": 2,
+      "expected_next_state": 3,
+      "observed_next_state": 3,
+      "reward_assertion": "gt",
+      "reward_threshold": 0.05,
+      "observed_reward": 0.16528132557868958,
+      "prev_step": 10,
+      "next_step": 11,
+      "relative_csv": "logs/hopper-hop/2/sd_hopper_50000_v5densepose_alpha5to05_seed2_20260426_run1/official_eval/step_0025000/episode_csv/episode_02.csv",
+      "note": "命中 prone->upright 后，shaping 应为正。",
+      "prev_features": {
+        "state_id": 2,
+        "pitch": 0.2543766498565674,
+        "nose_minus_foot_x": 0.4139691889286041,
+        "nose_minus_anchor_x": 0.2469845861196518,
+        "posture_anchor_x": -0.10171355307102203,
+        "body_contact_x": -0.26869815587997437,
+        "nose_minus_support_x": 0.49396881461143494,
+        "hip_minus_support_x": 0.33611565828323364,
+        "full_foot_support": 0.0,
+        "body_collision": 0.0,
+        "upright_quality_gate": 0.0,
+        "prepared_quality_gate": 0.0
+      },
+      "next_features": {
+        "state_id": 3,
+        "pitch": 0.38448596000671387,
+        "nose_minus_foot_x": 0.46609747409820557,
+        "nose_minus_anchor_x": 0.2730487287044525,
+        "posture_anchor_x": -0.11580856889486313,
+        "body_contact_x": -0.3088573217391968,
+        "nose_minus_support_x": 0.4221683144569397,
+        "hip_minus_support_x": 0.24617402255535126,
+        "full_foot_support": 0.9678027033805847,
+        "body_collision": 0.0,
+        "upright_quality_gate": 1.0,
+        "prepared_quality_gate": 0.0
+      }
+    },
+    {
+      "kind": "transition",
+      "name": "falling_to_prone_not_positive",
+      "passed": true,
+      "expected_prev_state": 0,
+      "observed_prev_state": 0,
+      "expected_next_state": 2,
+      "observed_next_state": 2,
+      "reward_assertion": "le",
+      "reward_threshold": 0.0,
+      "observed_reward": -0.01025096420198679,
+      "prev_step": 9,
+      "next_step": 10,
+      "relative_csv": "logs/hopper-hop/3/sd_hopper_100000_v5densepose_recover010_seed3_20260426_run1/official_eval/step_0100000/episode_csv/episode_01.csv",
+      "note": "falling->prone 不是目标迁移，不应拿正向里程碑奖励。",
+      "prev_features": {
+        "state_id": 0,
+        "pitch": 1.9757587909698486,
+        "nose_minus_foot_x": 0.6125848293304443,
+        "nose_minus_anchor_x": 0.3912786543369293,
+        "posture_anchor_x": -0.3125060200691223,
+        "body_contact_x": 0.06957877427339554,
+        "nose_minus_support_x": 0.6575775146484375,
+        "hip_minus_support_x": 0.5328490138053894,
+        "full_foot_support": 0.0,
+        "body_collision": 0.0,
+        "upright_quality_gate": 0.0,
+        "prepared_quality_gate": 0.0
+      },
+      "next_features": {
+        "state_id": 2,
+        "pitch": 2.106959581375122,
+        "nose_minus_foot_x": 0.46817609667778015,
+        "nose_minus_anchor_x": 0.3186368942260742,
+        "posture_anchor_x": -0.2613275349140167,
+        "body_contact_x": 0.04372827708721161,
+        "nose_minus_support_x": 0.5129372477531433,
+        "hip_minus_support_x": 0.4126441478729248,
+        "full_foot_support": 0.0,
+        "body_collision": 1.0,
+        "upright_quality_gate": 0.0,
+        "prepared_quality_gate": 0.0
+      }
+    }
+  ],
+  "coverage_note": "当前真实轨迹中尚未检出稳定的 upright->prepared、prepared->rising、falling->prepared 正样例，因此本轮先锁定真假 rear 与 prone->upright 的语义回归。"
+}

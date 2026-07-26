@@ -1,0 +1,16 @@
+\begin{table}[h]
+\centering
+\caption{Sample Efficiency Comparison on Beer Game (Return $\uparrow$, mean$\pm$SE, n=3)}
+\label{tab:sample_efficiency}
+\begin{tabular}{lccc}
+\toprule
+Budget & SD-MCTS$^\dagger$ & DreamerV3 & PPO \\
+\midrule
+1,000 & \textbf{-710$\pm$32} & -6785$\pm$2723 & -4335$\pm$824 \\
+3,000 & \textbf{-731$\pm$41} & -1373$\pm$237 & -4472$\pm$1154 \\
+10,000 & \textbf{-713$\pm$23} & \textbf{-713$\pm$111} & -6200$\pm$2284 \\
+\bottomrule
+\end{tabular}
+\vspace{1mm}
+\footnotesize{$^\dagger$ Our method. Higher is better (less negative cost).}
+\end{table}

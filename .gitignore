@@ -1,13 +1,19 @@
 __pycache__/
 *.pyc
+*.pyo
+
+# Local agent/editor state
+.mindfs/
+**/.mindfs/
+.codex/
+.vscode/
+.claude/
 
 # LaTeX build artifacts
 *.aux
 *.out
 *.log
 *.synctex.gz
-
-# Local generated copies from ad-hoc compilation
 /full_draft_zh.pdf
 /full_draft_zh.aux
 /full_draft_zh.out
@@ -15,9 +21,14 @@ __pycache__/
 /full_draft_zh_pre_review_backup.aux
 /full_draft_zh_pre_review_backup.out
 
-# Experiment runtime logs
+# Experiment runtime / checkpoints / large outputs
 docs/neurips/experiments/*.log
-docs/neurips/results/*.log
-sd_world_model_rl/docs/neurips/results/
-sd_world_model_rl/**/checkpoints/
-sd_world_model_rl/outputs/
+docs/neurips/results/**/checkpoints/
+**/checkpoints/
+outputs/
+*.pt
+*.pth
+*.ckpt
+
+# Accidental shell fragments
+0.5=*

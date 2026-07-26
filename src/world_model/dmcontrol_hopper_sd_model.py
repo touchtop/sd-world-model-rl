@@ -1,4 +1,4 @@
-"""Minimal grey-box SD world model for DMControl Hopper-Hop."""
+"""Compact grey-box SD world model for DMControl Hopper-Hop."""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ def _inv_softplus_torch(x: torch.Tensor) -> torch.Tensor:
 
 
 class DMControlHopperSDModel(nn.Module):
-    """Minimal structured SD core for ``dm_control.suite.hopper.hop``.
+    """Compact structured SD core for ``dm_control.suite.hopper.hop``.
 
     The explicit tensor carries:
 
@@ -125,6 +125,9 @@ class DMControlHopperSDModel(nn.Module):
     STATE_UPRIGHT_OMEGA_MAX = 3.5
     STATE_PREPARED_VZ_MAX = 0.40
     STATE_RISING_VZ_MIN = 0.05
+    STATE_HOP_HEIGHT_MIN = 0.55
+    STATE_HOP_PITCH_ABS_MAX = 1.10
+    STATE_HOP_VX_MIN = 0.75
 
     REAR_TO_UPRIGHT_REWARD_WEIGHT = 0.28
     PRONE_TO_UPRIGHT_REWARD_WEIGHT = 0.28
@@ -215,6 +218,7 @@ class DMControlHopperSDModel(nn.Module):
         "grounded_upright",
         "grounded_prepared",
         "rising_air",
+        "grounded_hop",
     )
     STAGE_MODES = ("full", "landing", "ground", "rise", "prone_recover")
 
@@ -1398,6 +1402,13 @@ class DMControlHopperSDModel(nn.Module):
             airborne_true
             * (vz > self.STATE_RISING_VZ_MIN).to(state.dtype)
         )
+        grounded_hop = (
+            grounded_any
+            * no_body_collision
+            * (height >= self.STATE_HOP_HEIGHT_MIN).to(state.dtype)
+            * (abs_theta <= self.STATE_HOP_PITCH_ABS_MAX).to(state.dtype)
+            * (vx >= self.STATE_HOP_VX_MIN).to(state.dtype)
+        )
         state_confident = torch.maximum(
             torch.maximum(rear_geometry, prone_geometry),
             torch.maximum(
@@ -1413,7 +1424,14 @@ class DMControlHopperSDModel(nn.Module):
         grounded_prepared = prepared_quality_gate
         grounded_upright = upright_quality_gate * (1.0 - grounded_prepared)
         grounded_rear = grounded_any * (1.0 - grounded_prepared) * (1.0 - grounded_upright) * rear_geometry
-        grounded_prone = grounded_any * (1.0 - grounded_prepared) * (1.0 - grounded_upright) * (1.0 - grounded_rear) * prone_geometry
+        grounded_hop = grounded_hop * (1.0 - grounded_prepared) * (1.0 - grounded_upright)
+        grounded_prone = (
+            grounded_any
+            * (1.0 - grounded_prepared)
+            * (1.0 - grounded_upright)
+            * (1.0 - grounded_rear)
+            * prone_geometry
+        )
         falling_air = airborne_true * (vz < -self.STATE_VZ_EPS).to(state.dtype)
         rising_air = rising_quality_gate
 
@@ -1640,6 +1658,7 @@ class DMControlHopperSDModel(nn.Module):
             "falling_air": falling_air,
             "grounded_rear": grounded_rear,
             "grounded_prone": grounded_prone,
+            "grounded_hop": grounded_hop,
             "grounded_upright": grounded_upright,
             "grounded_prepared": grounded_prepared,
             "rising_air": rising_air,
@@ -1714,11 +1733,21 @@ class DMControlHopperSDModel(nn.Module):
             & (feat["height"] >= DMControlHopperSDModel.STATE_UPRIGHT_HEIGHT_MIN)
             & ~prepared
         )
+        hop = (
+            grounded
+            & ~body_collision
+            & (feat["height"] >= DMControlHopperSDModel.STATE_HOP_HEIGHT_MIN)
+            & (torch.abs(feat["pitch"]) <= DMControlHopperSDModel.STATE_HOP_PITCH_ABS_MAX)
+            & (feat["vx"] >= DMControlHopperSDModel.STATE_HOP_VX_MIN)
+            & ~upright
+            & ~prepared
+        )
         falling = airborne_true & (feat["vz"] < -DMControlHopperSDModel.STATE_VZ_EPS)
         rising = airborne_true & (feat["vz"] > DMControlHopperSDModel.STATE_RISING_VZ_MIN)
         state_ids = torch.full_like(feat["vz"], -1, dtype=torch.long)
         state_ids = torch.where(rear, torch.full_like(state_ids, 1), state_ids)
         state_ids = torch.where(prone, torch.full_like(state_ids, 2), state_ids)
+        state_ids = torch.where(hop, torch.full_like(state_ids, 6), state_ids)
         state_ids = torch.where(upright, torch.full_like(state_ids, 3), state_ids)
         state_ids = torch.where(prepared, torch.full_like(state_ids, 4), state_ids)
         state_ids = torch.where(rising, torch.full_like(state_ids, 5), state_ids)

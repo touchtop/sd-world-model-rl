@@ -39,15 +39,15 @@ class TransitionCase:
 
 STATE_CASES = [
     StateCase(
-        name="fake_rear_now_prone",
+        name="front_lean_lift_now_hop",
         relative_csv=(
             "logs/hopper-hop/3/"
             "sd_hopper_100000_v5densepose_recover010_seed3_20260426_run1/"
             "official_eval/step_0100000/episode_csv/episode_01.csv"
         ),
         step=98,
-        expected_state=2,
-        note="前伏抬身片段，旧口径会误记为 rear。",
+        expected_state=6,
+        note="前伏抬身且具备前向推进的片段，应判为 hop 而不是 rear/prone。",
     ),
     StateCase(
         name="true_rear_stays_rear",
@@ -98,7 +98,7 @@ STATE_CASES = [
 
 TRANSITION_CASES = [
     TransitionCase(
-        name="prone_to_upright_positive_reward",
+        name="hop_to_upright_positive_reward",
         relative_csv=(
             "logs/hopper-hop/2/"
             "sd_hopper_50000_v5densepose_alpha5to05_seed2_20260426_run1/"
@@ -106,11 +106,11 @@ TRANSITION_CASES = [
         ),
         prev_step=10,
         next_step=11,
-        expected_prev_state=2,
+        expected_prev_state=6,
         expected_next_state=3,
         reward_assertion="gt",
         reward_threshold=0.05,
-        note="命中 prone->upright 后，shaping 应为正。",
+        note="命中 hop->upright 后，shaping 应为正。",
     ),
     TransitionCase(
         name="falling_to_prone_not_positive",
@@ -269,7 +269,7 @@ def run_suite() -> dict[str, Any]:
         "results": results,
         "coverage_note": (
             "当前真实轨迹中尚未检出稳定的 upright->prepared、prepared->rising、"
-            "falling->prepared 正样例，因此本轮先锁定真假 rear 与 prone->upright 的语义回归。"
+            "falling->prepared 正样例，因此本轮先锁定真假 rear、hop/upright 与 falling->prone 的语义回归。"
         ),
     }
 

@@ -300,6 +300,7 @@ class OnlineTrainer(Trainer):
 			'falling_air': float(feat['falling_air'][0].item()),
 			'grounded_rear': float(feat['grounded_rear'][0].item()),
 			'grounded_prone': float(feat['grounded_prone'][0].item()),
+			'grounded_hop': float(feat['grounded_hop'][0].item()) if 'grounded_hop' in feat else 0.0,
 			'grounded_upright': float(feat['grounded_upright'][0].item()),
 			'grounded_prepared': float(feat['grounded_prepared'][0].item()),
 			'rising_air': float(feat['rising_air'][0].item()),
@@ -347,6 +348,7 @@ class OnlineTrainer(Trainer):
 			'falling_air_frac': self._mean_of(rows, 'falling_air_gt_05'),
 			'grounded_rear_frac': self._mean_of(rows, 'grounded_rear_gt_05'),
 			'grounded_prone_frac': self._mean_of(rows, 'grounded_prone_gt_05'),
+			'grounded_hop_frac': self._mean_of(rows, 'grounded_hop_gt_05'),
 			'grounded_upright_frac': self._mean_of(rows, 'grounded_upright_gt_05'),
 			'grounded_prepared_frac': self._mean_of(rows, 'grounded_prepared_gt_05'),
 			'rising_air_frac': self._mean_of(rows, 'rising_air_gt_05'),
@@ -393,12 +395,13 @@ class OnlineTrainer(Trainer):
 					row.update(snap)
 					row.update(features)
 					row['rootx'] = snap['qpos_rootx']
-					row['falling_air_gt_05'] = 1.0 if features['dominant_state_id'] == 0 else 0.0
-					row['grounded_rear_gt_05'] = 1.0 if features['dominant_state_id'] == 1 else 0.0
-					row['grounded_prone_gt_05'] = 1.0 if features['dominant_state_id'] == 2 else 0.0
-					row['grounded_upright_gt_05'] = 1.0 if features['dominant_state_id'] == 3 else 0.0
-					row['grounded_prepared_gt_05'] = 1.0 if features['dominant_state_id'] == 4 else 0.0
-					row['rising_air_gt_05'] = 1.0 if features['dominant_state_id'] == 5 else 0.0
+					row['falling_air_gt_05'] = 1.0 if features['falling_air'] >= 0.5 else 0.0
+					row['grounded_rear_gt_05'] = 1.0 if features['grounded_rear'] >= 0.5 else 0.0
+					row['grounded_prone_gt_05'] = 1.0 if features['grounded_prone'] >= 0.5 else 0.0
+					row['grounded_upright_gt_05'] = 1.0 if features['grounded_upright'] >= 0.5 else 0.0
+					row['grounded_prepared_gt_05'] = 1.0 if features['grounded_prepared'] >= 0.5 else 0.0
+					row['rising_air_gt_05'] = 1.0 if features['rising_air'] >= 0.5 else 0.0
+					row['grounded_hop_gt_05'] = 1.0 if features.get('grounded_hop', 0.0) >= 0.5 else 0.0
 					row['full_foot_support_gt_05'] = 1.0 if features['full_foot_support'] >= 0.5 else 0.0
 					row['backward_speed_gt_05'] = 1.0 if features['backward_speed'] >= 0.5 else 0.0
 					row['rotation_penalty_gt_05'] = 1.0 if features['rotation_penalty'] >= 0.5 else 0.0

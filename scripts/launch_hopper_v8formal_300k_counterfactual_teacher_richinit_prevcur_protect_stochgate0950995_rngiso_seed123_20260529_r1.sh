@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+export EXP_PREFIX="tdmpc2_v8formal_300k_counterfactual_teacher_richinit_prevcur_protect_stochgate0950995_rngiso_seed123_20260529_r1"
+export OUTPUT_ROOT="results/sd_retrospective_rule_induction/closed_loop/hopper_v8formal_300k_counterfactual_teacher_richinit_prevcur_protect_stochgate0950995_rngiso_seed123_20260529_r1"
+export CYCLES=60
+export TEACHER_RULES="results/sd_retrospective_rule_induction/teacher_core/hopper_teacher_rich_init_v1/library_counterfactual_teacher_rich_init_confidence.json"
+export PROTECTED_TEACHER_ORIGINS="teacher_core_standard_hop,sd_tva_counterfactual_teacher_core_v1,sd_tva_counterfactual_teacher_rich_init_v1"
+
+exec "$(dirname "${BASH_SOURCE[0]}")/launch_hopper_v8formal_200k_counterfactual_teacher_retain8_prevcur_protect_stochgate0950995_rngiso_seed123_20260528_r1.sh" "$@"

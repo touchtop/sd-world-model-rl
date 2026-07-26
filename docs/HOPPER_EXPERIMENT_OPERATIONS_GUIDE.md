@@ -215,6 +215,90 @@ bash scripts/run_hopper_v5_100k_pureenv_sdinit_mech_sd_budget.sh \
 - 将 planner 从原先 `128/16/16/3` 恢复到半默认以上的搜索预算，减少与 TD-MPC2 对比时由搜索预算过低引入的混杂；
 - 仍按 `100k` 目标预算比较，实际 `steps=100500`，用于等待 `100k` 评估触发到达 episode 边界。
 
+mechanism-oriented SD 200k 接续脚本：
+
+脚本：
+
+- [run_hopper_v5_200k_pureenv_sdinit_mech_sd_budget_resume.sh](/home/data/round/code/sd_world_model_rl/scripts/run_hopper_v5_200k_pureenv_sdinit_mech_sd_budget_resume.sh)
+
+用法：
+
+```bash
+bash scripts/run_hopper_v5_200k_pureenv_sdinit_mech_sd_budget_resume.sh \
+  <gpu_id> <exp_name> <seed> <resume_from_full_pt>
+```
+
+示例：
+
+```bash
+bash scripts/run_hopper_v5_200k_pureenv_sdinit_mech_sd_budget_resume.sh \
+  1 sd_hopper_200k_pureenv_sdinit_mech_sd_budget_seed1_resume100k_20260502_run1 \
+  1 logs/hopper-hop/1/sd_hopper_100k_pureenv_sdinit_mech_sd_budget_seed1_20260501_run1/models/final.full.pt
+```
+
+固定口径：
+
+- `target_steps=200000`
+- `steps=200500`
+- `eval_freq=25000`
+- `checkpoint_freq=25000`
+- `eval_episodes=10`
+- `save_full_state=true`
+- `save_eval_traces=true`
+- 从 `final.full.pt` 恢复模型、优化器、buffer、计数器与 `SD` checkpoint 状态
+- 其余机制监督与 planner 预算沿用 `100k mechanism-oriented SD` 三种子脚本
+
+含义：
+
+- 目标按 `200k` 训练预算比较；
+- 实际多跑 `500` 步，用于等待 `200k` 评估触发到达 episode 边界，减少末端 `eval.csv` 和 `official_eval/step_0200000/` 漏写；
+- 接续目录必须使用新的 `exp_name`，不得复用 `100k` 目录；
+- 继续保持 `sd_online_planning_weight_enabled=false` 与 `256/32/24/6` 的 fairness 预算口径。
+
+mechanism-oriented SD 300k 接续脚本（TD-MPC2 官方默认规划预算）：
+
+脚本：
+
+- [run_hopper_v5_300k_pureenv_sdinit_mech_sd_official_budget_resume.sh](/home/data/round/code/sd_world_model_rl/scripts/run_hopper_v5_300k_pureenv_sdinit_mech_sd_official_budget_resume.sh)
+
+用法：
+
+```bash
+bash scripts/run_hopper_v5_300k_pureenv_sdinit_mech_sd_official_budget_resume.sh \
+  <gpu_id> <exp_name> <seed> <resume_from_full_pt>
+```
+
+示例：
+
+```bash
+bash scripts/run_hopper_v5_300k_pureenv_sdinit_mech_sd_official_budget_resume.sh \
+  1 sd_hopper_300k_pureenv_sdinit_mech_sd_official_budget_seed1_resume200k_20260504_run1 \
+  1 logs/hopper-hop/1/sd_hopper_200k_pureenv_sdinit_mech_sd_budget_seed1_resume100k_20260502_run1/models/final.full.pt
+```
+
+固定口径：
+
+- `target_steps=300000`
+- `steps=300500`
+- `eval_freq=25000`
+- `checkpoint_freq=25000`
+- `eval_episodes=10`
+- `save_full_state=true`
+- `save_eval_traces=true`
+- 从 `final.full.pt` 恢复模型、优化器、buffer、计数器与 `SD` checkpoint 状态
+- `num_samples=512`
+- `num_elites=64`
+- `num_pi_trajs=24`
+- `horizon=3`
+- `iterations=6`
+
+含义：
+
+- 目标按 `300k` 训练预算比较；
+- 实际多跑 `500` 步，用于等待 `300k` 评估触发到达 episode 边界，减少末端 `eval.csv` 和 `official_eval/step_0300000/` 漏写；
+- `SD` 监督、reward、residual 与 `sd_online_planning_weight_enabled=false` 口径保持不变；
+- planner 搜索预算恢复为 TD-MPC2 官方默认 `512/64/24/6`，用于观察在更公平预算下该机制导向版本的长程收益。
+
 planning-aware SD 200k 接续脚本：
 
 脚本：

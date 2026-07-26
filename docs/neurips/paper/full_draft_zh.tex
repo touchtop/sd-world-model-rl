@@ -631,7 +631,7 @@ SD-MCTS 在该公开基准上取得了 802.9 的三种子聚合均值，最差�
 850.0；按官方学习曲线估读，其在 50k 步附近通常处于约 500--600
 的分数区间，在 100k 步附近进入约 700--750 的分数区间。若将共享先验预训练与单种子微调的真实环境交互一并计入，本文协议总计约使用
 40k 步真实环境交互，仅为该 500k 官方结果的约
-1/12；同时，本文方法的总可训练参数仅为 17284，其中结构动力学本体仅包含 3 个可训练物理参数。按
+1/12；同时，本文方法的总可训练参数仅为 17284，其中系统动力学本体仅包含 3 个可训练物理参数。按
 DreamerV3 常见约 8M 参数规模计，约为其
 1/460。还需指出，本文在该实验上采用的是离散动作分支的 MCTS 实现，评测时将连续控制离散为有限个动作 bins，因此与公开基准的比较对本文方法实际上是偏保守的。即便如此，这一结果也并不旨在宣称超越该任务的高预算最终 SOTA，而是表明：在未经改造的公开基准上，当底层动力学形式已知时，将学习重点压缩到少量系统辨识参数与价值估计，仍能够在较低真实交互预算下达到较高分数区间。
 
@@ -709,6 +709,32 @@ SD-MCTS 在三个随机种子上均取得更高回报，三种子均值由 779.9
 
 {\color{red}
 \textbf{进一步的启发}：该实验提示，在那些成功行为依赖阶段性条件逐步满足的任务中，结构化收益不应仅理解为“把世界模型从黑盒换成结构化形式”。更关键的因素在于，这类任务的成功往往依赖若干具有先后关系的结构条件；如果这些条件只体现在状态递推里，而不进一步进入动作评估、搜索偏置与训练信号，那么求解器在早期仍主要依赖稀疏的终局奖励，结构知识就难以转化为稳定的低预算收益。相反，当这些结构量同时进入建模与求解两侧时，算法便能够在奖励尚弱的阶段优先保留那些更可能通向成功轨迹的候选动作。这也说明，在更复杂的任务上，结构化方法的后续发展方向很可能不仅是继续改进世界模型表达，还包括将更多求解过程纳入结构化空间中完成。}
+
+\hypertarget{sub-boxoban-extension}{%
+\subsection{6.8 Boxoban：结构化推箱规划的补充外部基准}\label{sub-boxoban-extension}}
+
+作为对 SD-MCTS 较广泛适用性的补充检验，我们进一步在 Boxoban 的公开 \texttt{unfiltered/test} 切分上评估动态运输阶段 GFT-TVA 版本。该实验使用完整 \(1000\) 关测试集，配置在内部 heldout 主线冻结后不再调参：底层转移由 exact-grid stock-flow provider 给出，MCTS 以 push-level 动作为搜索单位，叶值由显式 GFT-SD 读数与 GFT-TVA 按状态门控混合。最终结果为 \(989/1000\)，即 \(98.9\%\) 解题率。
+
+下表将该结果与已发表的 Boxoban/Sokoban 规划结果放在同一量级表中。需要强调的是，这里的目的不是宣称在原始解题率上严格超过所有搜索器；Orseau et al. 与 Orseau and Lelis 的策略/启发式搜索方法已经在该类 \(1000\) 关测试口径上报告过 \(1000/1000\)。本表更关心的是：在接近这些强搜索结果的同时，本文方法把可学习部分压缩到很小的 TVA 状态集合，并保留了显式结构化世界模型与可解释的 stock-flow/GFT 读数。
+
+\begin{table}[ht]
+\centering
+\caption{Boxoban/Sokoban 外部基准与训练、审计规模对照}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{p{0.19\textwidth} p{0.16\textwidth} p{0.34\textwidth} p{0.24\textwidth} p{0.13\textwidth}}
+\toprule
+方法 & 类型 & 训练或审计规模 & teacher / 搜索监督口径 & 测试结果 \\
+\midrule
+本文：SD-MCTS + 动态运输阶段 GFT-TVA & 显式结构世界模型 + push-level MCTS & exact-grid 转移；TVA 训练来自 \texttt{medium/train/001.txt} 的 40 关在线轨迹，\(1{,}378\) 个 raw 状态、\(834\) 个去重状态，其中 value 训练状态 \(114\) 个；独立审计为 \(120\) 个叶状态、\(78\) 个高置信 teacher 标签 & 训练和在线测试 teacher 调用均为 \(0\)；teacher 仅用于独立审计，预算为 \(4{,}000\) expansions/leaf & \(989/1000\) \\
+Guez et al. DRC(3,3), 2019 & model-free recurrent planning & Boxoban unfiltered large train set 为 \(900\text{k}\) 关；DRC(3,3) 训练至 \(10^9\) environment steps & 不使用显式世界模型或离线 teacher；通过大规模 RL 从奖励中学习隐式规划 & 约 \(99\%\) \\
+Orseau et al. LevinTS, 2018 & 带保证的 policy-guided tree search & 使用 A3C 预训练策略指导测试时树搜索；论文测试集为 \(1{,}000\) 个 Boxoban/Sokoban 关卡 & 强测试时搜索；LevinTS 总 expansions 约 \(6.6\times10^6\)，加入 \(1\%\) policy noise 后约 \(5.0\times10^6\) & \(1000/1000\) \\
+Orseau and Lelis PHS*, 2021 & policy + heuristic guided search & 使用 Boxoban 前 \(50{,}000\) 个训练问题；5 次随机初始化训练；训练预算为 7 天 CPU，测试预算为 2 天 & 通过 bootstrap search 交替学习 policy 与 heuristic；PHS* 平均 expansions 约 \(1{,}522.1\) & \(1000/1000\) \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+该补充结果支持的结论应表述为“接近已发表强搜索器和 model-free planning 方法的 Boxoban \texttt{unfiltered/test} 性能，同时显著降低可学习价值模块的训练/审计样本规模，并保留显式可解释结构”。它不应被表述为严格 SOTA：一方面，策略/启发式搜索文献已报告满分结果；另一方面，本文方法利用已知 Sokoban 规则构造 exact-grid 转移，因而其样本效率优势不能与从零学习规则的 model-free RL 在完全同协议下直接相除。更准确地说，该实验说明，在规则可显式编码的离散规划任务中，将学习集中到截断叶值与结构化 prior 的少量状态校准上，可以在公开测试集上达到接近最强已发表结果的求解率。
 
 \hypertarget{ux8ba8ux8bbaux4e0eux7ed3ux8bed-discussion-and-conclusion}{%
 \section{7 讨论与结语 (Discussion and
@@ -807,7 +833,7 @@ A.1 与 A.6）。
 \]
 其中，height、compression、support 与 clearance 对应任务中的关键结构量，vx、vz 与各类 rate 则描述连续演化趋势。
 \item \textbf{动作解释：} 动作为连续控制输入，先被分解为 drive、posture 与 foot 等控制分量，再分别作用到水平/竖直加速度、机体姿态、压缩量、摆动量与足端角等结构变量的更新中。也就是说，动作并不直接驱动一个无语义 latent 转移器，而是通过若干具有物理含义的中间通道影响一步递推。
-\item \textbf{结构方程：} Hopper 实验的一步转移主要由显式结构动力学主干给出。模型根据动作构造 \(x/z\) 加速度、姿态变化、压缩/摆动/足端角的速率更新，并以欧拉积分得到下一步结构状态。更新后再通过 `project\_state()` 将高度、接触强度、姿态角与冲击量投影回合法域。
+\item \textbf{系统动力学方程：} Hopper 实验的一步转移主要由显式系统动力学主干给出。模型根据动作构造 \(x/z\) 加速度、姿态变化、压缩/摆动/足端角的速率更新，并以欧拉积分得到下一步结构状态。更新后再通过 `project\_state()` 将高度、接触强度、姿态角与冲击量投影回合法域。
 \item \textbf{可学习参数：} 在该 Hopper 实现中，新增的可学习量主要是 \(11\) 个显式标量参数，即 `control\_scale` 的 \(4\) 个分量与 `rate\_damping` 的 \(7\) 个分量。与之对应，被替代的原 TD-MPC2 黑盒 latent dynamics 模块参数量为 \(300{,}128\)。
 \item \textbf{结构约束与奖励设计：} 环境奖励显式对齐为 `standing \times hopping`，其中 standing 由高度阈值给出，hopping 由前向速度是否达到任务目标决定。与此并行，规划器在叶节点评估时使用带 viability gate 的 planning reward：在真实奖励基础上，进一步考虑高度、姿态、支撑、离地间隙、向上速度与减粘连接触等结构信号，以缓解短规划视界下“只会站立或黏地前冲”的局部最优。论文所用配置同时采用课程式塑形（Curriculum Shaping）混合策略，初始塑形权重为 \(0.5\)，并在 \(10\text{k}\) 至 \(30\text{k}\) 训练步之间衰减至 \(0.25\)。
 \item \textbf{与求解层的分工：} Hopper 并未单独实现新的规划器，而是保留 TD-MPC2 的求解层接口，仅将世界模型替换为 SD 版本。具体而言，`encode / next / reward / pi / Q` 五个接口与原框架保持一致，训练阶段另对 `height\_head` 增加系数为 \(0.05\) 的辅助监督损失，使高度相关塑形分量不再处于无梯度漂移状态。因而，这一 Hopper 版本本质上属于“结构主干负责机制表达，原有求解闭环负责在线决策”的混合实现。
@@ -875,16 +901,41 @@ Hopper-Hop 的正文结果采用与公开基线对齐的三种子评测口径。
 
 从实现角度看，SD-MCTS 的主要在线开销来自有限视界树搜索。在离散动作设置下，其计算量主要由动作分支数、搜索深度和模拟次数共同决定，可近似写为 \(\mathcal{O}(n_{\text{sims}} \cdot H \cdot |\mathcal{A}|)\)。Beer Game 的动作空间本身离散，因此这一复杂度表达较为直接；Cartpole 则需先将连续动作离散化为有限分支，因此其实际计算开销除受 \(n_{\text{sims}}\) 与 \(H\) 影响外，还与离散动作分支数以及动作重复步数（action repeat）有关。
 
-为便于独立复现，本文核心结果与其主要入口脚本对应如下：
+为便于独立复现，本文同时提供独立的评审附件包
+\path{Attachments/}。该附件包不依赖作者工作目录中的绝对路径，而按
+\path{code/} 与 \path{data/}
+组织代码、结果文件、日志与复现说明。本文核心结果与附件中主要入口及支撑材料对应如下：
 \begin{itemize}
-\item \textbf{Beer Game 多步误差与图 3}：脚本 \path{docs/neurips/experiments/run_multi_step_rollout.py}；结果目录 \path{docs/neurips/results/multi_step_rollout/20260215_213008/}
-\item \textbf{Beer Game 物理一致性与表 2}：脚本 \path{docs/neurips/experiments/run_internal_physics_consistency.py}；结果目录 \path{docs/neurips/results/physics_consistency/20260331_table2_formal/}
-\item \textbf{结构突变干预与图 4/表 3}：脚本 \path{docs/neurips/experiments/run_causal_intervention.py}；结果目录 \path{docs/neurips/results/causal_intervention/20260224_201339/}
-\item \textbf{Cartpole 主结果}：脚本 \path{scripts/run_cartpole_sharedprior_paper.py}；结果文件 \path{results/si_robust_summaries/T4_sharedprior_paperformal_20260330_r1_summary.json}
-\item \textbf{Cartpole 1-step 补充消融}：脚本 \path{scripts/run_cartpole_onestep_paper.py}；结果文件 \path{results/si_robust_summaries/T4_onestep_paperformal_20260330_r1_summary.json}
+\item \textbf{Beer Game 样本效率、表 1、表 4 与图 3}：脚本
+\path{Attachments/code/experiments/run_comparison_revised.py}、
+\path{Attachments/code/experiments/run_beer_game_v2_revised.py} 与
+\path{Attachments/code/experiments/plot_sample_efficiency.py}；结果与图片位于
+\path{Attachments/data/beer_game/}。
+\item \textbf{Beer Game 物理一致性与图 2(a)}：脚本
+\path{Attachments/code/experiments/run_internal_physics_consistency.py}；结果文件
+\path{Attachments/data/physics_consistency/results.json}。
+\item \textbf{Beer Game 多步误差与图 2(b)}：脚本
+\path{Attachments/code/experiments/run_multi_step_rollout.py}；结果目录
+\path{Attachments/data/multi_step_rollout/}。
+\item \textbf{结构突变干预、表 2 与图 4}：脚本
+\path{Attachments/code/experiments/run_causal_intervention.py} 与
+\path{Attachments/code/experiments/plot_intervention_results.py}；结果与图片位于
+\path{Attachments/data/interventions/}。
+\item \textbf{Cartpole 主结果与表 5 补充消融}：脚本
+\path{Attachments/code/scripts/run_cartpole_sharedprior_paper.py} 与
+\path{Attachments/code/scripts/run_cartpole_onestep_paper.py}；论文口径的主结果与消融摘要位于
+\path{Attachments/data/cartpole/}。
+\item \textbf{Hopper-Hop 表 1 与表 6}：结构化 Hopper 主干位于
+\path{Attachments/code/src/world_model/dmcontrol_hopper_sd_model.py}；TD-MPC2
+结构化适配补丁位于 \path{Attachments/code/tdmpc2_sd_patch/}；三种子
+50k 评估日志与汇总位于
+\path{Attachments/data/hopper/table6_50k/}。
 \end{itemize}
 
-上述脚本均固化了论文口径所使用的随机种子集合、预算设定与结果汇总格式，可直接作为复现索引使用。
+附件根目录中的 \path{README.md} 给出了对应运行命令；
+\path{requirements.txt} 给出了 Python 依赖。为避免提交无关过程材料，探索脚本、重复图、字节码缓存与大体量 checkpoint 未随包提供；影响论文表格的聚合
+JSON、CSV、图片和关键日志均已纳入附件。论文中明确标注为官方公开基线的 DreamerV3 与
+TD-MPC2 数值仍以相应公开论文/附录结果为准。
 
 \hypertarget{a.7-q-ux4f30ux8ba1ux7684-bias-variance-ux5206ux89e3ux63a8ux5bfc-bias-variance-decomposition-of-q-estimation}{%
 \subsection{A.7 固定 rollout 策略下的 Q 估计偏差-方差分解推导 (Bias-Variance

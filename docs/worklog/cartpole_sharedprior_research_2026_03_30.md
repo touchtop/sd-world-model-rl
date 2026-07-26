@@ -493,7 +493,7 @@ Seed 84:
 因此当前 cartpole 叙事里，可直接使用：
 - **真实环境交互量：5000 steps / seed**
 - **总可训练参数：17284**
-- **其中结构动力学本体仅 3 个可训练物理参数**
+- **其中系统动力学本体仅 3 个可训练物理参数**
 
 ### 3. DreamerV3 官方可核验结果
 #### (a) 官方论文可核验表格
@@ -560,7 +560,7 @@ Seed 84:
 
 2. **参数效率**
 - 我们：
-  - 结构动力学本体：**3 trainable physical scalars**
+  - 系统动力学本体：**3 trainable physical scalars**
   - 含 VNet 总计：**17284 trainable params**
 - DreamerV3：**8M 级别**（官方 size table）
 - 这是论文中最容易讲清楚也最能体现结构先验价值的证据。

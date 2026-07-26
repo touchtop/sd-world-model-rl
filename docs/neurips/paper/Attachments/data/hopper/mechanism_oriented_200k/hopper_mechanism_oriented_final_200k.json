@@ -1,0 +1,24 @@
+{
+  "method": "mechanism-oriented SD",
+  "environment": "dm_control hopper-hop",
+  "checkpoint_step": 200001,
+  "reported_budget": "200k environment steps",
+  "seeds": [
+    1,
+    2,
+    3
+  ],
+  "episode_reward_by_seed": [
+    185.62394375917793,
+    265.8724420160055,
+    169.19294960862607
+  ],
+  "mean": 206.8964451279365,
+  "population_std": 42.23837551248083,
+  "source_files": [
+    "seed1/run_100k_200k/eval.csv",
+    "seed2/run_100k_200k/eval.csv",
+    "seed3/run_100k_200k/eval.csv"
+  ],
+  "notes": "Resume-run checkpoints are logged as 125001/150001/175001/200001 because training resumes immediately after the 100k run boundary."
+}

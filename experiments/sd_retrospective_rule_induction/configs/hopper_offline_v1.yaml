@@ -1,0 +1,70 @@
+# Offline configuration for SD retrospective attribution and rule induction.
+# This file is intentionally independent from TD-MPC2 Hydra configs.
+
+project: sd_retrospective_rule_induction
+task: hopper-hop
+random_seed: 20260505
+
+read_only_inputs:
+  log_root: logs/hopper-hop
+  sd_model_source: src/world_model/dmcontrol_hopper_sd_model.py
+  run_globs:
+    - sd_hopper_100k_pureenv_sdinit_mech_sd_budget_seed*_20260501_run1
+    - sd_hopper_200k_pureenv_sdinit_mech_sd_budget_seed*_resume100k_20260502_run1
+    - sd_hopper_300k_pureenv_sdinit_mech_sd_official_budget_seed*_resume200k_20260504_run1
+
+outputs:
+  root: results/sd_retrospective_rule_induction
+  manifests: results/sd_retrospective_rule_induction/manifests
+  sd_explainers: results/sd_retrospective_rule_induction/sd_explainers
+  attributions: results/sd_retrospective_rule_induction/attributions
+  rules: results/sd_retrospective_rule_induction/rules
+  reports: results/sd_retrospective_rule_induction/reports
+
+cycle_steps:
+  - 25000
+  - 50000
+  - 75000
+  - 100000
+  - 125001
+  - 150001
+  - 175001
+  - 200001
+  - 225001
+  - 250001
+  - 275001
+  - 300001
+
+trajectory_selection:
+  good_quantile: 0.80
+  bad_quantile: 0.20
+  random_per_cycle: 10
+  min_episode_return_for_good: null
+  max_episode_return_for_bad: null
+
+counterfactuals:
+  horizon: 5
+  num_action_samples: 32
+  action_source_modes:
+    - local_noise
+    - nearest_good_trace
+    - phase_matched_good_trace
+
+rule_induction:
+  max_depth: 4
+  min_support: 20
+  max_rules: 25
+  validation_holdout_seeds:
+    - 3
+
+intervention_policy:
+  stage: offline_only
+  online_training_enabled: false
+  rule_prior_enabled_by_default: false
+
+protected_paths:
+  - external/tdmpc2
+  - scripts/run_hopper_v5_100k_pureenv_sdinit_mech_sd_budget.sh
+  - scripts/run_hopper_v5_200k_pureenv_sdinit_mech_sd_budget_resume.sh
+  - scripts/run_hopper_v5_300k_pureenv_sdinit_mech_sd_official_budget_resume.sh
+
