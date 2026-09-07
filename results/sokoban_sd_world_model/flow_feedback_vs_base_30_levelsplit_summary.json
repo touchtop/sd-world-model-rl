@@ -1,0 +1,90 @@
+{
+  "base_files": [
+    "results/sokoban_sd_world_model/flow_smoke_30_levelsplit_seed0.json",
+    "results/sokoban_sd_world_model/flow_smoke_30_levelsplit_seed1.json",
+    "results/sokoban_sd_world_model/flow_smoke_30_levelsplit_seed2.json"
+  ],
+  "feedback_files": [
+    "results/sokoban_sd_world_model/flow_feedback_smoke_30_levelsplit_seed0.json",
+    "results/sokoban_sd_world_model/flow_feedback_smoke_30_levelsplit_seed1.json",
+    "results/sokoban_sd_world_model/flow_feedback_smoke_30_levelsplit_seed2.json"
+  ],
+  "base_no_feedback": {
+    "valid_stock_mae": {
+      "mean": 0.0516518789033095,
+      "stdev": 0.0032465265139958385,
+      "values": [
+        0.04891884699463844,
+        0.05621336027979851,
+        0.04982342943549156
+      ]
+    },
+    "valid_zero_flow_stock_mae": {
+      "mean": 0.09816546738147736,
+      "stdev": 0.0072372134961558535,
+      "values": [
+        0.10804840922355652,
+        0.09091933071613312,
+        0.09552866220474243
+      ]
+    },
+    "valid_relative_improvement": {
+      "mean": 0.4691395196414155,
+      "stdev": 0.06789611953409615,
+      "values": [
+        0.547250650461467,
+        0.3817226783674094,
+        0.47844523009537
+      ]
+    },
+    "valid_flow_mae": {
+      "mean": 0.04553703094522158,
+      "stdev": 0.0014427984448686162,
+      "values": [
+        0.04675167053937912,
+        0.04350985586643219,
+        0.04634956642985344
+      ]
+    }
+  },
+  "feedback_gated": {
+    "valid_stock_mae": {
+      "mean": 0.050986512253681816,
+      "stdev": 0.003173560523246053,
+      "values": [
+        0.048393163830041885,
+        0.05545543134212494,
+        0.04911094158887863
+      ]
+    },
+    "valid_zero_flow_stock_mae": {
+      "mean": 0.09816546738147736,
+      "stdev": 0.0072372134961558535,
+      "values": [
+        0.10804840922355652,
+        0.09091933071613312,
+        0.09552866220474243
+      ]
+    },
+    "valid_relative_improvement": {
+      "mean": 0.4760261538188252,
+      "stdev": 0.0665271201516332,
+      "values": [
+        0.5521159063997465,
+        0.39005895770100857,
+        0.4859035973557205
+      ]
+    },
+    "valid_flow_mae": {
+      "mean": 0.04690564547975858,
+      "stdev": 0.0024533683840560743,
+      "values": [
+        0.0502265989780426,
+        0.04437512531876564,
+        0.0461152121424675
+      ]
+    }
+  },
+  "feedback_minus_base_valid_stock_mae_mean": -0.0006653666496276855,
+  "feedback_relative_mae_change_vs_base": -0.012881751133840233
+}

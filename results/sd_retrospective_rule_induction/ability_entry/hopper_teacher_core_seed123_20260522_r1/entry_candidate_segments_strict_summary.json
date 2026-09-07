@@ -1,0 +1,55 @@
+{
+  "analysis_family": "hopper_strict_entry_segments_v1",
+  "outputs": [
+    "results/sd_retrospective_rule_induction/ability_entry/hopper_teacher_core_seed123_20260522_r1/entry_candidate_segments_strict_no_pre_entry.json",
+    "results/sd_retrospective_rule_induction/ability_entry/hopper_teacher_core_seed123_20260522_r1/entry_candidate_segments_strict_entry_cycle_only.json"
+  ],
+  "source": "results/sd_retrospective_rule_induction/ability_entry/hopper_teacher_core_seed123_20260522_r1/entry_candidate_segments.json",
+  "summaries": [
+    {
+      "cycle_offset_counts": {
+        "0": 120,
+        "1": 149
+      },
+      "mean_future_reward_sum": 1.8217454552269614,
+      "mean_future_rootx_delta": 0.08392342264100608,
+      "mode": "no_pre_entry",
+      "raw_windows": 568,
+      "role_conflict_uid_groups_before_filter": 29,
+      "role_counts": {
+        "entry_success": 117,
+        "matched_failure": 152
+      },
+      "selected_windows": 269,
+      "threshold_counts": {
+        "1.0": 66,
+        "10.0": 94,
+        "100.0": 63,
+        "50.0": 46
+      },
+      "unique_uids_selected": 269
+    },
+    {
+      "cycle_offset_counts": {
+        "0": 135
+      },
+      "mean_future_reward_sum": 1.7039639898679322,
+      "mean_future_rootx_delta": 0.06119610386105045,
+      "mode": "entry_cycle_only",
+      "raw_windows": 568,
+      "role_conflict_uid_groups_before_filter": 29,
+      "role_counts": {
+        "entry_success": 53,
+        "matched_failure": 82
+      },
+      "selected_windows": 135,
+      "threshold_counts": {
+        "1.0": 38,
+        "10.0": 39,
+        "100.0": 31,
+        "50.0": 27
+      },
+      "unique_uids_selected": 135
+    }
+  ]
+}

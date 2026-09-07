@@ -1,0 +1,144 @@
+{
+  "stock_action_base": {
+    "files": [
+      "results/sokoban_sd_world_model/flow_smoke_30_levelsplit_seed0.json",
+      "results/sokoban_sd_world_model/flow_smoke_30_levelsplit_seed1.json",
+      "results/sokoban_sd_world_model/flow_smoke_30_levelsplit_seed2.json"
+    ],
+    "valid_stock_mae": {
+      "mean": 0.0516518789033095,
+      "stdev": 0.0032465265139958385,
+      "values": [
+        0.04891884699463844,
+        0.05621336027979851,
+        0.04982342943549156
+      ]
+    },
+    "valid_flow_mae": {
+      "mean": 0.04553703094522158,
+      "stdev": 0.0014427984448686162,
+      "values": [
+        0.04675167053937912,
+        0.04350985586643219,
+        0.04634956642985344
+      ]
+    },
+    "valid_relative_improvement": {
+      "mean": 0.4691395196414155,
+      "stdev": 0.06789611953409615,
+      "values": [
+        0.547250650461467,
+        0.3817226783674094,
+        0.47844523009537
+      ]
+    }
+  },
+  "stock_action_feedback": {
+    "files": [
+      "results/sokoban_sd_world_model/flow_feedback_smoke_30_levelsplit_seed0.json",
+      "results/sokoban_sd_world_model/flow_feedback_smoke_30_levelsplit_seed1.json",
+      "results/sokoban_sd_world_model/flow_feedback_smoke_30_levelsplit_seed2.json"
+    ],
+    "valid_stock_mae": {
+      "mean": 0.050986512253681816,
+      "stdev": 0.003173560523246053,
+      "values": [
+        0.048393163830041885,
+        0.05545543134212494,
+        0.04911094158887863
+      ]
+    },
+    "valid_flow_mae": {
+      "mean": 0.04690564547975858,
+      "stdev": 0.0024533683840560743,
+      "values": [
+        0.0502265989780426,
+        0.04437512531876564,
+        0.0461152121424675
+      ]
+    },
+    "valid_relative_improvement": {
+      "mean": 0.4760261538188252,
+      "stdev": 0.0665271201516332,
+      "values": [
+        0.5521159063997465,
+        0.39005895770100857,
+        0.4859035973557205
+      ]
+    }
+  },
+  "action_only_base": {
+    "files": [
+      "results/sokoban_sd_world_model/flow_actiononly_smoke_30_levelsplit_seed0.json",
+      "results/sokoban_sd_world_model/flow_actiononly_smoke_30_levelsplit_seed1.json",
+      "results/sokoban_sd_world_model/flow_actiononly_smoke_30_levelsplit_seed2.json"
+    ],
+    "valid_stock_mae": {
+      "mean": 0.04863980785012245,
+      "stdev": 0.00374038859121807,
+      "values": [
+        0.047435399144887924,
+        0.0537027083337307,
+        0.044781316071748734
+      ]
+    },
+    "valid_flow_mae": {
+      "mean": 0.0570392037431399,
+      "stdev": 0.008883310508292526,
+      "values": [
+        0.06950445473194122,
+        0.04945271462202072,
+        0.052160441875457764
+      ]
+    },
+    "valid_relative_improvement": {
+      "mean": 0.5005144172166145,
+      "stdev": 0.06560664559391924,
+      "values": [
+        0.5609801246889052,
+        0.40933673938493415,
+        0.5312263875760043
+      ]
+    }
+  },
+  "action_only_feedback": {
+    "files": [
+      "results/sokoban_sd_world_model/flow_actiononly_feedback_smoke_30_levelsplit_seed0.json",
+      "results/sokoban_sd_world_model/flow_actiononly_feedback_smoke_30_levelsplit_seed1.json",
+      "results/sokoban_sd_world_model/flow_actiononly_feedback_smoke_30_levelsplit_seed2.json"
+    ],
+    "valid_stock_mae": {
+      "mean": 0.04908239717284838,
+      "stdev": 0.002582516790964636,
+      "values": [
+        0.047339051961898804,
+        0.052733395248651505,
+        0.04717474430799484
+      ]
+    },
+    "valid_flow_mae": {
+      "mean": 0.06114010885357857,
+      "stdev": 0.0050028636407771915,
+      "values": [
+        0.06820079684257507,
+        0.05800089240074158,
+        0.05721863731741905
+      ]
+    },
+    "valid_relative_improvement": {
+      "mean": 0.4960138807923717,
+      "stdev": 0.0583634304483716,
+      "values": [
+        0.5618718285435153,
+        0.41999798246101405,
+        0.5061718313725857
+      ]
+    }
+  },
+  "feedback_effect": {
+    "stock_action_mae_delta": -0.0006653666496276855,
+    "stock_action_relative_delta": -0.012881751133840233,
+    "action_only_mae_delta": 0.0004425893227259295,
+    "action_only_relative_delta": 0.009099323009040532
+  }
+}

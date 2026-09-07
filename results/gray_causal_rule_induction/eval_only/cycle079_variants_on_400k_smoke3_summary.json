@@ -1,0 +1,556 @@
+{
+  "by_mode": {
+    "cycle079_certified_active": {
+      "mean_across_seeds": 363.9740478991427,
+      "mean_rule_prior_num_rules": 126,
+      "seed_mean_values": [
+        456.73078899582225,
+        338.53535228967667,
+        296.65600241192925
+      ],
+      "std_across_seeds": 67.78067448618386
+    },
+    "cycle079_drop_reject_active": {
+      "mean_across_seeds": 363.9740478991427,
+      "mean_rule_prior_num_rules": 126,
+      "seed_mean_values": [
+        456.73078899582225,
+        338.53535228967667,
+        296.65600241192925
+      ],
+      "std_across_seeds": 67.78067448618386
+    },
+    "cycle079_original_active": {
+      "mean_across_seeds": 355.45152165078457,
+      "mean_rule_prior_num_rules": 130,
+      "seed_mean_values": [
+        436.28432244062424,
+        336.4692369699478,
+        293.6010055417816
+      ],
+      "std_across_seeds": 59.776682070810494
+    },
+    "cycle079_strict_active": {
+      "mean_across_seeds": 364.23189705931065,
+      "mean_rule_prior_num_rules": 125,
+      "seed_mean_values": [
+        460.81776802738506,
+        333.40842032432556,
+        298.4695028262213
+      ],
+      "std_across_seeds": 69.77012179044826
+    },
+    "cycle079_teacher_v8_active": {
+      "mean_across_seeds": 360.6109653199609,
+      "mean_rule_prior_num_rules": 31,
+      "seed_mean_values": [
+        456.8418724586566,
+        331.05212850372,
+        293.9388949975061
+      ],
+      "std_across_seeds": 69.71197239056285
+    },
+    "cycle079_teacher_v8_certified_active": {
+      "mean_across_seeds": 353.0221461622148,
+      "mean_rule_prior_num_rules": 28,
+      "seed_mean_values": [
+        434.0754149854183,
+        331.05212850372,
+        293.9388949975061
+      ],
+      "std_across_seeds": 59.282219456407894
+    },
+    "rule_off": {
+      "mean_across_seeds": 359.0800305948231,
+      "mean_rule_prior_num_rules": 0,
+      "seed_mean_values": [
+        446.7359764575958,
+        331.3317486892144,
+        299.17236663765897
+      ],
+      "std_across_seeds": 63.357346836850674
+    }
+  },
+  "checkpoint_family": "400k cycle080 final.full.pt",
+  "cycle_reference": 79,
+  "deltas": {
+    "cycle079_certified_active": {
+      "delta_vs_cycle079_original_active_by_seed": [
+        20.446466555198015,
+        2.0661153197288513,
+        3.0549968701476473
+      ],
+      "delta_vs_rule_off_by_seed": [
+        9.994812538226427,
+        7.203603600462259,
+        -2.516364225729717
+      ],
+      "mean_delta_vs_cycle079_original_active": 8.52252624835817,
+      "mean_delta_vs_rule_off": 4.894017304319656
+    },
+    "cycle079_drop_reject_active": {
+      "delta_vs_cycle079_original_active_by_seed": [
+        20.446466555198015,
+        2.0661153197288513,
+        3.0549968701476473
+      ],
+      "delta_vs_rule_off_by_seed": [
+        9.994812538226427,
+        7.203603600462259,
+        -2.516364225729717
+      ],
+      "mean_delta_vs_cycle079_original_active": 8.52252624835817,
+      "mean_delta_vs_rule_off": 4.894017304319656
+    },
+    "cycle079_original_active": {
+      "delta_vs_rule_off_by_seed": [
+        -10.451654016971588,
+        5.1374882807334075,
+        -5.571361095877364
+      ],
+      "mean_delta_vs_rule_off": -3.628508944038515
+    },
+    "cycle079_strict_active": {
+      "delta_vs_cycle079_original_active_by_seed": [
+        24.53344558676082,
+        -3.0608166456222534,
+        4.868497284439684
+      ],
+      "delta_vs_rule_off_by_seed": [
+        14.081791569789232,
+        2.076671635111154,
+        -0.7028638114376804
+      ],
+      "mean_delta_vs_cycle079_original_active": 8.780375408526083,
+      "mean_delta_vs_rule_off": 5.1518664644875685
+    },
+    "cycle079_teacher_v8_active": {
+      "delta_vs_cycle079_original_active_by_seed": [
+        20.557550018032373,
+        -5.41710846622783,
+        0.33788945572450757
+      ],
+      "delta_vs_rule_off_by_seed": [
+        10.105896001060785,
+        -0.2796201854944229,
+        -5.233471640152857
+      ],
+      "mean_delta_vs_cycle079_original_active": 5.15944366917635,
+      "mean_delta_vs_rule_off": 1.5309347251378351
+    },
+    "cycle079_teacher_v8_certified_active": {
+      "delta_vs_cycle079_original_active_by_seed": [
+        -2.2089074552059174,
+        -5.41710846622783,
+        0.33788945572450757
+      ],
+      "delta_vs_rule_off_by_seed": [
+        -12.660561472177505,
+        -0.2796201854944229,
+        -5.233471640152857
+      ],
+      "mean_delta_vs_cycle079_original_active": -2.4293754885697467,
+      "mean_delta_vs_rule_off": -6.057884432608262
+    },
+    "rule_off": {
+      "delta_vs_cycle079_original_active_by_seed": [
+        10.451654016971588,
+        -5.1374882807334075,
+        5.571361095877364
+      ],
+      "mean_delta_vs_cycle079_original_active": 3.628508944038515
+    }
+  },
+  "rows": [
+    {
+      "max": 456.274992,
+      "mean": 446.7359764575958,
+      "min": 434.628042,
+      "mode": "rule_off",
+      "report": "/home/data/round/code/sd_world_model_rl/results/gray_causal_rule_induction/eval_only/cycle079_variants_on_400k_smoke3/seed1_rule_off.json",
+      "rewards": [
+        456.274992,
+        449.304895,
+        434.628042
+      ],
+      "rule_prior_enabled": false,
+      "rule_prior_num_rules": 0,
+      "seed": 1,
+      "std": 9.022088391371714,
+      "tva_terminal_prior_bonus_max": null,
+      "tva_terminal_prior_bonus_mean": null
+    },
+    {
+      "max": 344.823038,
+      "mean": 331.3317486892144,
+      "min": 305.258443,
+      "mode": "rule_off",
+      "report": "/home/data/round/code/sd_world_model_rl/results/gray_causal_rule_induction/eval_only/cycle079_variants_on_400k_smoke3/seed2_rule_off.json",
+      "rewards": [
+        305.258443,
+        343.913765,
+        344.823038
+      ],
+      "rule_prior_enabled": false,
+      "rule_prior_num_rules": 0,
+      "seed": 2,
+      "std": 18.440347893278414,
+      "tva_terminal_prior_bonus_max": null,
+      "tva_terminal_prior_bonus_mean": null
+    },
+    {
+      "max": 301.925166,
+      "mean": 299.17236663765897,
+      "min": 297.758852,
+      "mode": "rule_off",
+      "report": "/home/data/round/code/sd_world_model_rl/results/gray_causal_rule_induction/eval_only/cycle079_variants_on_400k_smoke3/seed3_rule_off.json",
+      "rewards": [
+        301.925166,
+        297.833082,
+        297.758852
+      ],
+      "rule_prior_enabled": false,
+      "rule_prior_num_rules": 0,
+      "seed": 3,
+      "std": 1.946758956218486,
+      "tva_terminal_prior_bonus_max": null,
+      "tva_terminal_prior_bonus_mean": null
+    },
+    {
+      "max": 446.102574,
+      "mean": 436.28432244062424,
+      "min": 426.558288,
+      "mode": "cycle079_original_active",
+      "report": "/home/data/round/code/sd_world_model_rl/results/gray_causal_rule_induction/eval_only/cycle079_variants_on_400k_smoke3/seed1_cycle079_original_active.json",
+      "rewards": [
+        426.558288,
+        446.102574,
+        436.192105
+      ],
+      "rule_prior_enabled": true,
+      "rule_prior_num_rules": 130,
+      "seed": 1,
+      "std": 7.9791877965899225,
+      "tva_terminal_prior_bonus_max": null,
+      "tva_terminal_prior_bonus_mean": null
+    },
+    {
+      "max": 339.698965,
+      "mean": 336.4692369699478,
+      "min": 334.719249,
+      "mode": "cycle079_original_active",
+      "report": "/home/data/round/code/sd_world_model_rl/results/gray_causal_rule_induction/eval_only/cycle079_variants_on_400k_smoke3/seed2_cycle079_original_active.json",
+      "rewards": [
+        334.719249,
+        339.698965,
+        334.989497
+      ],
+      "rule_prior_enabled": true,
+      "rule_prior_num_rules": 130,
+      "seed": 2,
+      "std": 2.286425989889609,
+      "tva_terminal_prior_bonus_max": null,
+      "tva_terminal_prior_bonus_mean": null
+    },
+    {
+      "max": 298.29788,
+      "mean": 293.6010055417816,
+      "min": 285.638093,
+      "mode": "cycle079_original_active",
+      "report": "/home/data/round/code/sd_world_model_rl/results/gray_causal_rule_induction/eval_only/cycle079_variants_on_400k_smoke3/seed3_cycle079_original_active.json",
+      "rewards": [
+        296.867044,
+        298.29788,
+        285.638093
+      ],
+      "rule_prior_enabled": true,
+      "rule_prior_num_rules": 130,
+      "seed": 3,
+      "std": 5.660848376786192,
+      "tva_terminal_prior_bonus_max": null,
+      "tva_terminal_prior_bonus_mean": null
+    },
+    {
+      "max": 474.04832,
+      "mean": 456.73078899582225,
+      "min": 425.930347,
+      "mode": "cycle079_drop_reject_active",
+      "report": "/home/data/round/code/sd_world_model_rl/results/gray_causal_rule_induction/eval_only/cycle079_variants_on_400k_smoke3/seed1_cycle079_drop_reject_active.json",
+      "rewards": [
+        425.930347,
+        470.213699,
+        474.04832
+      ],
+      "rule_prior_enabled": true,
+      "rule_prior_num_rules": 126,
+      "seed": 1,
+      "std": 21.835391526902878,
+      "tva_terminal_prior_bonus_max": null,
+      "tva_terminal_prior_bonus_mean": null
+    },
+    {
+      "max": 341.187843,
+      "mean": 338.53535228967667,
+      "min": 334.719249,
+      "mode": "cycle079_drop_reject_active",
+      "report": "/home/data/round/code/sd_world_model_rl/results/gray_causal_rule_induction/eval_only/cycle079_variants_on_400k_smoke3/seed2_cycle079_drop_reject_active.json",
+      "rewards": [
+        334.719249,
+        339.698965,
+        341.187843
+      ],
+      "rule_prior_enabled": true,
+      "rule_prior_num_rules": 126,
+      "seed": 2,
+      "std": 2.766004689406644,
+      "tva_terminal_prior_bonus_max": null,
+      "tva_terminal_prior_bonus_mean": null
+    },
+    {
+      "max": 304.533497,
+      "mean": 296.65600241192925,
+      "min": 286.487686,
+      "mode": "cycle079_drop_reject_active",
+      "report": "/home/data/round/code/sd_world_model_rl/results/gray_causal_rule_induction/eval_only/cycle079_variants_on_400k_smoke3/seed3_cycle079_drop_reject_active.json",
+      "rewards": [
+        286.487686,
+        304.533497,
+        298.946824
+      ],
+      "rule_prior_enabled": true,
+      "rule_prior_num_rules": 126,
+      "seed": 3,
+      "std": 7.543152373434793,
+      "tva_terminal_prior_bonus_max": null,
+      "tva_terminal_prior_bonus_mean": null
+    },
+    {
+      "max": 474.04832,
+      "mean": 456.73078899582225,
+      "min": 425.930347,
+      "mode": "cycle079_certified_active",
+      "report": "/home/data/round/code/sd_world_model_rl/results/gray_causal_rule_induction/eval_only/cycle079_variants_on_400k_smoke3/seed1_cycle079_certified_active.json",
+      "rewards": [
+        425.930347,
+        470.213699,
+        474.04832
+      ],
+      "rule_prior_enabled": true,
+      "rule_prior_num_rules": 126,
+      "seed": 1,
+      "std": 21.835391526902878,
+      "tva_terminal_prior_bonus_max": null,
+      "tva_terminal_prior_bonus_mean": null
+    },
+    {
+      "max": 341.187843,
+      "mean": 338.53535228967667,
+      "min": 334.719249,
+      "mode": "cycle079_certified_active",
+      "report": "/home/data/round/code/sd_world_model_rl/results/gray_causal_rule_induction/eval_only/cycle079_variants_on_400k_smoke3/seed2_cycle079_certified_active.json",
+      "rewards": [
+        334.719249,
+        339.698965,
+        341.187843
+      ],
+      "rule_prior_enabled": true,
+      "rule_prior_num_rules": 126,
+      "seed": 2,
+      "std": 2.766004689406644,
+      "tva_terminal_prior_bonus_max": null,
+      "tva_terminal_prior_bonus_mean": null
+    },
+    {
+      "max": 304.533497,
+      "mean": 296.65600241192925,
+      "min": 286.487686,
+      "mode": "cycle079_certified_active",
+      "report": "/home/data/round/code/sd_world_model_rl/results/gray_causal_rule_induction/eval_only/cycle079_variants_on_400k_smoke3/seed3_cycle079_certified_active.json",
+      "rewards": [
+        286.487686,
+        304.533497,
+        298.946824
+      ],
+      "rule_prior_enabled": true,
+      "rule_prior_num_rules": 126,
+      "seed": 3,
+      "std": 7.543152373434793,
+      "tva_terminal_prior_bonus_max": null,
+      "tva_terminal_prior_bonus_mean": null
+    },
+    {
+      "max": 477.196257,
+      "mean": 460.81776802738506,
+      "min": 440.623002,
+      "mode": "cycle079_strict_active",
+      "report": "/home/data/round/code/sd_world_model_rl/results/gray_causal_rule_induction/eval_only/cycle079_variants_on_400k_smoke3/seed1_cycle079_strict_active.json",
+      "rewards": [
+        477.196257,
+        440.623002,
+        464.634045
+      ],
+      "rule_prior_enabled": true,
+      "rule_prior_num_rules": 125,
+      "seed": 1,
+      "std": 15.172864439063648,
+      "tva_terminal_prior_bonus_max": null,
+      "tva_terminal_prior_bonus_mean": null
+    },
+    {
+      "max": 341.187843,
+      "mean": 333.40842032432556,
+      "min": 323.951128,
+      "mode": "cycle079_strict_active",
+      "report": "/home/data/round/code/sd_world_model_rl/results/gray_causal_rule_induction/eval_only/cycle079_variants_on_400k_smoke3/seed2_cycle079_strict_active.json",
+      "rewards": [
+        335.086289,
+        323.951128,
+        341.187843
+      ],
+      "rule_prior_enabled": true,
+      "rule_prior_num_rules": 125,
+      "seed": 2,
+      "std": 7.136176347021192,
+      "tva_terminal_prior_bonus_max": null,
+      "tva_terminal_prior_bonus_mean": null
+    },
+    {
+      "max": 304.533497,
+      "mean": 298.4695028262213,
+      "min": 292.596489,
+      "mode": "cycle079_strict_active",
+      "report": "/home/data/round/code/sd_world_model_rl/results/gray_causal_rule_induction/eval_only/cycle079_variants_on_400k_smoke3/seed3_cycle079_strict_active.json",
+      "rewards": [
+        298.278522,
+        304.533497,
+        292.596489
+      ],
+      "rule_prior_enabled": true,
+      "rule_prior_num_rules": 125,
+      "seed": 3,
+      "std": 4.875133858626946,
+      "tva_terminal_prior_bonus_max": null,
+      "tva_terminal_prior_bonus_mean": null
+    },
+    {
+      "max": 469.668384,
+      "mean": 456.8418724586566,
+      "min": 443.135048,
+      "mode": "cycle079_teacher_v8_active",
+      "report": "/home/data/round/code/sd_world_model_rl/results/gray_causal_rule_induction/eval_only/cycle079_variants_on_400k_smoke3/seed1_cycle079_teacher_v8_active.json",
+      "rewards": [
+        469.668384,
+        443.135048,
+        457.722186
+      ],
+      "rule_prior_enabled": true,
+      "rule_prior_num_rules": 31,
+      "seed": 1,
+      "std": 10.850059707849772,
+      "tva_terminal_prior_bonus_max": null,
+      "tva_terminal_prior_bonus_mean": null
+    },
+    {
+      "max": 334.183749,
+      "mean": 331.05212850372,
+      "min": 328.992626,
+      "mode": "cycle079_teacher_v8_active",
+      "report": "/home/data/round/code/sd_world_model_rl/results/gray_causal_rule_induction/eval_only/cycle079_variants_on_400k_smoke3/seed2_cycle079_teacher_v8_active.json",
+      "rewards": [
+        329.98001,
+        328.992626,
+        334.183749
+      ],
+      "rule_prior_enabled": true,
+      "rule_prior_num_rules": 31,
+      "seed": 2,
+      "std": 2.250780278153086,
+      "tva_terminal_prior_bonus_max": null,
+      "tva_terminal_prior_bonus_mean": null
+    },
+    {
+      "max": 300.609706,
+      "mean": 293.9388949975061,
+      "min": 283.549798,
+      "mode": "cycle079_teacher_v8_active",
+      "report": "/home/data/round/code/sd_world_model_rl/results/gray_causal_rule_induction/eval_only/cycle079_variants_on_400k_smoke3/seed3_cycle079_teacher_v8_active.json",
+      "rewards": [
+        297.657181,
+        300.609706,
+        283.549798
+      ],
+      "rule_prior_enabled": true,
+      "rule_prior_num_rules": 31,
+      "seed": 3,
+      "std": 7.444432072605805,
+      "tva_terminal_prior_bonus_max": null,
+      "tva_terminal_prior_bonus_mean": null
+    },
+    {
+      "max": 465.96279,
+      "mean": 434.0754149854183,
+      "min": 410.472167,
+      "mode": "cycle079_teacher_v8_certified_active",
+      "report": "/home/data/round/code/sd_world_model_rl/results/gray_causal_rule_induction/eval_only/cycle079_variants_on_400k_smoke3/seed1_cycle079_teacher_v8_certified_active.json",
+      "rewards": [
+        465.96279,
+        410.472167,
+        425.791288
+      ],
+      "rule_prior_enabled": true,
+      "rule_prior_num_rules": 28,
+      "seed": 1,
+      "std": 23.39903673724096,
+      "tva_terminal_prior_bonus_max": null,
+      "tva_terminal_prior_bonus_mean": null
+    },
+    {
+      "max": 334.183749,
+      "mean": 331.05212850372,
+      "min": 328.992626,
+      "mode": "cycle079_teacher_v8_certified_active",
+      "report": "/home/data/round/code/sd_world_model_rl/results/gray_causal_rule_induction/eval_only/cycle079_variants_on_400k_smoke3/seed2_cycle079_teacher_v8_certified_active.json",
+      "rewards": [
+        329.98001,
+        328.992626,
+        334.183749
+      ],
+      "rule_prior_enabled": true,
+      "rule_prior_num_rules": 28,
+      "seed": 2,
+      "std": 2.250780278153086,
+      "tva_terminal_prior_bonus_max": null,
+      "tva_terminal_prior_bonus_mean": null
+    },
+    {
+      "max": 300.609706,
+      "mean": 293.9388949975061,
+      "min": 283.549798,
+      "mode": "cycle079_teacher_v8_certified_active",
+      "report": "/home/data/round/code/sd_world_model_rl/results/gray_causal_rule_induction/eval_only/cycle079_variants_on_400k_smoke3/seed3_cycle079_teacher_v8_certified_active.json",
+      "rewards": [
+        297.657181,
+        300.609706,
+        283.549798
+      ],
+      "rule_prior_enabled": true,
+      "rule_prior_num_rules": 28,
+      "seed": 3,
+      "std": 7.444432072605805,
+      "tva_terminal_prior_bonus_max": null,
+      "tva_terminal_prior_bonus_mean": null
+    }
+  ],
+  "rule_libraries": {
+    "cycle079_certified_active": "/home/data/round/code/sd_world_model_rl/results/gray_causal_rule_induction/rule_library_variants_cycle079/cycle079_certified_active.json",
+    "cycle079_drop_reject_active": "/home/data/round/code/sd_world_model_rl/results/gray_causal_rule_induction/rule_library_variants_cycle079/cycle079_drop_reject_active.json",
+    "cycle079_original_active": "/home/data/round/code/sd_world_model_rl/results/sd_retrospective_rule_induction/closed_loop/hopper_v8formal_500k_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume300k_20260603_r1/cycle_079/rules/library_closed_loop_cycle_079_confidence.json",
+    "cycle079_strict_active": "/home/data/round/code/sd_world_model_rl/results/gray_causal_rule_induction/rule_library_variants_cycle079/cycle079_strict_active.json",
+    "cycle079_teacher_v8_active": "/home/data/round/code/sd_world_model_rl/results/gray_causal_rule_induction/rule_library_variants_cycle079/cycle079_teacher_v8_active.json",
+    "cycle079_teacher_v8_certified_active": "/home/data/round/code/sd_world_model_rl/results/gray_causal_rule_induction/rule_library_variants_cycle079/cycle079_teacher_v8_certified_active.json",
+    "rule_off": null
+  },
+  "run_name": "tdmpc2_v8formal_500k_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume300k_20260603_r1_cycle080_target400079",
+  "sd_checkpoint": "/home/data/round/code/sd_world_model_rl/results/sd_retrospective_rule_induction/closed_loop/hopper_v8formal_500k_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume300k_20260603_r1/cycle_079/sd_explainers/sd_explainer_cycle_079.pt",
+  "tva_checkpoint": "/home/data/round/code/sd_world_model_rl/results/sd_retrospective_rule_induction/closed_loop/hopper_v8formal_500k_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume300k_20260603_r1/cycle_079/tva/hopper_tva_cycle_079.pt"
+}

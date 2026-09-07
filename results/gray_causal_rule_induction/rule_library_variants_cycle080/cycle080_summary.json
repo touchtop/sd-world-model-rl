@@ -1,0 +1,122 @@
+{
+  "certificate_report": "results/gray_causal_rule_induction/cycle080_gray_rule_certificates.json",
+  "prefix": "cycle080",
+  "source_rule_library": "results/sd_retrospective_rule_induction/closed_loop/hopper_v8formal_500k_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume300k_20260603_r1/cycle_080/rules/library_closed_loop_cycle_080_confidence.json",
+  "variants": [
+    {
+      "demoted_active": 4,
+      "input_certificate_counts": {
+        "reject_or_retire": 19,
+        "shadow_only": 92,
+        "strict_action_certificate": 156,
+        "value_certificate": 4
+      },
+      "kept_active": 126,
+      "num_rules": 271,
+      "path": "results/gray_causal_rule_induction/rule_library_variants_cycle080/cycle080_drop_reject_active.json",
+      "source_counts": {
+        "sd_tva_counterfactual_teacher_rich_init_v1": 30,
+        "v4_substate": 227,
+        "v8_transition_replay_safety": 14
+      },
+      "status_counts": {
+        "confidence_active": 126,
+        "confidence_observing": 35,
+        "confidence_retired": 110
+      },
+      "variant": "drop_reject_active"
+    },
+    {
+      "demoted_active": 4,
+      "input_certificate_counts": {
+        "reject_or_retire": 19,
+        "shadow_only": 92,
+        "strict_action_certificate": 156,
+        "value_certificate": 4
+      },
+      "kept_active": 126,
+      "num_rules": 271,
+      "path": "results/gray_causal_rule_induction/rule_library_variants_cycle080/cycle080_certified_active.json",
+      "source_counts": {
+        "sd_tva_counterfactual_teacher_rich_init_v1": 30,
+        "v4_substate": 227,
+        "v8_transition_replay_safety": 14
+      },
+      "status_counts": {
+        "confidence_active": 126,
+        "confidence_observing": 35,
+        "confidence_retired": 110
+      },
+      "variant": "certified_active"
+    },
+    {
+      "demoted_active": 5,
+      "input_certificate_counts": {
+        "reject_or_retire": 19,
+        "shadow_only": 92,
+        "strict_action_certificate": 156,
+        "value_certificate": 4
+      },
+      "kept_active": 125,
+      "num_rules": 271,
+      "path": "results/gray_causal_rule_induction/rule_library_variants_cycle080/cycle080_strict_active.json",
+      "source_counts": {
+        "sd_tva_counterfactual_teacher_rich_init_v1": 30,
+        "v4_substate": 227,
+        "v8_transition_replay_safety": 14
+      },
+      "status_counts": {
+        "confidence_active": 125,
+        "confidence_observing": 35,
+        "confidence_retired": 111
+      },
+      "variant": "strict_active"
+    },
+    {
+      "demoted_active": 99,
+      "input_certificate_counts": {
+        "reject_or_retire": 19,
+        "shadow_only": 92,
+        "strict_action_certificate": 156,
+        "value_certificate": 4
+      },
+      "kept_active": 31,
+      "num_rules": 271,
+      "path": "results/gray_causal_rule_induction/rule_library_variants_cycle080/cycle080_teacher_v8_active.json",
+      "source_counts": {
+        "sd_tva_counterfactual_teacher_rich_init_v1": 30,
+        "v4_substate": 227,
+        "v8_transition_replay_safety": 14
+      },
+      "status_counts": {
+        "confidence_active": 31,
+        "confidence_observing": 35,
+        "confidence_retired": 205
+      },
+      "variant": "teacher_v8_active"
+    },
+    {
+      "demoted_active": 102,
+      "input_certificate_counts": {
+        "reject_or_retire": 19,
+        "shadow_only": 92,
+        "strict_action_certificate": 156,
+        "value_certificate": 4
+      },
+      "kept_active": 28,
+      "num_rules": 271,
+      "path": "results/gray_causal_rule_induction/rule_library_variants_cycle080/cycle080_teacher_v8_certified_active.json",
+      "source_counts": {
+        "sd_tva_counterfactual_teacher_rich_init_v1": 30,
+        "v4_substate": 227,
+        "v8_transition_replay_safety": 14
+      },
+      "status_counts": {
+        "confidence_active": 28,
+        "confidence_observing": 35,
+        "confidence_retired": 208
+      },
+      "variant": "teacher_v8_certified_active"
+    }
+  ]
+}

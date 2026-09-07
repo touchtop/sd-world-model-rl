@@ -1,0 +1,73 @@
+{
+  "created_at_utc": "2026-05-06T06:08:57.495104+00:00",
+  "repo_root": "/home/data/round/code/sd_world_model_rl",
+  "log_root": "logs/hopper-hop",
+  "run_globs": [
+    "tdmpc2_v71a_conf_closed_loop_5k_seed1_20260506_cycle028_target140027",
+    "tdmpc2_v71a_conf_closed_loop_5k_seed1_20260506_cycle029_target145028",
+    "tdmpc2_v71a_conf_closed_loop_5k_seed1_20260506_cycle030_target150029"
+  ],
+  "write_policy": "results_only",
+  "runs": [
+    {
+      "seed": 1,
+      "run_name": "tdmpc2_v71a_conf_closed_loop_5k_seed1_20260506_cycle028_target140027",
+      "run_dir": "logs/hopper-hop/1/tdmpc2_v71a_conf_closed_loop_5k_seed1_20260506_cycle028_target140027",
+      "eval_csv": "logs/hopper-hop/1/tdmpc2_v71a_conf_closed_loop_5k_seed1_20260506_cycle028_target140027/eval.csv",
+      "eval_full_csv": "logs/hopper-hop/1/tdmpc2_v71a_conf_closed_loop_5k_seed1_20260506_cycle028_target140027/eval_full.csv",
+      "train_csv": "logs/hopper-hop/1/tdmpc2_v71a_conf_closed_loop_5k_seed1_20260506_cycle028_target140027/train.csv",
+      "eval_rows": [
+        {
+          "step": 140027,
+          "episode_reward": 1.1586468815803528
+        }
+      ],
+      "official_eval_summaries": [
+        {
+          "step_dir": "step_0140027",
+          "summary_csv": "logs/hopper-hop/1/tdmpc2_v71a_conf_closed_loop_5k_seed1_20260506_cycle028_target140027/official_eval/step_0140027/eval_episode_summary.csv"
+        }
+      ]
+    },
+    {
+      "seed": 1,
+      "run_name": "tdmpc2_v71a_conf_closed_loop_5k_seed1_20260506_cycle029_target145028",
+      "run_dir": "logs/hopper-hop/1/tdmpc2_v71a_conf_closed_loop_5k_seed1_20260506_cycle029_target145028",
+      "eval_csv": "logs/hopper-hop/1/tdmpc2_v71a_conf_closed_loop_5k_seed1_20260506_cycle029_target145028/eval.csv",
+      "eval_full_csv": "logs/hopper-hop/1/tdmpc2_v71a_conf_closed_loop_5k_seed1_20260506_cycle029_target145028/eval_full.csv",
+      "train_csv": "logs/hopper-hop/1/tdmpc2_v71a_conf_closed_loop_5k_seed1_20260506_cycle029_target145028/train.csv",
+      "eval_rows": [
+        {
+          "step": 145028,
+          "episode_reward": 25.608373863001663
+        }
+      ],
+      "official_eval_summaries": [
+        {
+          "step_dir": "step_0145028",
+          "summary_csv": "logs/hopper-hop/1/tdmpc2_v71a_conf_closed_loop_5k_seed1_20260506_cycle029_target145028/official_eval/step_0145028/eval_episode_summary.csv"
+        }
+      ]
+    },
+    {
+      "seed": 1,
+      "run_name": "tdmpc2_v71a_conf_closed_loop_5k_seed1_20260506_cycle030_target150029",
+      "run_dir": "logs/hopper-hop/1/tdmpc2_v71a_conf_closed_loop_5k_seed1_20260506_cycle030_target150029",
+      "eval_csv": "logs/hopper-hop/1/tdmpc2_v71a_conf_closed_loop_5k_seed1_20260506_cycle030_target150029/eval.csv",
+      "eval_full_csv": "logs/hopper-hop/1/tdmpc2_v71a_conf_closed_loop_5k_seed1_20260506_cycle030_target150029/eval_full.csv",
+      "train_csv": "logs/hopper-hop/1/tdmpc2_v71a_conf_closed_loop_5k_seed1_20260506_cycle030_target150029/train.csv",
+      "eval_rows": [
+        {
+          "step": 150029,
+          "episode_reward": 0.02888566783318917
+        }
+      ],
+      "official_eval_summaries": [
+        {
+          "step_dir": "step_0150029",
+          "summary_csv": "logs/hopper-hop/1/tdmpc2_v71a_conf_closed_loop_5k_seed1_20260506_cycle030_target150029/official_eval/step_0150029/eval_episode_summary.csv"
+        }
+      ]
+    }
+  ]
+}

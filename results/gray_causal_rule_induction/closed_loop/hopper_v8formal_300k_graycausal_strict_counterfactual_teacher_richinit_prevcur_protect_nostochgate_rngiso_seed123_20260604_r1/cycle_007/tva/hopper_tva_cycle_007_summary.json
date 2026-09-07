@@ -1,0 +1,25 @@
+{
+  "batch_size": 256,
+  "checkpoint": "results/gray_causal_rule_induction/closed_loop/hopper_v8formal_300k_graycausal_strict_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_20260604_r1/cycle_007/tva/hopper_tva_cycle_007.pt",
+  "epochs": 10,
+  "eval_mse": 42.42900085449219,
+  "eval_smooth_l1": 3.619539737701416,
+  "gamma": 0.99,
+  "hidden": 128,
+  "init_checkpoint": "results/gray_causal_rule_induction/closed_loop/hopper_v8formal_300k_graycausal_strict_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_20260604_r1/cycle_006/tva/hopper_tva_cycle_006.pt",
+  "init_loaded_tensors": 6,
+  "lr": 0.001,
+  "num_transitions": 5000,
+  "sd_checkpoint": "results/gray_causal_rule_induction/closed_loop/hopper_v8formal_300k_graycausal_strict_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_20260604_r1/cycle_007/sd_explainers/sd_explainer_cycle_007.pt",
+  "seed": 20260514,
+  "selection": "results/gray_causal_rule_induction/closed_loop/hopper_v8formal_300k_graycausal_strict_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_20260604_r1/cycle_007/manifests/selected_trajectories.json",
+  "shaped_coef": 1.0,
+  "target_stats": {
+    "max": -0.8100000023841858,
+    "mean": -47.45747375488281,
+    "min": -65.04365539550781,
+    "std": 8.277417182922363
+  },
+  "train_loss": 3.6820048093795776,
+  "true_coef": 1.0
+}

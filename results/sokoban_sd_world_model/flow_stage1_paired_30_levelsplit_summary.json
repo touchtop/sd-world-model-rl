@@ -1,0 +1,479 @@
+{
+  "material_passport": {
+    "origin_skill": "experiment-agent",
+    "origin_mode": "validate",
+    "verification_status": "VERIFIED",
+    "version_label": "sokoban_flow_baseline_rerun_summary_v1"
+  },
+  "group_name": "stage1_paired_net",
+  "scope": {
+    "experiment_type": "frozen_minimal_baseline_retest",
+    "sd_mcts_enabled": false,
+    "transition_labels_from": "exact_single_push_diagnostic_provider",
+    "learned_component": "nonnegative_flow_model"
+  },
+  "groups": {
+    "stage1_paired_net": {
+      "files": [
+        "results/sokoban_sd_world_model/flow_stage1_paired_30_levelsplit_seed0.json",
+        "results/sokoban_sd_world_model/flow_stage1_paired_30_levelsplit_seed1.json",
+        "results/sokoban_sd_world_model/flow_stage1_paired_30_levelsplit_seed2.json"
+      ],
+      "seeds": [
+        0,
+        1,
+        2
+      ],
+      "config_digest": {
+        "model_kind": "base",
+        "flow_parameterization": "paired_net",
+        "feature_mode": "stock_action",
+        "stock_loss_preset": "uniform",
+        "rollout_loss_weight": 1.0,
+        "rollout_depth": 2,
+        "split_mode": "level",
+        "baseline_id": "sokoban_six_stock_nonnegative_flow_rollout_sup_base_v1",
+        "is_frozen_minimal_baseline": false
+      },
+      "metrics": {
+        "valid_stock_mae": {
+          "values": [
+            0.04783107340335846,
+            0.04885187745094299,
+            0.044244665652513504
+          ],
+          "mean": 0.04697587216893832,
+          "std": 0.0019757069624841083
+        },
+        "valid_flow_mae": {
+          "values": [
+            0.03978300094604492,
+            0.037919651716947556,
+            0.03389652445912361
+          ],
+          "mean": 0.03719972570737203,
+          "std": 0.0024564705646132313
+        },
+        "valid_zero_flow_stock_mae": {
+          "values": [
+            0.09030485898256302,
+            0.07829882204532623,
+            0.08786465227603912
+          ],
+          "mean": 0.08548944443464279,
+          "std": 0.005181212210280942
+        },
+        "valid_rollout_stock_mae_mean": {
+          "values": [
+            0.05128047615289688,
+            0.05131674185395241,
+            0.05239179544150829
+          ],
+          "mean": 0.05166300448278586,
+          "std": 0.0005155456632895117
+        },
+        "valid_rollout_zero_flow_stock_mae_mean": {
+          "values": [
+            0.10995316877961159,
+            0.10145176574587822,
+            0.11122569069266319
+          ],
+          "mean": 0.10754354173938434,
+          "std": 0.00433875013270659
+        },
+        "valid_rollout_improvement_over_zero_flow_mean": {
+          "values": [
+            0.533615295292829,
+            0.49417596158460847,
+            0.528959585548663
+          ],
+          "mean": 0.5189169474753669,
+          "std": 0.017597465640265902
+        },
+        "valid_rollout_step1_stock_mae": {
+          "values": [
+            0.04379454627633095,
+            0.04316757991909981,
+            0.04335961490869522
+          ],
+          "mean": 0.04344058036804199,
+          "std": 0.00026228261790207225
+        },
+        "valid_rollout_step2_stock_mae": {
+          "values": [
+            0.058766406029462814,
+            0.05946590378880501,
+            0.061423975974321365
+          ],
+          "mean": 0.05988542859752973,
+          "std": 0.0011247726590458199
+        },
+        "valid_rollout_step1_flow_mae": {
+          "values": [
+            0.03769518435001373,
+            0.03460085019469261,
+            0.03320194408297539
+          ],
+          "mean": 0.03516599287589391,
+          "std": 0.0018773814586492985
+        },
+        "valid_rollout_step2_flow_mae": {
+          "values": [
+            0.03841715306043625,
+            0.0363035649061203,
+            0.03475949168205261
+          ],
+          "mean": 0.036493403216203056,
+          "std": 0.001499255510291942
+        },
+        "valid_clip_any_stock_fraction": {
+          "values": [
+            0.9531615972518921,
+            0.963350772857666,
+            0.9690322875976562
+          ],
+          "mean": 0.9618482192357382,
+          "std": 0.006565716693698128
+        },
+        "valid_clip_mean_abs_correction": {
+          "values": [
+            0.03287247568368912,
+            0.027778252959251404,
+            0.02538316696882248
+          ],
+          "mean": 0.028677965203921,
+          "std": 0.0031229844539105694
+        },
+        "valid_alias_stock_max_next_delta_variance": {
+          "values": [
+            0.3904161751270294,
+            0.3803754448890686,
+            0.3954983055591583
+          ],
+          "mean": 0.38876330852508545,
+          "std": 0.006283534287570066
+        },
+        "valid_alias_stock_action_max_next_delta_variance": {
+          "values": [
+            0.09125160425901413,
+            0.10170450061559677,
+            0.11775518208742142
+          ],
+          "mean": 0.1035704289873441,
+          "std": 0.010900188865121537
+        },
+        "valid_flow_pair_pred_coactivation_mean": {
+          "values": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "mean": 0.0,
+          "std": 0.0
+        },
+        "valid_flow_pair_pred_coactivation_max": {
+          "values": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "mean": 0.0,
+          "std": 0.0
+        }
+      },
+      "per_stock_step2": {
+        "valid_rollout_step2_goal_completion_mae": {
+          "values": [
+            0.004908691626042128,
+            0.0068085384555161,
+            0.005053033120930195
+          ],
+          "mean": 0.0055900877341628075,
+          "std": 0.0008635875701828195
+        },
+        "valid_rollout_step2_unresolved_box_pressure_mae": {
+          "values": [
+            0.01631069742143154,
+            0.020907213911414146,
+            0.018993709236383438
+          ],
+          "mean": 0.01873720685640971,
+          "std": 0.0018852649794073408
+        },
+        "valid_rollout_step2_mobility_mae": {
+          "values": [
+            0.030726183205842972,
+            0.05108905956149101,
+            0.053096503019332886
+          ],
+          "mean": 0.044970581928888954,
+          "std": 0.010105596751138899
+        },
+        "valid_rollout_step2_reachable_capacity_mae": {
+          "values": [
+            0.1392563432455063,
+            0.13074569404125214,
+            0.12827998399734497
+          ],
+          "mean": 0.1327606737613678,
+          "std": 0.00470214298949831
+        },
+        "valid_rollout_step2_congestion_mae": {
+          "values": [
+            0.12651628255844116,
+            0.11514578759670258,
+            0.1346629112958908
+          ],
+          "mean": 0.1254416604836782,
+          "std": 0.008003983959047297
+        },
+        "valid_rollout_step2_irreversibility_risk_mae": {
+          "values": [
+            0.03488021716475487,
+            0.03209911659359932,
+            0.02845771610736847
+          ],
+          "mean": 0.03181234995524088,
+          "std": 0.0026298043383097152
+        }
+      },
+      "per_stock_one_step": {
+        "valid_goal_completion_mae": {
+          "values": [
+            0.003791241906583309,
+            0.004494325257837772,
+            0.0030464099254459143
+          ],
+          "mean": 0.003777325696622332,
+          "std": 0.0005911908592654969
+        },
+        "valid_unresolved_box_pressure_mae": {
+          "values": [
+            0.012261414900422096,
+            0.01554949302226305,
+            0.011886021122336388
+          ],
+          "mean": 0.013232309681673845,
+          "std": 0.0016456476126608388
+        },
+        "valid_mobility_mae": {
+          "values": [
+            0.033282309770584106,
+            0.05482269823551178,
+            0.051970452070236206
+          ],
+          "mean": 0.04669182002544403,
+          "std": 0.009553186239966482
+        },
+        "valid_reachable_capacity_mae": {
+          "values": [
+            0.11224184930324554,
+            0.10097657144069672,
+            0.08253078162670135
+          ],
+          "mean": 0.09858306745688121,
+          "std": 0.012247000492922142
+        },
+        "valid_congestion_mae": {
+          "values": [
+            0.10479503870010376,
+            0.0999862551689148,
+            0.1035480946302414
+          ],
+          "mean": 0.10277646283308665,
+          "std": 0.00203759032278224
+        },
+        "valid_irreversibility_risk_mae": {
+          "values": [
+            0.0206146202981472,
+            0.01728193461894989,
+            0.012486221268773079
+          ],
+          "mean": 0.01679425872862339,
+          "std": 0.0033362742219115076
+        }
+      },
+      "flow_pair_pred_coactivation": {
+        "goal_fill_flow__goal_unfill_flow": {
+          "values": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "mean": 0.0,
+          "std": 0.0
+        },
+        "assignment_relief_flow__assignment_worsening_flow": {
+          "values": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "mean": 0.0,
+          "std": 0.0
+        },
+        "mobility_loss_flow__mobility_recovery_flow": {
+          "values": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "mean": 0.0,
+          "std": 0.0
+        },
+        "reachability_loss_flow__reachability_recovery_flow": {
+          "values": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "mean": 0.0,
+          "std": 0.0
+        },
+        "congestion_generation_flow__congestion_release_flow": {
+          "values": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "mean": 0.0,
+          "std": 0.0
+        },
+        "risk_accumulation_flow__risk_relief_flow": {
+          "values": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "mean": 0.0,
+          "std": 0.0
+        }
+      }
+    }
+  },
+  "reproducibility_comparison": {
+    "threshold": 0.05,
+    "metrics": {
+      "valid_stock_mae": {
+        "current_mean": 0.04697587216893832,
+        "reference_mean": 0.04440526167551676,
+        "delta": 0.0025706104934215546,
+        "relative_delta": 0.054721932233145636,
+        "exact_match": false,
+        "within_threshold": false
+      },
+      "valid_flow_mae": {
+        "current_mean": 0.03719972570737203,
+        "reference_mean": 0.04738566527764002,
+        "delta": -0.01018593957026799,
+        "relative_delta": -0.21495824761743826,
+        "exact_match": false,
+        "within_threshold": false
+      },
+      "valid_zero_flow_stock_mae": {
+        "current_mean": 0.08548944443464279,
+        "reference_mean": 0.08548944443464279,
+        "delta": 0.0,
+        "relative_delta": 0.0,
+        "exact_match": true,
+        "within_threshold": true
+      },
+      "valid_rollout_stock_mae_mean": {
+        "current_mean": 0.05166300448278586,
+        "reference_mean": 0.048756017039219536,
+        "delta": 0.0029069874435663223,
+        "relative_delta": 0.056268261450704675,
+        "exact_match": false,
+        "within_threshold": false
+      },
+      "valid_rollout_zero_flow_stock_mae_mean": {
+        "current_mean": 0.10754354173938434,
+        "reference_mean": 0.10754354173938434,
+        "delta": 0.0,
+        "relative_delta": 0.0,
+        "exact_match": true,
+        "within_threshold": true
+      },
+      "valid_rollout_improvement_over_zero_flow_mean": {
+        "current_mean": 0.5189169474753669,
+        "reference_mean": 0.5453278369792934,
+        "delta": -0.02641088950392656,
+        "relative_delta": -0.048431214607020705,
+        "exact_match": false,
+        "within_threshold": true
+      },
+      "valid_rollout_step1_stock_mae": {
+        "current_mean": 0.04344058036804199,
+        "reference_mean": 0.04114841545621554,
+        "delta": 0.002292164911826454,
+        "relative_delta": 0.05276552229290046,
+        "exact_match": false,
+        "within_threshold": false
+      },
+      "valid_rollout_step2_stock_mae": {
+        "current_mean": 0.05988542859752973,
+        "reference_mean": 0.056363618622223534,
+        "delta": 0.0035218099753061977,
+        "relative_delta": 0.05880913033077085,
+        "exact_match": false,
+        "within_threshold": false
+      },
+      "valid_rollout_step1_flow_mae": {
+        "current_mean": 0.03516599287589391,
+        "reference_mean": 0.045396736512581505,
+        "delta": -0.010230743636687592,
+        "relative_delta": -0.22536297590141058,
+        "exact_match": false,
+        "within_threshold": false
+      },
+      "valid_rollout_step2_flow_mae": {
+        "current_mean": 0.036493403216203056,
+        "reference_mean": 0.043629493564367294,
+        "delta": -0.007136090348164238,
+        "relative_delta": -0.1635611547412589,
+        "exact_match": false,
+        "within_threshold": false
+      }
+    },
+    "verdict": "PARTIALLY_REPRODUCIBLE",
+    "mismatched_metrics": [
+      "valid_stock_mae",
+      "valid_flow_mae",
+      "valid_rollout_stock_mae_mean",
+      "valid_rollout_step1_stock_mae",
+      "valid_rollout_step2_stock_mae",
+      "valid_rollout_step1_flow_mae",
+      "valid_rollout_step2_flow_mae"
+    ]
+  }
+}

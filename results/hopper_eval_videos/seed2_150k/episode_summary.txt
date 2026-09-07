@@ -1,0 +1,12 @@
+checkpoint=/home/data/round/code/sd_world_model_rl/logs/hopper-hop/2/legacy_v3b_restore_200k_seed2_resume50k_fix3_20260421/models/150000.pt
+config=task=hopper-hop,seed=2,world_model_kind=sd_hopper,mlp_dim=512,num_q=5,sd_reward_mode=curriculum,alpha=0.5,alpha_min=0.1,alpha_start=10000,alpha_end=30000
+episode=00 reward=0.000000 length=500 mp4=/home/data/round/code/sd_world_model_rl/results/hopper_eval_videos/seed2_150k/episode_00_R_0.00.mp4
+episode=01 reward=0.000000 length=500 mp4=/home/data/round/code/sd_world_model_rl/results/hopper_eval_videos/seed2_150k/episode_01_R_0.00.mp4
+episode=02 reward=0.000000 length=500 mp4=/home/data/round/code/sd_world_model_rl/results/hopper_eval_videos/seed2_150k/episode_02_R_0.00.mp4
+episode=03 reward=201.147546 length=500 mp4=/home/data/round/code/sd_world_model_rl/results/hopper_eval_videos/seed2_150k/episode_03_R_201.15.mp4
+episode=04 reward=0.000000 length=500 mp4=/home/data/round/code/sd_world_model_rl/results/hopper_eval_videos/seed2_150k/episode_04_R_0.00.mp4
+episode=05 reward=0.000000 length=500 mp4=/home/data/round/code/sd_world_model_rl/results/hopper_eval_videos/seed2_150k/episode_05_R_0.00.mp4
+episode=06 reward=0.000000 length=500 mp4=/home/data/round/code/sd_world_model_rl/results/hopper_eval_videos/seed2_150k/episode_06_R_0.00.mp4
+episode=07 reward=0.000000 length=500 mp4=/home/data/round/code/sd_world_model_rl/results/hopper_eval_videos/seed2_150k/episode_07_R_0.00.mp4
+episode=08 reward=48.830896 length=500 mp4=/home/data/round/code/sd_world_model_rl/results/hopper_eval_videos/seed2_150k/episode_08_R_48.83.mp4
+episode=09 reward=0.000000 length=500 mp4=/home/data/round/code/sd_world_model_rl/results/hopper_eval_videos/seed2_150k/episode_09_R_0.00.mp4

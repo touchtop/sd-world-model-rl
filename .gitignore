@@ -32,3 +32,24 @@ outputs/
 
 # Accidental shell fragments
 0.5=*
+
+# Local runtime logs and bulk experiment outputs. Curated summaries, reports,
+# manifests, metrics, and figures may be explicitly force-added when needed.
+/logs/
+/results/
+/.codex
+
+# Model, checkpoint, and media artifacts are kept outside the Git repository.
+*.pkl
+*.pickle
+*.joblib
+*.npy
+*.npz
+*.bin
+*.safetensors
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.gif
+*.webm

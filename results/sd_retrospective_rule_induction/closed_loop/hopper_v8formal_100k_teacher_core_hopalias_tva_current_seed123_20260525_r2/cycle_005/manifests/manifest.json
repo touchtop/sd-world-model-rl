@@ -1,0 +1,196 @@
+{
+  "created_at_utc": "2026-05-25T12:53:05.041579+00:00",
+  "repo_root": "/home/data/round/code/sd_world_model_rl",
+  "log_root": "logs/hopper-hop",
+  "run_globs": [
+    "tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle003_target15002",
+    "tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle004_target20003",
+    "tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle005_target25004"
+  ],
+  "write_policy": "results_only",
+  "runs": [
+    {
+      "seed": 1,
+      "run_name": "tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle003_target15002",
+      "run_dir": "logs/hopper-hop/1/tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle003_target15002",
+      "eval_csv": null,
+      "eval_full_csv": null,
+      "train_csv": "logs/hopper-hop/1/tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle003_target15002/train.csv",
+      "eval_rows": [],
+      "official_eval_summaries": [],
+      "train_replay_summaries": [
+        {
+          "step_dir": "step_0015003",
+          "summary_csv": "logs/hopper-hop/1/tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle003_target15002/retrospective_train_traces/step_0015003/eval_episode_summary.csv",
+          "source": "train_replay"
+        }
+      ]
+    },
+    {
+      "seed": 1,
+      "run_name": "tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle004_target20003",
+      "run_dir": "logs/hopper-hop/1/tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle004_target20003",
+      "eval_csv": null,
+      "eval_full_csv": null,
+      "train_csv": "logs/hopper-hop/1/tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle004_target20003/train.csv",
+      "eval_rows": [],
+      "official_eval_summaries": [],
+      "train_replay_summaries": [
+        {
+          "step_dir": "step_0020004",
+          "summary_csv": "logs/hopper-hop/1/tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle004_target20003/retrospective_train_traces/step_0020004/eval_episode_summary.csv",
+          "source": "train_replay"
+        }
+      ]
+    },
+    {
+      "seed": 1,
+      "run_name": "tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle005_target25004",
+      "run_dir": "logs/hopper-hop/1/tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle005_target25004",
+      "eval_csv": "logs/hopper-hop/1/tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle005_target25004/eval.csv",
+      "eval_full_csv": "logs/hopper-hop/1/tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle005_target25004/eval_full.csv",
+      "train_csv": "logs/hopper-hop/1/tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle005_target25004/train.csv",
+      "eval_rows": [
+        {
+          "step": 25004,
+          "episode_reward": 0.0407067134976387
+        }
+      ],
+      "official_eval_summaries": [
+        {
+          "step_dir": "step_0025004",
+          "summary_csv": "logs/hopper-hop/1/tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle005_target25004/official_eval/step_0025004/eval_episode_summary.csv"
+        }
+      ],
+      "train_replay_summaries": [
+        {
+          "step_dir": "step_0025005",
+          "summary_csv": "logs/hopper-hop/1/tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle005_target25004/retrospective_train_traces/step_0025005/eval_episode_summary.csv",
+          "source": "train_replay"
+        }
+      ]
+    },
+    {
+      "seed": 2,
+      "run_name": "tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle003_target15002",
+      "run_dir": "logs/hopper-hop/2/tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle003_target15002",
+      "eval_csv": null,
+      "eval_full_csv": null,
+      "train_csv": "logs/hopper-hop/2/tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle003_target15002/train.csv",
+      "eval_rows": [],
+      "official_eval_summaries": [],
+      "train_replay_summaries": [
+        {
+          "step_dir": "step_0015003",
+          "summary_csv": "logs/hopper-hop/2/tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle003_target15002/retrospective_train_traces/step_0015003/eval_episode_summary.csv",
+          "source": "train_replay"
+        }
+      ]
+    },
+    {
+      "seed": 2,
+      "run_name": "tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle004_target20003",
+      "run_dir": "logs/hopper-hop/2/tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle004_target20003",
+      "eval_csv": null,
+      "eval_full_csv": null,
+      "train_csv": "logs/hopper-hop/2/tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle004_target20003/train.csv",
+      "eval_rows": [],
+      "official_eval_summaries": [],
+      "train_replay_summaries": [
+        {
+          "step_dir": "step_0020004",
+          "summary_csv": "logs/hopper-hop/2/tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle004_target20003/retrospective_train_traces/step_0020004/eval_episode_summary.csv",
+          "source": "train_replay"
+        }
+      ]
+    },
+    {
+      "seed": 2,
+      "run_name": "tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle005_target25004",
+      "run_dir": "logs/hopper-hop/2/tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle005_target25004",
+      "eval_csv": "logs/hopper-hop/2/tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle005_target25004/eval.csv",
+      "eval_full_csv": "logs/hopper-hop/2/tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle005_target25004/eval_full.csv",
+      "train_csv": "logs/hopper-hop/2/tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle005_target25004/train.csv",
+      "eval_rows": [
+        {
+          "step": 25004,
+          "episode_reward": 0.0
+        }
+      ],
+      "official_eval_summaries": [
+        {
+          "step_dir": "step_0025004",
+          "summary_csv": "logs/hopper-hop/2/tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle005_target25004/official_eval/step_0025004/eval_episode_summary.csv"
+        }
+      ],
+      "train_replay_summaries": [
+        {
+          "step_dir": "step_0025005",
+          "summary_csv": "logs/hopper-hop/2/tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle005_target25004/retrospective_train_traces/step_0025005/eval_episode_summary.csv",
+          "source": "train_replay"
+        }
+      ]
+    },
+    {
+      "seed": 3,
+      "run_name": "tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle003_target15002",
+      "run_dir": "logs/hopper-hop/3/tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle003_target15002",
+      "eval_csv": null,
+      "eval_full_csv": null,
+      "train_csv": "logs/hopper-hop/3/tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle003_target15002/train.csv",
+      "eval_rows": [],
+      "official_eval_summaries": [],
+      "train_replay_summaries": [
+        {
+          "step_dir": "step_0015003",
+          "summary_csv": "logs/hopper-hop/3/tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle003_target15002/retrospective_train_traces/step_0015003/eval_episode_summary.csv",
+          "source": "train_replay"
+        }
+      ]
+    },
+    {
+      "seed": 3,
+      "run_name": "tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle004_target20003",
+      "run_dir": "logs/hopper-hop/3/tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle004_target20003",
+      "eval_csv": null,
+      "eval_full_csv": null,
+      "train_csv": "logs/hopper-hop/3/tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle004_target20003/train.csv",
+      "eval_rows": [],
+      "official_eval_summaries": [],
+      "train_replay_summaries": [
+        {
+          "step_dir": "step_0020004",
+          "summary_csv": "logs/hopper-hop/3/tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle004_target20003/retrospective_train_traces/step_0020004/eval_episode_summary.csv",
+          "source": "train_replay"
+        }
+      ]
+    },
+    {
+      "seed": 3,
+      "run_name": "tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle005_target25004",
+      "run_dir": "logs/hopper-hop/3/tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle005_target25004",
+      "eval_csv": "logs/hopper-hop/3/tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle005_target25004/eval.csv",
+      "eval_full_csv": "logs/hopper-hop/3/tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle005_target25004/eval_full.csv",
+      "train_csv": "logs/hopper-hop/3/tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle005_target25004/train.csv",
+      "eval_rows": [
+        {
+          "step": 25004,
+          "episode_reward": 0.0
+        }
+      ],
+      "official_eval_summaries": [
+        {
+          "step_dir": "step_0025004",
+          "summary_csv": "logs/hopper-hop/3/tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle005_target25004/official_eval/step_0025004/eval_episode_summary.csv"
+        }
+      ],
+      "train_replay_summaries": [
+        {
+          "step_dir": "step_0025005",
+          "summary_csv": "logs/hopper-hop/3/tdmpc2_v8formal_100k_teacher_core_hopalias_tva_current_seed123_20260525_r2_cycle005_target25004/retrospective_train_traces/step_0025005/eval_episode_summary.csv",
+          "source": "train_replay"
+        }
+      ]
+    }
+  ]
+}

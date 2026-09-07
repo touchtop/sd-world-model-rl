@@ -1,0 +1,51 @@
+{
+  "checkpoint": "results/sd_retrospective_rule_induction/closed_loop/hopper_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1/cycle_161/sd_explainers/sd_explainer_cycle_161.pt",
+  "epochs": 3,
+  "history_tail": [
+    {
+      "best_val_loss": 0.9305366277694702,
+      "epoch": 1.0,
+      "train_loss": 1.164806914600459,
+      "val_loss": 0.9305366277694702
+    },
+    {
+      "best_val_loss": 0.9302664995193481,
+      "epoch": 2.0,
+      "train_loss": 1.1658638282255693,
+      "val_loss": 0.9302664995193481
+    },
+    {
+      "best_val_loss": 0.9300476908683777,
+      "epoch": 3.0,
+      "train_loss": 1.1593155766075307,
+      "val_loss": 0.9300476908683777
+    }
+  ],
+  "init_checkpoint": "results/sd_retrospective_rule_induction/closed_loop/hopper_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1/cycle_160/sd_explainers/sd_explainer_cycle_160.pt",
+  "init_loaded_tensors": 30,
+  "metrics": {
+    "body_contact_z_mae": 0.01879880577325821,
+    "full_foot_support_mae": 0.4074554741382599,
+    "height_mae": 0.009466194547712803,
+    "one_step_struct_rmse": 2.1020572185516357,
+    "pitch_mae": 0.06911185383796692,
+    "pitch_rate_mae": 2.615884304046631,
+    "rollout_10_rmse": 2.7571025090292096,
+    "rollout_1_rmse": 1.1918846758781,
+    "rollout_20_rmse": 2.7123423535376787,
+    "rollout_3_rmse": 1.9717839893419296,
+    "rollout_5_rmse": 2.28645576024428,
+    "support_contact_mae": 0.41022881865501404,
+    "vx_mae": 0.17812010645866394,
+    "vz_mae": 0.35891711711883545
+  },
+  "model_config": {
+    "transition_residual_scale": 1.0,
+    "use_transition_residual": true
+  },
+  "num_transitions": 50000,
+  "seed": 20260668,
+  "selection": "results/sd_retrospective_rule_induction/closed_loop/hopper_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1/cycle_161/manifests/selected_trajectories.json",
+  "train_size": 45010,
+  "val_size": 4990
+}

@@ -1,0 +1,196 @@
+{
+  "created_at_utc": "2026-06-13T07:22:09.629328+00:00",
+  "repo_root": "/home/data/round/code/sd_world_model_rl",
+  "log_root": "logs/hopper-hop",
+  "run_globs": [
+    "tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle195_target975194",
+    "tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle196_target980195",
+    "tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle197_target985196"
+  ],
+  "write_policy": "results_only",
+  "runs": [
+    {
+      "seed": 1,
+      "run_name": "tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle195_target975194",
+      "run_dir": "logs/hopper-hop/1/tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle195_target975194",
+      "eval_csv": "logs/hopper-hop/1/tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle195_target975194/eval.csv",
+      "eval_full_csv": "logs/hopper-hop/1/tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle195_target975194/eval_full.csv",
+      "train_csv": "logs/hopper-hop/1/tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle195_target975194/train.csv",
+      "eval_rows": [
+        {
+          "step": 975194,
+          "episode_reward": 604.9813506611506
+        }
+      ],
+      "official_eval_summaries": [
+        {
+          "step_dir": "step_0975194",
+          "summary_csv": "logs/hopper-hop/1/tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle195_target975194/official_eval/step_0975194/eval_episode_summary.csv"
+        }
+      ],
+      "train_replay_summaries": [
+        {
+          "step_dir": "step_0975195",
+          "summary_csv": "logs/hopper-hop/1/tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle195_target975194/retrospective_train_traces/step_0975195/eval_episode_summary.csv",
+          "source": "train_replay"
+        }
+      ]
+    },
+    {
+      "seed": 1,
+      "run_name": "tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle196_target980195",
+      "run_dir": "logs/hopper-hop/1/tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle196_target980195",
+      "eval_csv": null,
+      "eval_full_csv": null,
+      "train_csv": "logs/hopper-hop/1/tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle196_target980195/train.csv",
+      "eval_rows": [],
+      "official_eval_summaries": [],
+      "train_replay_summaries": [
+        {
+          "step_dir": "step_0980196",
+          "summary_csv": "logs/hopper-hop/1/tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle196_target980195/retrospective_train_traces/step_0980196/eval_episode_summary.csv",
+          "source": "train_replay"
+        }
+      ]
+    },
+    {
+      "seed": 1,
+      "run_name": "tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle197_target985196",
+      "run_dir": "logs/hopper-hop/1/tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle197_target985196",
+      "eval_csv": null,
+      "eval_full_csv": null,
+      "train_csv": "logs/hopper-hop/1/tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle197_target985196/train.csv",
+      "eval_rows": [],
+      "official_eval_summaries": [],
+      "train_replay_summaries": [
+        {
+          "step_dir": "step_0985197",
+          "summary_csv": "logs/hopper-hop/1/tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle197_target985196/retrospective_train_traces/step_0985197/eval_episode_summary.csv",
+          "source": "train_replay"
+        }
+      ]
+    },
+    {
+      "seed": 2,
+      "run_name": "tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle195_target975194",
+      "run_dir": "logs/hopper-hop/2/tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle195_target975194",
+      "eval_csv": "logs/hopper-hop/2/tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle195_target975194/eval.csv",
+      "eval_full_csv": "logs/hopper-hop/2/tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle195_target975194/eval_full.csv",
+      "train_csv": "logs/hopper-hop/2/tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle195_target975194/train.csv",
+      "eval_rows": [
+        {
+          "step": 975194,
+          "episode_reward": 323.130608125031
+        }
+      ],
+      "official_eval_summaries": [
+        {
+          "step_dir": "step_0975194",
+          "summary_csv": "logs/hopper-hop/2/tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle195_target975194/official_eval/step_0975194/eval_episode_summary.csv"
+        }
+      ],
+      "train_replay_summaries": [
+        {
+          "step_dir": "step_0975195",
+          "summary_csv": "logs/hopper-hop/2/tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle195_target975194/retrospective_train_traces/step_0975195/eval_episode_summary.csv",
+          "source": "train_replay"
+        }
+      ]
+    },
+    {
+      "seed": 2,
+      "run_name": "tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle196_target980195",
+      "run_dir": "logs/hopper-hop/2/tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle196_target980195",
+      "eval_csv": null,
+      "eval_full_csv": null,
+      "train_csv": "logs/hopper-hop/2/tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle196_target980195/train.csv",
+      "eval_rows": [],
+      "official_eval_summaries": [],
+      "train_replay_summaries": [
+        {
+          "step_dir": "step_0980196",
+          "summary_csv": "logs/hopper-hop/2/tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle196_target980195/retrospective_train_traces/step_0980196/eval_episode_summary.csv",
+          "source": "train_replay"
+        }
+      ]
+    },
+    {
+      "seed": 2,
+      "run_name": "tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle197_target985196",
+      "run_dir": "logs/hopper-hop/2/tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle197_target985196",
+      "eval_csv": null,
+      "eval_full_csv": null,
+      "train_csv": "logs/hopper-hop/2/tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle197_target985196/train.csv",
+      "eval_rows": [],
+      "official_eval_summaries": [],
+      "train_replay_summaries": [
+        {
+          "step_dir": "step_0985197",
+          "summary_csv": "logs/hopper-hop/2/tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle197_target985196/retrospective_train_traces/step_0985197/eval_episode_summary.csv",
+          "source": "train_replay"
+        }
+      ]
+    },
+    {
+      "seed": 3,
+      "run_name": "tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle195_target975194",
+      "run_dir": "logs/hopper-hop/3/tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle195_target975194",
+      "eval_csv": "logs/hopper-hop/3/tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle195_target975194/eval.csv",
+      "eval_full_csv": "logs/hopper-hop/3/tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle195_target975194/eval_full.csv",
+      "train_csv": "logs/hopper-hop/3/tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle195_target975194/train.csv",
+      "eval_rows": [
+        {
+          "step": 975194,
+          "episode_reward": 392.72108720713294
+        }
+      ],
+      "official_eval_summaries": [
+        {
+          "step_dir": "step_0975194",
+          "summary_csv": "logs/hopper-hop/3/tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle195_target975194/official_eval/step_0975194/eval_episode_summary.csv"
+        }
+      ],
+      "train_replay_summaries": [
+        {
+          "step_dir": "step_0975195",
+          "summary_csv": "logs/hopper-hop/3/tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle195_target975194/retrospective_train_traces/step_0975195/eval_episode_summary.csv",
+          "source": "train_replay"
+        }
+      ]
+    },
+    {
+      "seed": 3,
+      "run_name": "tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle196_target980195",
+      "run_dir": "logs/hopper-hop/3/tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle196_target980195",
+      "eval_csv": null,
+      "eval_full_csv": null,
+      "train_csv": "logs/hopper-hop/3/tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle196_target980195/train.csv",
+      "eval_rows": [],
+      "official_eval_summaries": [],
+      "train_replay_summaries": [
+        {
+          "step_dir": "step_0980196",
+          "summary_csv": "logs/hopper-hop/3/tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle196_target980195/retrospective_train_traces/step_0980196/eval_episode_summary.csv",
+          "source": "train_replay"
+        }
+      ]
+    },
+    {
+      "seed": 3,
+      "run_name": "tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle197_target985196",
+      "run_dir": "logs/hopper-hop/3/tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle197_target985196",
+      "eval_csv": null,
+      "eval_full_csv": null,
+      "train_csv": "logs/hopper-hop/3/tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle197_target985196/train.csv",
+      "eval_rows": [],
+      "official_eval_summaries": [],
+      "train_replay_summaries": [
+        {
+          "step_dir": "step_0985197",
+          "summary_csv": "logs/hopper-hop/3/tdmpc2_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1_cycle197_target985196/retrospective_train_traces/step_0985197/eval_episode_summary.csv",
+          "source": "train_replay"
+        }
+      ]
+    }
+  ]
+}

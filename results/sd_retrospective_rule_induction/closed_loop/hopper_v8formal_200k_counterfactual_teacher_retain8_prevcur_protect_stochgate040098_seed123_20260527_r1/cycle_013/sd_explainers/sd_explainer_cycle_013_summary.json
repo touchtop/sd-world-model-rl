@@ -1,0 +1,51 @@
+{
+  "checkpoint": "results/sd_retrospective_rule_induction/closed_loop/hopper_v8formal_200k_counterfactual_teacher_retain8_prevcur_protect_stochgate040098_seed123_20260527_r1/cycle_013/sd_explainers/sd_explainer_cycle_013.pt",
+  "epochs": 3,
+  "history_tail": [
+    {
+      "best_val_loss": 0.6046435832977295,
+      "epoch": 1.0,
+      "train_loss": 0.6754677864638242,
+      "val_loss": 0.6046435832977295
+    },
+    {
+      "best_val_loss": 0.6041070222854614,
+      "epoch": 2.0,
+      "train_loss": 0.6763145822015676,
+      "val_loss": 0.6041070222854614
+    },
+    {
+      "best_val_loss": 0.6038150191307068,
+      "epoch": 3.0,
+      "train_loss": 0.6744278574531729,
+      "val_loss": 0.6038150191307068
+    }
+  ],
+  "init_checkpoint": "results/sd_retrospective_rule_induction/closed_loop/hopper_v8formal_200k_counterfactual_teacher_retain8_prevcur_protect_stochgate040098_seed123_20260527_r1/cycle_012/sd_explainers/sd_explainer_cycle_012.pt",
+  "init_loaded_tensors": 30,
+  "metrics": {
+    "body_contact_z_mae": 0.00933369155973196,
+    "full_foot_support_mae": 0.20552854239940643,
+    "height_mae": 0.008058518171310425,
+    "one_step_struct_rmse": 1.5074660778045654,
+    "pitch_mae": 0.037714648991823196,
+    "pitch_rate_mae": 1.6041096448898315,
+    "rollout_10_rmse": 1.6716466650832444,
+    "rollout_1_rmse": 1.2800578069873154,
+    "rollout_20_rmse": 1.70994341513142,
+    "rollout_3_rmse": 1.9301407928578556,
+    "rollout_5_rmse": 1.8797935440670699,
+    "support_contact_mae": 0.38745546340942383,
+    "vx_mae": 0.1676056981086731,
+    "vz_mae": 0.2633225619792938
+  },
+  "model_config": {
+    "transition_residual_scale": 1.0,
+    "use_transition_residual": true
+  },
+  "num_transitions": 50000,
+  "seed": 20260520,
+  "selection": "results/sd_retrospective_rule_induction/closed_loop/hopper_v8formal_200k_counterfactual_teacher_retain8_prevcur_protect_stochgate040098_seed123_20260527_r1/cycle_013/manifests/selected_trajectories.json",
+  "train_size": 45010,
+  "val_size": 4990
+}

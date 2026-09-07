@@ -1,0 +1,1599 @@
+Proceedings of the Twenty-Fifth International Joint Conference on Artificial Intelligence (IJCAI-16)
+
+Improved Heuristic and Tie-Breaking for Optimally Solving Sokoban
+André G. Pereira
+Robert Holte and Jonathan Schaeffer
+Federal University of Rio Grande do Sul, Brazil
+University of Alberta, Canada
+agpereira@inf.ufrgs.br
+{holte,jonathan}@cs.ualberta.ca
+Luciana S. Buriol and Marcus Ritt
+Federal University of Rio Grande do Sul, Brazil
+{buriol,marcus.ritt}@inf.ufrgs.br
+Abstract
+
+Sokoban is a PSPACE-complete [Culberson, 1999] singleagent search domain that is harder to solve than other common search domains considering the branching factor, solution length, domain-dependent characteristics and search
+space size – estimated at 1098 [Junghanns and Schaeffer,
+2001]. In addition, no domain-independent PDB heuristic
+can optimally solve the easiest instance in the standard test
+set. Major progress has been made in solving Sokoban nonoptimally [Junghanns and Schaeffer, 2001]. Currently, the
+best non-optimal method solves 86 [Takahashi, 2016] of the
+90 standard test set instances [Myers, 2016].
+PDB heuristics are ineffective in transportation domains
+where the mapping of movable objects to goal locations is
+not fixed beforehand (this is the case in Sokoban). Pereira
+et al. [2015] introduced an admissible PDB heuristic (I) that
+addresses this issue by using an intermediate goal state. The
+heuristic I with the proposed tie-breaking rule (F) increases
+from 10 to 20 the number of optimality solved instances.
+However, the gap in solving abilities between optimal and
+non-optimal solvers is still wide.
+We extend this idea to allow the use of multiple intermediate goal states. However, the heuristic I is the sum of two estimates which are computed independently. As we will show,
+the fact they are solved independently makes the heuristic ineffective when using multiple intermediate goal states. In addition, the tie-breaking rule F is prone to error and can guide
+the search to parts of the search space that will not lead to an
+(optimal) solution.
+In this paper, we propose a novel PDB heuristic (D) that
+is effective when using multiple intermediate goal states. We
+also propose a tie-breaking rule (L) that solves the main limitations of F. Our method increases the number of optimally
+solved instances from 20 to 28 and the number of proved optimal solutions from 25 to 32. Our heuristic is general and
+addresses an important limitation of PDB heuristics in a large
+class of single-agent search domains (i.e., transportation).
+
+We present a novel admissible pattern database
+heuristic (D) and tie-breaking rule (L) for Sokoban,
+allowing us to increase the number of optimally
+solved standard Sokoban instances from 20 to 28
+and the number of proved optimal solutions from
+25 to 32 compared to previous methods. The previously best heuristic for Sokoban (I) used the idea
+of an intermediate goal state to enable the effective use of pattern database heuristics in transportation domains, where the mapping of movable objects to goal locations is not fixed beforehand. We
+extend this idea to allow the use of multiple intermediate goal states and show that heuristic I
+is no longer effective. We solve this problem and
+show that our heuristic D is effective in this situation. Sokoban is a well-known single-agent search
+domain characterized by a large branching factor,
+long solution lengths, and the presence of unsolvable states. Given the exponential growth in the
+complexity of standard Sokoban instances, the increase in the number of optimally solved instances
+represents a major advance in our understanding of
+how to search in extremely large search spaces.
+
+1
+
+Introduction
+
+A single-agent search problem is given by the initial state, the
+set of goal states (or goal condition) and the set of actions.
+Each action defines how to transform a state into a successor state with given cost. A solution is a path from the initial
+state to a goal state – an optimal solution has minimum cost.
+Single-agent heuristic search algorithms such as A⇤ [Hart et
+al., 1968] and Iterative Deepening A⇤ [Korf, 1985] use the
+function f (u) = g(u) + h(u) to guide the search, where
+g(u) is the cost to reach the state u from the initial state
+and h(u) is an estimate of the cost to reach a goal state
+from u. If the heuristic function h is admissible these algorithms are guaranteed to find an optimal solution. Culberson
+and Schaeffer [1996] proposed pattern databases (PDB) as a
+way to generate high-quality admissible heuristics for many
+single-agent search domains [Korf, 1997; Edelkamp, 2001;
+Korf and Felner, 2002; Felner et al., 2004; Holte et al., 2006;
+Felner et al., 2007].
+
+2
+
+Background
+
+An instance of Sokoban has k movable blocks (stones) and
+k goal squares placed on a grid-square maze defined by immovable blocks (walls) and free squares. There is an additional block called the man which is the only block that can
+be moved directly. The man can traverse free squares and
+
+662
+
+(a) Instance.
+
+(b) One cut square.
+
+(c) Two cut squares.
+
+(d) Three cut squares.
+
+(e) Fill Order (F).
+
+Figure 1: Decompositions with one (1b), two (1c) and three (1d) cut squares of the instance shown in (1a). Cut squares
+are shown in black, maze zone squares in white, goal zone squares in brown with diagonal lines and dead squares in gray.
+Tie-breaking rule computed by F (1e).
+push (never pull) a stone to an adjacent free square. Figure 1a
+shows a stone at square 3E, a goal square at 3B, the man at
+square 2B and a wall at 1A. A solution is a sequence of actions that moves the k stones from their initial squares to the k
+goal squares and an optimal solution has the minimum number of pushes. The moves of the man are not counted. Note
+that square 9C is considered dead; once a stone is pushed
+there it can never reach a goal square.
+Let Q be the set of free squares of an instance, G ✓ Q
+the set of goal squares and B the set of stones. A state u
+is a pair u = (p(B), m), where p is a map from the stones
+to the free squares and m is the position of the man. For a
+stone at square p(b) let (p(b), g) be the minimum cost to
+push the stone at p(b) to square g when the man is at m in
+an instance with only one stone. This cost ignores all other
+stones. The enhanced minimum matching (EMM) is the standard heuristic of Sokoban, it is based on a minimum cost perfect matching in the complete bipartite graph between stones
+and goal squares with edge set {(b, g) | b 2 B, g 2 G} and
+weights (p(b), g). In this bipartite graph let M ⇤ be a minimum cost perfect matching. The matching cost is enhanced
+with linear conflicts that increase the heuristic value by two
+when a pair of adjacent stones is in the optimal path of each
+other, each stone can be part of only one linear conflict. Let L
+be the number of linear conflicts in a state. Then, the value
+of EMM for a state u is,
+EMM =
+
+X
+
+The heuristic I is the sum of the cost to solve two independent subproblems that are a relaxation of the original problem. The cut square defines the intermediate goal state and it
+can store many stones and the man simultaneously (this is the
+relaxation). The maze subproblem corresponds to the cost
+to push stones that are in the maze zone to the cut square.
+The goal subproblem corresponds to the cost to push stones
+at the cut square and in the goal zone to the goal squares.
+Let hM and hG be respectively the heuristic functions for the
+maze and goal subproblems. The value of heuristic I for a
+state u is defined as the sum of hM and hG .
+A PDB is used to compute hM . The abstraction used maintains only k 0 of all k stones in the instance, a PDB-k 0 uses an
+abstraction of k 0 stones. For this PDB, there is a unique abstract goal state that has k 0 stones placed at the cut square.
+To build the PDB the algorithm performs a reverse search
+from the abstract goal state to enumerate all reachable abstract states with stones k 0 in the maze zone. Let (p(P )) be
+the cost stored in the PDB for an abstract state u0 with stones
+P ✓ B. To compute hM the algorithm creates a partition B
+of all stones in the maze zone into parts P of size k 0 . Among
+all possible partitions B the heuristic tries to find one that
+maximizes the heuristic value as described in [Pereira et al.,
+2015]. The value of hM for a state u is,
+hM =
+
+X
+
+(p(P )).
+
+P 2B
+
+A modified state is used to compute hG . Stones in the maze
+zone are placed at the cut square and the position of the man
+is changed accordingly, all stones in the goal zone remain the
+same. A complete description of the procedure can be found
+in [Pereira et al., 2015]. Let d be this new map from the
+stones to free squares and position of the man. Let L be the
+number of linear conflicts in a state considering only stones
+in the goal zone and at the cut square. Finally, the value of hG
+for a state u is defined as,
+
+(p(b), g) + 2L.
+
+(b,g)2M ⇤
+
+A series of articles [Pereira et al., 2013; 2014; 2015] introduced admissible PDB heuristics to Sokoban. The heuristic I [Pereira et al., 2015] provides the best previous results.
+It uses an instance decomposition to obtain an intermediate
+goal state. If all stones on a set of non-dead squares M have
+to pass over a fixed cut square c to be pushed to all reachable goal squares, the cut square c is used as an intermediate
+goal state. The squares in M are the maze zone squares and
+all other non-dead and non-goal squares are the goal zone
+squares. Figure 1b shows an instance decomposition: the
+cut square shown at 6C is part of the maze zone, the two
+maze zone squares at 7C and 8C and for example a goal zone
+square at 7D.
+
+hG =
+
+X
+
+(d(b), g) + 2L.
+
+(b,g)2M ⇤
+
+In addition to the heuristic I, Pereira et al. [2015] introduced the tie-breaking rule called fill order F. It uses the property that there is an order to fill the goal squares respecting the
+
+663
+
+restrictions of the instance. F attempts to approximate this order by placing all stones on goal squares and removing them
+in an arbitrary order with reverse moves. If a reverse move
+is possible the stone is removed from the instance and the
+corresponding goal square receives a priority value equal to
+the number of stones removed so far. This process continues until all stones have been removed. During the search,
+nodes with stones on goal squares with higher numbers are
+preferred. Figure 1e shows the order computed by F.
+
+3
+
+stones are placed at each cut square and the cost of this subproblem is two. 2I provides the heuristic value of 25 which
+is lower than plain EMM; because of that small difference, 2I
+expands 100 times more nodes to solve the instance.
+The solution to improve the heuristic value is to solve the
+subproblems recognizing that they are dependent – the number of stones in each cut square in both subproblems has to
+be the same. We call this heuristic D. Using it in the instance
+shown in Figure 1a it provides the heuristic value of 31 – the
+optimum solution cost.
+
+Proposed Pattern Database Heuristic based
+on Multiple Intermediate Goal States
+
+3.2
+
+In heuristic D, we have a unique PDB for each abstract goal
+state generated by the combinations of k 0 stones on the cut
+squares. One PDB for each pair (x, y) of the previous example. Let a be an assignment that maps stones in the maze zone
+to cut squares, stones in the goal zone remain the same. Let A
+be the set of all possible such assignments. Let a(P ) (p(P ))
+be the cost in one of the PDBs for an abstract state with subset of stones P , the number of stones in each cut squares defined by a(P ) selects the PDB. To guarantee admissibility of
+heuristic D we have to find an assignment a that minimizes
+the sum of hM and hG . Thus, the value of heuristic D for a
+state u is defined as,
+
+In this section, we describe a simple method to extend the
+heuristic I to use multiple intermediate goal states and we
+show why it is ineffective. We present a more complex approach our novel admissible PDB heuristic D and describe
+how to compute the it efficiently in Section 3.2.
+
+3.1
+
+PDB Construction and Heuristic Computation
+
+Instance Decomposition and Independent
+Subproblems
+
+We want to find a set of cut squares C that maximizes the
+size of the maze zone M . To find such a set we analyze all
+possible sets of cut squares of fixed size. Given a set C we
+perform k reverse searches one for each goal square in which
+we place a single stone at the goal square. In all searches the
+squares in C are blocked for the stone, it cannot be placed at
+them. Then, all reachable non-dead and non-goal squares in
+these searches are part of the goal zone, and all other nondead squares are part of the maze zone. By construction, all
+stones in the set of non-dead squares M can only be pushed
+to the goal zone passing over the squares in C.
+We place a number in front of the letter I (and later D)
+to define the number of cut squares used. 1I uses one cut
+square and 2I uses two cut squares. The PDB construction for heuristic I using more cut squares is the same as
+the original approach the only difference is that there are
+more abstract goal states. Each combinations of k 0 stones
+on the cut squares generates an abstract goal state. With
+two cut squares, x stones on one cut square and y on the
+other, and k 0 = 4 stones, we have five abstract goal states
+(x, y) = (0, 4), (1, 3), (2, 2), (3, 1) and (4, 0). Each pair
+(x, y) is a unique abstract goal state. When computing hG for
+each stone in the maze zone, it is unknown which cut square
+will be used in pushing that stone into the goal zone. Then,
+when placing stones in the maze zone at the cut squares, the
+stone will be placed at the closest cut square for each goal
+square. The remainder of the heuristic computation is the
+same.
+An instance decomposition of Figure 1a using one cut
+square, Figure 1b, finds a maze zone with three squares (6C,
+7C and 8C). Because of that 1I and plain EMM have the
+same heuristic value of 27 for that instance. In an instance
+decomposition using two cut squares (Figure 1c), the maze
+zone comprises almost the whole instance, a three cut squares
+decomposition increases the maze zone by one square (Figure 1d). 2I with a PDB-k 0 = 4 provides the optimal solution cost of 23 for the maze subproblem, where all stones are
+pushed to the cut square on 3C. When computing hG , two
+
+2
+
+D = min 4
+8a2A
+
+X
+
+P 2B
+
+a(P ) (p(P ))
+
++
+
+X
+
+(b,g)2M ⇤
+
+3
+
+(a(b), g)5 + 2L.
+
+In the following, we describe how to compute the partition B and an optimal assignment efficiently.
+
+Partitioning Computation
+When computing B it is unknown at the time which cut square
+will be assigned to each stone. We assume that each subset P will be assigned to the set of cut squares that minimizes
+its cost and thus selecting the PDB with minimum cost. If
+k 0 = 2, the optimal B can be found in polynomial time by
+a maximum weighted matching. If k 0 > 2, we use a greedy
+randomized constructive method based on the one proposed
+by [Pereira et al., 2015]. The method starts by querying the
+cost of every subset, all kk0 subsets. Then, it ranks the subset according to the number of conflict pushes: the difference
+between the cost of the subset and the cost to push each stone
+in the subset individually to its closest cut square. Then, a
+greedy randomized method selects a disjoint partition trying
+to maximize the sum of the conflict pushes. Only subsets with
+all stones in the maze zone are included in B.
+Assignment Computation
+The assignment computation, in general, is the costly part of
+the heuristic. If the sum of conflict pushes in B is zero, we return the value of EMM. We only assign cut squares for stones
+in parts P with conflict pushes greater than zero, all other
+parts are removed from B. The intuition is that we just have
+to select cut squares for stones that are likely to increase the
+heuristic value. The simplest approach is to compute the cost
+of all possible assignments. When checking all possible assignments we call the heuristic the exhaustive heuristic DE .
+
+664
+
+The difficulty is that the number of stones in B could be k
+and thus, we have to check the cost of |C|k assignments for a
+single state. To find an optimal assignment more efficiently
+we propose the use of a branch and bound computation.
+We use a best-first branch and bound computation (BB). At
+each step in the BB a stone is assigned to a cut square. At
+the beginning, no stones have cut squares assigned and thus
+the lower bound is equal to EMM. If all stones in a part have
+cut squares then we compute the lower bound, otherwise, we
+just use the lower bound of the parent in the BB tree. The
+lower bound is defined as the cost of the two subproblems,
+but only parts where all stones have assigned cut squares use
+the cost of the PDB. The upper bound is defined as the cost
+of EMM plus the number of conflict pushes. The heuristic D
+using the BB is called DB .
+
+3.3
+
+(a) Fill Order F.
+
+(b) Level Order L.
+
+Figure 2: Two different tie-breaking rules.
+
+4
+
+Tie-Breaking Rule
+
+Having the f -value equal to the optimal solution length does
+not necessarily mean a solution is close at hand; there can
+be a prohibitively large number of states remaining to be expanded. This makes tie-breaking rules important. When comparing two Sokoban states, the one with more stones on goal
+squares, in general, is closer to being solved. Moreover, there
+is an optimal order to place stones on goal squares such that
+a solution can be found or the solution cost is minimized.
+The tie-breaking rule F [Pereira et al., 2015] explores these
+ideas to speed up the process of finding solutions. Using F the
+search expands fewer nodes and solves more instances, but it
+has three main sources of errors: the total order of the goal
+squares, the rule used to define the order, and the assignment
+of partial priorities.
+
+Admissibility
+
+In this subsection, we show that the heuristic D is admissible. Let h⇤ be the perfect heuristic. It is witnessed by
+some optimal sequence of actions S. For each stone in
+any part of B, consider the corresponding subsequence of
+S that brings it for the first time to some cut square. Such
+a subsequence must exist, by definition of the cut squares.
+The final position of each stone in these subsequences defines an assignment a of the stones in B to the cut squares.
+For all the stones in B, there must be a subsequence disjoint from the subsequence above, that brings it from the
+cut square to some goal square. Similarly, for all remaining stones there must be such a sequence. These subsequences define a matching M of stones to goal squares.
+Therefore, we have a pair (a, M ) and the value of h⇤ can
+be defined as h⇤ (a, M ) = (p(B), a(B)) + (a(B), M (B)).
+Let hD (a⇤ , M ⇤ ) = hM (p(B), a⇤ (B)) + hG (a⇤ (B), M ⇤ (B))
+be the heuristic D with an optimal assignment a⇤ that minimizes the total cost given an optimal matching M ⇤ .
+Theorem 3.1. hD (a⇤ , M ⇤ ) is admissible.
+
+A total order may be attempting too much. When there
+is insufficient information to define an order to fill the goal
+squares one should not be preferred to the other. Figure 2a
+shows an order defined by F. In this instance according to
+the rule F, the goal square with number three has to receive a
+stone before the goal square with number two, which is not a
+feasible solution and thus the order is wrong. The rule used
+to define the order could be strengthened to avoid this type
+of error. Also, giving partial priorities may prioritize nodes
+with stones on goal squares with lower priorities such that
+those with higher priorities cannot be filled anymore. These
+problems may cause the search to explore a large portion of
+the search space without finding a solution.
+
+Proof. For any state, we want to show that hD (a⇤ , M ⇤ ) 
+h⇤ (a, M ).
+By definition, the pair (a⇤ , M ⇤ ) minimizes the value
+of hD , any other pair (a, M ) cannot provide a lower value.
+Thus, we have that hD (a⇤ , M ⇤ )  hD (a, M ).
+Now, we want to show that hD (a, M )  h⇤ (a, M ) where
+(a, M ) is the pair extracted from the optimal sequence S.
+First, consider hM and (p(B), a(B)) both heuristics compute the cost to push the same set of stones from their original squares p(B) to the same set of cut squares a(B). The
+value of (p(B), a(B)) accounts for conflicts between all
+stones in B, but the value of hM accounts only for conflicts
+that occur within each part P and thus it must be a lower
+bound on (p(B), a(B)). A similar argument also applies for
+(a(B), M (B)) and hG . All stones B have the same original a(B) and destination M (B) squares. The value of hG
+accounts only for linear conflicts while (a(B), M (B)) accounts for all conflicts which include linear conflicts. Thus,
+hG must be a lower bound on (a(B), M (B)). Therefore,
+
+To solve these problems we propose the tie-breaking rule
+level order (L). We compute L by placing all stones on goal
+squares. Then, iteratively we remove a stone with reverse
+moves. A stone is considered removed if it can reach a square
+that has a stone on it on the initial state of the instance without
+moving other stones on goal squares. Goal squares that have
+their stones removed in the same iteration receive the same
+priority. If after one iteration no stone can be removed, all
+the remaining goal squares with stones receive the highest
+priority. Figure 2b shows the order defined by L. During the
+search, a node receives a priority of the goal square with a
+stone only if all the goal squares with higher priority (bigger
+numbers) already have stones. For example, (a) a node with
+a single stone on a goal square with priority three will not
+receive any priority, and (b) a node with two stones on goal
+squares with priority four and one stone on goal square with
+priority zero will receive a priority of two.
+
+hD (a⇤ , M ⇤ )  hD (a, M )  h⇤ (a, M ).
+
+665
+
+Table 1: Heuristic values for the initial states of the standard set of 90 instances. Highlighted cells in columns 1I, 2I and
+2D have values equal to the best-known solution. Improved values over 1I are shown in bold. Highlighted cells in column
+column UB show proved optimal solution lengths: when the time limit is reached, the lowest f -value on the open list is equal
+to the best-known solution. 1I proves the optimal solution length of 25 instances and 2DB of 32 instances.
+1I
+
+2I
+
+2D
+
+UB
+
+#
+
+1I
+
+2I
+
+2D
+
+UB
+
+#
+
+1I
+
+2I
+
+2D
+
+UB
+
+#
+
+1I
+
+2I
+
+2D
+
+UB
+
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+
+97
+131
+134
+355
+141
+106
+80
+220
+231
+510
+213
+206
+224
+231
+100
+170
+203
+106
+286
+450
+137
+308
+432
+
+93
+123
+126
+343
+133
+100
+86
+220
+222
+510
+209
+198
+224
+231
+106
+162
+199
+103
+278
+374
+126
+307
+428
+
+97
+131
+134
+355
+141
+106
+86
+220
+231
+510
+213
+208
+224
+231
+108
+170
+203
+106
+286
+450
+137
+310
+432
+
+97
+131
+134
+355
+143
+110
+88
+230
+237
+512
+241
+212
+238
+239
+122
+186
+213
+124
+302
+462
+147
+324
+448
+
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+
+518
+378
+175
+359
+290
+132
+407
+236
+115
+152
+164
+368
+511
+242
+79
+658
+314
+227
+208
+138
+169
+290
+227
+
+517
+361
+162
+350
+287
+130
+400
+233
+122
+140
+164
+352
+502
+225
+79
+598
+306
+227
+204
+130
+165
+282
+217
+
+534
+378
+175
+359
+290
+132
+407
+236
+129
+170
+164
+368
+511
+246
+79
+658
+314
+227
+208
+138
+169
+290
+227
+
+544
+386
+195
+363
+308
+164
+465
+250
+139
+174
+168
+378
+521
+284
+81
+672
+324
+237
+218
+146
+179
+300
+247
+
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+69
+
+201
+200
+106
+102
+118
+379
+186
+181
+120
+193
+217
+197
+218
+148
+253
+241
+429
+381
+207
+193
+395
+333
+223
+
+183
+186
+88
+100
+100
+359
+182
+178
+115
+193
+219
+189
+222
+147
+255
+236
+424
+373
+203
+193
+392
+329
+217
+
+201
+200
+114
+100
+118
+379
+186
+181
+120
+201
+219
+197
+222
+150
+255
+241
+429
+381
+207
+193
+395
+333
+223
+
+209
+200
+124
+370
+118
+421
+186
+187
+120
+203
+225
+199
+230
+152
+263
+245
+431
+385
+211
+325
+401
+341
+433
+
+70
+71
+72
+73
+74
+75
+76
+77
+78
+79
+80
+81
+82
+83
+84
+85
+86
+87
+88
+89
+90
+
+329
+298
+294
+441
+182
+263
+194
+360
+136
+170
+231
+167
+137
+194
+153
+307
+124
+223
+342
+361
+446
+
+327
+300
+262
+437
+176
+267
+196
+238
+136
+149
+201
+141
+131
+184
+149
+307
+112
+217
+336
+351
+447
+
+329
+302
+294
+441
+190
+273
+198
+364
+136
+170
+231
+173
+137
+194
+155
+307
+124
+223
+342
+361
+448
+
+333
+308
+296
+441
+212
+295
+204
+368
+136
+174
+231
+173
+143
+194
+155
+329
+134
+233
+390
+379
+460
+
+Experimental Results
+
+100
+
+5.1
+
+One Cut square
+
+In this section, we compare our proposed heuristic D and tiebreaking rule L with the state-of-the-art heuristic I and tiebreaking rule F. As well, we include extending heuristic I to
+multiple intermediate goal states. All experiments were run
+on a PC with an AMD FX-8150 CPU running at 3.6 GHz
+with 32 GB of RAM. We use the standard limits for Sokoban
+of 20 million expanded nodes or one hour of CPU time. In
+our experiments a search ended either because a solution was
+found or the time limit was reached, the node limit was never
+reached. The standard test set xSokoban of 90 instances is
+used.
+
+100
+Two Cut squares
+
+5
+
+#
+
+75
+50
+25
+0
+
+0
+
+25 50 75 100
+Two Cut squares
+
+(a) One vs. two cut squares.
+
+75
+50
+25
+0
+
+0
+
+25 50 75 100
+Three Cut squares
+
+(b) Two vs. three cut squares.
+
+Figure 3: Comparison of the percentage of maze zone squares
+considering different numbers of cut squares: (3a) two cut
+squares compared to one cut square has a > 10% increase in
+the size of the maze zone in 48 instances, and (3b) three cut
+squares compared to two cut squares has it in 14 instances.
+
+Instance Decomposition and PDB
+Construction
+
+Our first experiment is regarding instance decomposition. We
+compare the percentage of maze zone squares obtained by
+one, two, and three cut squares. These results are shown in
+Figure 3. Over the 90 instances, decompositions with one,
+two, and three cut squares on average include respectively
+66%, 92% and 97% of the squares in the instance are maze
+zone squares. Using two cut squares has 100% of the maze
+zone squares in 33 instances, while using one cut has only
+three instances.
+A two cut squares decomposition provides a considerable
+improvement in the percentage of maze zone squares over
+one cut square. Because of that we perform experiments to at
+most two cut squares. PDBs built with k 0 = 4 are the largest
+that can be built for all instances in one hour, and previously
+
+provided the best results. Thus, we fix the size of k 0 = 4 in
+all our experiments. On average, PDB-4 for 2I has 323, 572
+entries and takes 15 seconds to build, while 2D has 695, 606
+entries and takes 108 seconds.
+
+5.2
+
+Heuristics on Initial States and Proved
+Optimal Solutions
+
+Table 1 shows the heuristic values for the initial states of the
+90 instances. Column UB shows the best-known upper bound.
+The first information to be noted is that heuristic I when ex-
+
+666
+
+Table 2: Solved instances for different heuristics and tiebreaking rules. Only instances solved by at least one of the
+methods are shown.
+
+tended from one cut square 1I to two cut squares 2I has
+worse results in general, but it is still able to increase the
+heuristic value on some instances (e.g. #7). 2D improves
+the heuristic value on average by 1.71 compared to 1I over
+instances where 1I doesn’t provide the best-known solution.
+For some instances it may be hard to improve the heuristic
+value. For example, consider #10: the heuristic has not improved, but 1I has 32% maze zone squares while 2D has
+100%. Thus during the search 2D will detect more deadlocks.
+2D improves the heuristic value in 25% of the instances compared to 1I, including an enormous improvement of 18 for
+instance #33.
+Highlighted entries in Table 1 are the instances for which
+the optimal solution cost is now known. If the heuristic value
+of the initial state or the lowest f -value on the open list when
+the time limit is reached is equal to the best-known solution,
+then the optimal solution length is known. Considering only
+the heuristic value for the initial states 14 instances have the
+optimal solution proved. 1I, 2I and 2D prove respectively
+12, 1 and 14. The ones proved by 1I and 2I are a subset of
+2D. Considering the f -value when the time limit is reached,
+32 instances have their optimal solution cost proven. 2DB
+proves 32, and 1I proves 25, a subset of 2DB . For some
+instances, we may not prove the optimality of the solution
+cost because the upper bound is loose (best human solution).
+However, we can compare which heuristic is closer to solve
+the instance: over all algorithms, 1I has the highest or equal
+highest f -value on the open list at the end of the search for 64
+instances while 2DB has it for 87 instances.
+
+5.3
+
+#
+
+Solved Instances
+
+All methods use the same basic code infrastructure and an A⇤
+search. We applied an additional improvement to heuristic I
+to make the comparison fairer: only use the cost in the PDB
+if the whole subset of stones is in the maze zone. Doing this
+1I can solve one more instance.
+Table 2 shows all instances solved by at least one of the
+methods. We use two combinations of tie-breaking rules: IF
+corresponds to the previous best tie-breaking rule using inertia [Junghanns and Schaeffer, 2001] as first order rule, and
+fill order as second order rule, and LI corresponds to our proposed tie-breaking rule L as first level rule, and inertia as second order rule. For each heuristic (1I, 2I, 2DE , 2DB ) there
+are two columns, one for each tie-breaking rule (IF, LI). A
+dot in a specific column indicates that the instance defining
+the row was solved by that combination of heuristic and tiebreaking rule. With the exception of 2I all heuristics solve
+more instances using LI. The improvement is more significant in 2DB solving five more instances, but even 1I benefits
+from LI. For example in instance #21 it expands 100 times
+fewer nodes and reduces the time by more than half an hour.
+Comparing the heuristics, 2I can only solve five instances,
+showing that the extension to multiple intermediate goal
+states is ineffective with heuristic I. Even with a more accurate heuristic, 2DE cannot solve more instances than 1I
+due to the cost of expanding nodes. 2DB can solve more instances than 1I with both tie-breaking rules. In computing
+Table 2, 2DB on average expands 10 times fewer nodes per
+second than 1I, but it solves seven more instances. In large
+
+1I
+
+2I
+
+2DE
+
+2DB
+
+IF
+
+LI
+
+IF
+
+LI
+
+IF
+
+LI
+
+IF
+
+LI
+
+1
+2
+3
+4
+5
+6
+7
+9
+17
+21
+33
+38
+43
+48
+51
+53
+55
+57
+60
+65
+73
+78
+79
+80
+81
+82
+83
+84
+
+•
+•
+•
+•
+•
+•
+•
+•
+•
+•
+
+•
+•
+•
+•
+•
+•
+•
+•
+•
+•
+
+•
+
+•
+
+•
+
+•
+
+•
+
+•
+
+•
+•
+•
+•
+•
+•
+•
+•
+•
+
+•
+•
+•
+•
+•
+•
+•
+•
+•
+
+•
+•
+•
+•
+•
+•
+•
+•
+•
+•
+
+•
+•
+
+•
+•
+•
+
+•
+
+•
+
+•
+•
+
+•
+•
+
+•
+•
+
+•
+•
+
+•
+
+•
+•
+
+•
+•
+•
+•
+•
+
+•
+•
+•
+•
+•
+
+•
+•
+
+•
+•
+
+•
+•
+•
+•
+•
+•
+•
+•
+
+•
+•
+•
+•
+•
+•
+•
+•
+
+Tot.
+
+21
+
+22
+
+20
+
+21
+
+•
+•
+•
+•
+•
+•
+•
+•
+•
+•
+•
+•
+•
+•
+•
+•
+•
+•
+•
+•
+•
+•
+•
+•
+•
+•
+•
+•
+
+•
+•
+
+•
+
+•
+
+5
+
+5
+
+•
+•
+
+•
+•
+•
+•
+•
+•
+•
+•
+•
+
+23
+
+28
+
+search spaces the comparison of 1I and 2DB indicates that a
+heuristic that is more informed can be beneficial, even if more
+computationally expensive. Another point highlighted by the
+results of 2DB is the effort to prove the optimality and to find
+the solution. 2DB can prove the optimality of 32 instances.
+However, it can only find the optimal solution for 28.
+Figure 4 shows the detailed results of 1I+IF, the previous state-of-the-art, compared to 2DB +LI. 2DB uses at most
+307 seconds more than 1I to solve any instance (#73). Comparing only the solved instances by both methods, 2DB uses
+more time in 13 instances while 1I uses more time in 15
+instances. Regarding time, there is no clear winner. Regarding expanded nodes 2DB is the clear winner. Comparing only
+the solved instances by both methods 2DB expands 200 times
+fewer nodes on average.
+
+6
+
+Discussion
+
+We have shown how to effectively apply PDB heuristics in transportation domains where the mapping of movable objects to goal locations is not fixed beforehand and
+where multiple intermediate goal states are helpful. We
+use our heuristic D and tie-breaking rule L and solve optimally more instances than previous methods. Domains like
+
+667
+
+108
+
+55
+
+81
+
+48
+
+84
+7
+
+55 81
+
+[Culberson, 1999] Joseph C. Culberson. Sokoban is PSPACEComplete. In Fun With Algorithms, pages 65–76, 1999.
+[Edelkamp, 2001] Stefan Edelkamp.
+Planning with pattern
+databases. In European Conference on Planning, pages 13–24,
+2001.
+[Felner et al., 2004] Ariel Felner, Richard E. Korf, and Sarit
+Hanan. Additive pattern database heuristics. J. Artificial Intelligence Res., 22:279–318, 2004.
+[Felner et al., 2007] Ariel Felner, Richard E. Korf, Ram Meshulam, and Robert C. Holte. Compressed pattern databases. J.
+Artificial Intelligence Res., 30:213–247, 2007.
+[Hart et al., 1968] Peter E. Hart, Nils J. Nilsson, and Bertram
+Raphael. A formal basis for the heuristic determination of minimum cost paths. IEEE Trans. Systems Science and Cybernetics,
+4(2):100–107, 1968.
+[Holte et al., 2006] Robert C. Holte, Ariel Felner, Jack Newton,
+Ram Meshulam, and David Furcy. Maximizing over multiple
+pattern databases speeds up heuristic search. Artificial Intelligence, 170(16-17):1123–1136, 2006.
+[Hüffner et al., 2001] Falk Hüffner, Stefan Edelkamp, Henning
+Fernau, and Rolf Niedermeier. Finding optimal solutions to
+Atomix. In KI: Advances in Artificial Intelligence, pages 229–
+243, 2001.
+[Junghanns and Schaeffer, 2001] Andreas
+Junghanns
+and
+Jonathan Schaeffer. Sokoban: Enhancing general singleagent search methods using domain knowledge. Artificial
+Intelligence, 129(1–2):219–251, 2001.
+[Korf and Felner, 2002] Richard E. Korf and Ariel Felner. Disjoint pattern database heuristics. Artificial Intelligence, 134(1–
+2):9–22, 2002.
+[Korf, 1985] Richard E. Korf. Depth-first iterative-deepening: An
+optimal admissible tree search. Artificial Intelligence, 27(1):97–
+109, 1985.
+[Korf, 1997] Richard E. Korf. Finding optimal solutions to Rubik’s Cube using pattern databases. In AAAI Conference on Artificial Intelligence, pages 700–705, 1997.
+[Myers, 2016] Andrew Myers. Standard set. www.cs.cornell.edu/
+andru/xsokoban.html, February 2016.
+[Pereira et al., 2013] André Grahl Pereira, Marcus Ritt, and Luciana Salete Buriol. Finding optimal solutions to Sokoban using
+instance dependent pattern databases. In Symposium on Combinatorial Search, pages 141–148, 2013.
+[Pereira et al., 2014] André Grahl Pereira, Marcus Ritt, and Luciana Salete Buriol. Solving Sokoban optimally using pattern
+databases for deadlock detection. In Encontro Nacional de Inteligência Artificial, 2014.
+[Pereira et al., 2015] André Grahl Pereira, Marcus Ritt, and Luciana Salete Buriol. Optimal Sokoban solving using pattern
+databases with specific domain knowledge. Artificial Intelligence, 227:52 – 70, 2015.
+[Takahashi, 2016] Ken’ichiro Takahashi. Takaken Solver. www.
+ic-net.or.jp/home/takaken/e/soko, February 2016.
+[Trug et al., 2004] Sebastian Trug, Jorg Hoffmann, and Bernhard
+Nebel. Applying automatic planning systems to airport groundtraffic control–a feasibility study. In KI: Advances in Artificial
+Intelligence, pages 183–197. Springer, 2004.
+
+57 33
+
+7
+
+3
+
+33
+
+10
+
+57
+21
+51
+
+106
+
+8460
+
+21
+
+60
+
+51
+
+38
+
+104
+
+1I + IF
+
+1I + IF
+
+48
+
+102
+
+9
+
+79
+
+43
+
+6
+53
+4
+73
+80
+83
+
+82
+3
+
+65
+
+73
+
+38
+79
+
+82
+
+5
+78 17
+
+1
+
+2
+
+102
+
+9
+
+4
+
+65
+
+10
+
+1
+
+83
+
+43
+
+80
+5
+
+17
+
+78
+
+6
+
+0
+
+10
+
+2
+
+0
+
+10
+
+0
+
+10
+
+2
+
+4
+
+6
+
+10 10
+2DB + LI
+
+8
+
+10
+
+(a) Number of expanded nodes.
+
+10
+
+1
+
+3
+
+10
+
+0
+
+53
+
+1
+
+10
+102 103
+2DB + LI
+
+(b) Total time in seconds.
+
+Figure 4: Comparison of the heuristics 1I+IF (previous
+state-of-the-art) and 2DB +LI.
+ATOMIX [Hüffner et al., 2001] and A IRPORT-IPC-4 [Trug et
+al., 2004] require D instead of heuristic I because in these
+domains the heuristic 1I in general doesn’t provide maze
+zones with effective size. Tie-breaking rules inspired in L
+could also improve the results in these domains. Other domains with similar characteristics like S TORAGE and T IDYBOT (both from IPC) are likely to benefit from our techniques.
+The main limitation of our approach is that an increase of
+the number of cut squares will make the heuristic computation more costly. If the number of cut squares is similar to
+the number of goal locations the heuristic D is unlikely to improve the results. It is reasonable to increase the number of
+cut squares given that we are not using any specific method
+to prune the BB and that many selections of cut squares will
+not produce an optimal solution. In Sokoban for example, it
+is often the case that if more than one stone chooses the same
+cut square the solution is already infeasible. We could detect
+this infeasibility early without EMM. Pruning methods based
+on these cases could increase the efficiency of our method.
+
+7
+
+Conclusion
+
+We extend the effectiveness of PDB heuristics in transportation domains and use this to increase the number of optimally solved instances of Sokoban. Further improvements in
+Sokoban could be produced by better strategies to select the
+subsets and by increasing the number of stones in the PDB.
+Another improvement could be related to the tie-breaking
+rule. We have proven the optimal solution cost for 32 instances, but we were not able to find a solution for four of
+them mainly because of tie-breaking.
+
+Acknowledgments
+The first author would like to thanks the financial support of
+CNPq.
+
+References
+[Culberson and Schaeffer, 1996] Joseph C. Culberson and
+Jonathan Schaeffer. Searching with pattern databases. In Canadian Conference on Artificial Intelligence, pages 402–416,
+1996.
+
+668
+
+

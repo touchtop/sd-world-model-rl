@@ -1,0 +1,196 @@
+{
+  "created_at_utc": "2026-05-13T20:20:25.779316+00:00",
+  "repo_root": "/home/data/round/code/sd_world_model_rl",
+  "log_root": "logs/hopper-hop",
+  "run_globs": [
+    "tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle029_target145028",
+    "tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle030_target150029",
+    "tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle031_target155030"
+  ],
+  "write_policy": "results_only",
+  "runs": [
+    {
+      "seed": 1,
+      "run_name": "tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle029_target145028",
+      "run_dir": "logs/hopper-hop/1/tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle029_target145028",
+      "eval_csv": null,
+      "eval_full_csv": null,
+      "train_csv": "logs/hopper-hop/1/tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle029_target145028/train.csv",
+      "eval_rows": [],
+      "official_eval_summaries": [],
+      "train_replay_summaries": [
+        {
+          "step_dir": "step_0145029",
+          "summary_csv": "logs/hopper-hop/1/tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle029_target145028/retrospective_train_traces/step_0145029/eval_episode_summary.csv",
+          "source": "train_replay"
+        }
+      ]
+    },
+    {
+      "seed": 1,
+      "run_name": "tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle030_target150029",
+      "run_dir": "logs/hopper-hop/1/tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle030_target150029",
+      "eval_csv": "logs/hopper-hop/1/tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle030_target150029/eval.csv",
+      "eval_full_csv": "logs/hopper-hop/1/tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle030_target150029/eval_full.csv",
+      "train_csv": "logs/hopper-hop/1/tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle030_target150029/train.csv",
+      "eval_rows": [
+        {
+          "step": 150029,
+          "episode_reward": 27.875874643557474
+        }
+      ],
+      "official_eval_summaries": [
+        {
+          "step_dir": "step_0150029",
+          "summary_csv": "logs/hopper-hop/1/tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle030_target150029/official_eval/step_0150029/eval_episode_summary.csv"
+        }
+      ],
+      "train_replay_summaries": [
+        {
+          "step_dir": "step_0150030",
+          "summary_csv": "logs/hopper-hop/1/tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle030_target150029/retrospective_train_traces/step_0150030/eval_episode_summary.csv",
+          "source": "train_replay"
+        }
+      ]
+    },
+    {
+      "seed": 1,
+      "run_name": "tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle031_target155030",
+      "run_dir": "logs/hopper-hop/1/tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle031_target155030",
+      "eval_csv": null,
+      "eval_full_csv": null,
+      "train_csv": "logs/hopper-hop/1/tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle031_target155030/train.csv",
+      "eval_rows": [],
+      "official_eval_summaries": [],
+      "train_replay_summaries": [
+        {
+          "step_dir": "step_0155031",
+          "summary_csv": "logs/hopper-hop/1/tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle031_target155030/retrospective_train_traces/step_0155031/eval_episode_summary.csv",
+          "source": "train_replay"
+        }
+      ]
+    },
+    {
+      "seed": 2,
+      "run_name": "tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle029_target145028",
+      "run_dir": "logs/hopper-hop/2/tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle029_target145028",
+      "eval_csv": null,
+      "eval_full_csv": null,
+      "train_csv": "logs/hopper-hop/2/tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle029_target145028/train.csv",
+      "eval_rows": [],
+      "official_eval_summaries": [],
+      "train_replay_summaries": [
+        {
+          "step_dir": "step_0145029",
+          "summary_csv": "logs/hopper-hop/2/tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle029_target145028/retrospective_train_traces/step_0145029/eval_episode_summary.csv",
+          "source": "train_replay"
+        }
+      ]
+    },
+    {
+      "seed": 2,
+      "run_name": "tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle030_target150029",
+      "run_dir": "logs/hopper-hop/2/tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle030_target150029",
+      "eval_csv": "logs/hopper-hop/2/tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle030_target150029/eval.csv",
+      "eval_full_csv": "logs/hopper-hop/2/tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle030_target150029/eval_full.csv",
+      "train_csv": "logs/hopper-hop/2/tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle030_target150029/train.csv",
+      "eval_rows": [
+        {
+          "step": 150029,
+          "episode_reward": 69.82140893859324
+        }
+      ],
+      "official_eval_summaries": [
+        {
+          "step_dir": "step_0150029",
+          "summary_csv": "logs/hopper-hop/2/tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle030_target150029/official_eval/step_0150029/eval_episode_summary.csv"
+        }
+      ],
+      "train_replay_summaries": [
+        {
+          "step_dir": "step_0150030",
+          "summary_csv": "logs/hopper-hop/2/tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle030_target150029/retrospective_train_traces/step_0150030/eval_episode_summary.csv",
+          "source": "train_replay"
+        }
+      ]
+    },
+    {
+      "seed": 2,
+      "run_name": "tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle031_target155030",
+      "run_dir": "logs/hopper-hop/2/tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle031_target155030",
+      "eval_csv": null,
+      "eval_full_csv": null,
+      "train_csv": "logs/hopper-hop/2/tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle031_target155030/train.csv",
+      "eval_rows": [],
+      "official_eval_summaries": [],
+      "train_replay_summaries": [
+        {
+          "step_dir": "step_0155031",
+          "summary_csv": "logs/hopper-hop/2/tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle031_target155030/retrospective_train_traces/step_0155031/eval_episode_summary.csv",
+          "source": "train_replay"
+        }
+      ]
+    },
+    {
+      "seed": 3,
+      "run_name": "tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle029_target145028",
+      "run_dir": "logs/hopper-hop/3/tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle029_target145028",
+      "eval_csv": null,
+      "eval_full_csv": null,
+      "train_csv": "logs/hopper-hop/3/tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle029_target145028/train.csv",
+      "eval_rows": [],
+      "official_eval_summaries": [],
+      "train_replay_summaries": [
+        {
+          "step_dir": "step_0145029",
+          "summary_csv": "logs/hopper-hop/3/tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle029_target145028/retrospective_train_traces/step_0145029/eval_episode_summary.csv",
+          "source": "train_replay"
+        }
+      ]
+    },
+    {
+      "seed": 3,
+      "run_name": "tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle030_target150029",
+      "run_dir": "logs/hopper-hop/3/tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle030_target150029",
+      "eval_csv": "logs/hopper-hop/3/tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle030_target150029/eval.csv",
+      "eval_full_csv": "logs/hopper-hop/3/tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle030_target150029/eval_full.csv",
+      "train_csv": "logs/hopper-hop/3/tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle030_target150029/train.csv",
+      "eval_rows": [
+        {
+          "step": 150029,
+          "episode_reward": 129.79374763518572
+        }
+      ],
+      "official_eval_summaries": [
+        {
+          "step_dir": "step_0150029",
+          "summary_csv": "logs/hopper-hop/3/tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle030_target150029/official_eval/step_0150029/eval_episode_summary.csv"
+        }
+      ],
+      "train_replay_summaries": [
+        {
+          "step_dir": "step_0150030",
+          "summary_csv": "logs/hopper-hop/3/tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle030_target150029/retrospective_train_traces/step_0150030/eval_episode_summary.csv",
+          "source": "train_replay"
+        }
+      ]
+    },
+    {
+      "seed": 3,
+      "run_name": "tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle031_target155030",
+      "run_dir": "logs/hopper-hop/3/tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle031_target155030",
+      "eval_csv": null,
+      "eval_full_csv": null,
+      "train_csv": "logs/hopper-hop/3/tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle031_target155030/train.csv",
+      "eval_rows": [],
+      "official_eval_summaries": [],
+      "train_replay_summaries": [
+        {
+          "step_dir": "step_0155031",
+          "summary_csv": "logs/hopper-hop/3/tdmpc2_v8formal_200k_toerecovery_stagefix_seed123_20260513_r1_cycle031_target155030/retrospective_train_traces/step_0155031/eval_episode_summary.csv",
+          "source": "train_replay"
+        }
+      ]
+    }
+  ]
+}

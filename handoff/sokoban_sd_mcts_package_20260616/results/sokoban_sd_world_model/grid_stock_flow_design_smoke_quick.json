@@ -1,0 +1,1374 @@
+{
+  "material_passport": {
+    "origin": "sokoban_grid_stock_flow_refactor",
+    "verification_status": "ANALYZED",
+    "version_label": "exact_grid_stock_flow_sd_validation_v1"
+  },
+  "config": {
+    "levels": "datasets/sokoban_boxoban/boxoban-levels/medium/train/000.txt",
+    "max_levels": 3,
+    "max_depth": 1,
+    "max_states_per_level": 20,
+    "sample_limit": 10
+  },
+  "design_contract": {
+    "provider_id": "exact_grid_stock_flow_v1",
+    "state_stocks": [
+      "box_grid_occupancy_b",
+      "player_grid_occupancy_p"
+    ],
+    "flow": "one_hot_directed_floor_edge_for_each_legal_push",
+    "transition": "b_next = b + B f; p_next = one_hot(box_source)",
+    "legacy_six_stock_line": "frozen_diagnostic_only",
+    "learned_transition_parameters": []
+  },
+  "aggregate": {
+    "levels_checked": 3,
+    "levels_passed": 3,
+    "states_checked": 15,
+    "transitions_checked": 64,
+    "reachable_players_checked": 308,
+    "box_mass_violations": 0,
+    "player_mass_violations": 0,
+    "flow_onehot_violations": 0,
+    "box_balance_violations": 0,
+    "step_mismatch_violations": 0,
+    "canonical_mismatches": 0,
+    "tier_a_counts": {
+      "tier_a_deadlocked": 19
+    },
+    "failed_checks": [],
+    "grid_sd_gate": "PASS"
+  },
+  "levels": [
+    {
+      "level_id": "datasets/sokoban_boxoban/boxoban-levels/medium/train/000.txt:0",
+      "height": 10,
+      "width": 10,
+      "n_boxes": 4,
+      "floor_cells": 34,
+      "directed_edges": 88,
+      "states_checked": 9,
+      "transitions_checked": 50,
+      "reachable_players_checked": 265,
+      "box_mass_violations": 0,
+      "player_mass_violations": 0,
+      "flow_onehot_violations": 0,
+      "box_balance_violations": 0,
+      "step_mismatch_violations": 0,
+      "canonical_mismatches": 0,
+      "tier_a_counts": {
+        "tier_a_deadlocked": 16
+      },
+      "incidence_shape": [
+        34,
+        88
+      ],
+      "level_pass": true,
+      "samples": [
+        {
+          "depth": 0,
+          "canonical_key_before": {
+            "boxes": [
+              [
+                5,
+                5
+              ],
+              [
+                5,
+                7
+              ],
+              [
+                7,
+                6
+              ],
+              [
+                7,
+                7
+              ]
+            ],
+            "player_component_min": [
+              2,
+              7
+            ]
+          },
+          "action": {
+            "box_index": 0,
+            "direction": 2,
+            "flat_index": 2
+          },
+          "flow": {
+            "source": [
+              5,
+              5
+            ],
+            "target": [
+              5,
+              4
+            ],
+            "direction": 2,
+            "edge_index": 43
+          },
+          "box_balance_l1": 0,
+          "tier_a_after": {
+            "solved": false,
+            "dead_square_boxes": 0,
+            "static_frozen_boxes": 0,
+            "tier_a_deadlocked": false,
+            "no_legal_pushes": false
+          }
+        },
+        {
+          "depth": 0,
+          "canonical_key_before": {
+            "boxes": [
+              [
+                5,
+                5
+              ],
+              [
+                5,
+                7
+              ],
+              [
+                7,
+                6
+              ],
+              [
+                7,
+                7
+              ]
+            ],
+            "player_component_min": [
+              2,
+              7
+            ]
+          },
+          "action": {
+            "box_index": 0,
+            "direction": 3,
+            "flat_index": 3
+          },
+          "flow": {
+            "source": [
+              5,
+              5
+            ],
+            "target": [
+              5,
+              6
+            ],
+            "direction": 3,
+            "edge_index": 44
+          },
+          "box_balance_l1": 0,
+          "tier_a_after": {
+            "solved": false,
+            "dead_square_boxes": 0,
+            "static_frozen_boxes": 0,
+            "tier_a_deadlocked": false,
+            "no_legal_pushes": false
+          }
+        },
+        {
+          "depth": 0,
+          "canonical_key_before": {
+            "boxes": [
+              [
+                5,
+                5
+              ],
+              [
+                5,
+                7
+              ],
+              [
+                7,
+                6
+              ],
+              [
+                7,
+                7
+              ]
+            ],
+            "player_component_min": [
+              2,
+              7
+            ]
+          },
+          "action": {
+            "box_index": 1,
+            "direction": 0,
+            "flat_index": 4
+          },
+          "flow": {
+            "source": [
+              5,
+              7
+            ],
+            "target": [
+              4,
+              7
+            ],
+            "direction": 0,
+            "edge_index": 48
+          },
+          "box_balance_l1": 0,
+          "tier_a_after": {
+            "solved": false,
+            "dead_square_boxes": 0,
+            "static_frozen_boxes": 0,
+            "tier_a_deadlocked": false,
+            "no_legal_pushes": false
+          }
+        },
+        {
+          "depth": 0,
+          "canonical_key_before": {
+            "boxes": [
+              [
+                5,
+                5
+              ],
+              [
+                5,
+                7
+              ],
+              [
+                7,
+                6
+              ],
+              [
+                7,
+                7
+              ]
+            ],
+            "player_component_min": [
+              2,
+              7
+            ]
+          },
+          "action": {
+            "box_index": 1,
+            "direction": 1,
+            "flat_index": 5
+          },
+          "flow": {
+            "source": [
+              5,
+              7
+            ],
+            "target": [
+              6,
+              7
+            ],
+            "direction": 1,
+            "edge_index": 49
+          },
+          "box_balance_l1": 0,
+          "tier_a_after": {
+            "solved": false,
+            "dead_square_boxes": 0,
+            "static_frozen_boxes": 0,
+            "tier_a_deadlocked": false,
+            "no_legal_pushes": false
+          }
+        },
+        {
+          "depth": 0,
+          "canonical_key_before": {
+            "boxes": [
+              [
+                5,
+                5
+              ],
+              [
+                5,
+                7
+              ],
+              [
+                7,
+                6
+              ],
+              [
+                7,
+                7
+              ]
+            ],
+            "player_component_min": [
+              2,
+              7
+            ]
+          },
+          "action": {
+            "box_index": 1,
+            "direction": 2,
+            "flat_index": 6
+          },
+          "flow": {
+            "source": [
+              5,
+              7
+            ],
+            "target": [
+              5,
+              6
+            ],
+            "direction": 2,
+            "edge_index": 50
+          },
+          "box_balance_l1": 0,
+          "tier_a_after": {
+            "solved": false,
+            "dead_square_boxes": 0,
+            "static_frozen_boxes": 0,
+            "tier_a_deadlocked": false,
+            "no_legal_pushes": false
+          }
+        },
+        {
+          "depth": 0,
+          "canonical_key_before": {
+            "boxes": [
+              [
+                5,
+                5
+              ],
+              [
+                5,
+                7
+              ],
+              [
+                7,
+                6
+              ],
+              [
+                7,
+                7
+              ]
+            ],
+            "player_component_min": [
+              2,
+              7
+            ]
+          },
+          "action": {
+            "box_index": 1,
+            "direction": 3,
+            "flat_index": 7
+          },
+          "flow": {
+            "source": [
+              5,
+              7
+            ],
+            "target": [
+              5,
+              8
+            ],
+            "direction": 3,
+            "edge_index": 51
+          },
+          "box_balance_l1": 0,
+          "tier_a_after": {
+            "solved": false,
+            "dead_square_boxes": 0,
+            "static_frozen_boxes": 0,
+            "tier_a_deadlocked": false,
+            "no_legal_pushes": false
+          }
+        },
+        {
+          "depth": 0,
+          "canonical_key_before": {
+            "boxes": [
+              [
+                5,
+                5
+              ],
+              [
+                5,
+                7
+              ],
+              [
+                7,
+                6
+              ],
+              [
+                7,
+                7
+              ]
+            ],
+            "player_component_min": [
+              2,
+              7
+            ]
+          },
+          "action": {
+            "box_index": 3,
+            "direction": 0,
+            "flat_index": 12
+          },
+          "flow": {
+            "source": [
+              7,
+              7
+            ],
+            "target": [
+              6,
+              7
+            ],
+            "direction": 0,
+            "edge_index": 67
+          },
+          "box_balance_l1": 0,
+          "tier_a_after": {
+            "solved": false,
+            "dead_square_boxes": 0,
+            "static_frozen_boxes": 0,
+            "tier_a_deadlocked": false,
+            "no_legal_pushes": false
+          }
+        },
+        {
+          "depth": 0,
+          "canonical_key_before": {
+            "boxes": [
+              [
+                5,
+                5
+              ],
+              [
+                5,
+                7
+              ],
+              [
+                7,
+                6
+              ],
+              [
+                7,
+                7
+              ]
+            ],
+            "player_component_min": [
+              2,
+              7
+            ]
+          },
+          "action": {
+            "box_index": 3,
+            "direction": 1,
+            "flat_index": 13
+          },
+          "flow": {
+            "source": [
+              7,
+              7
+            ],
+            "target": [
+              8,
+              7
+            ],
+            "direction": 1,
+            "edge_index": 68
+          },
+          "box_balance_l1": 0,
+          "tier_a_after": {
+            "solved": false,
+            "dead_square_boxes": 1,
+            "static_frozen_boxes": 0,
+            "tier_a_deadlocked": true,
+            "no_legal_pushes": false
+          }
+        },
+        {
+          "depth": 1,
+          "canonical_key_before": {
+            "boxes": [
+              [
+                5,
+                4
+              ],
+              [
+                5,
+                7
+              ],
+              [
+                7,
+                6
+              ],
+              [
+                7,
+                7
+              ]
+            ],
+            "player_component_min": [
+              2,
+              7
+            ]
+          },
+          "action": {
+            "box_index": 0,
+            "direction": 2,
+            "flat_index": 2
+          },
+          "flow": {
+            "source": [
+              5,
+              4
+            ],
+            "target": [
+              5,
+              3
+            ],
+            "direction": 2,
+            "edge_index": 40
+          },
+          "box_balance_l1": 0,
+          "tier_a_after": {
+            "solved": false,
+            "dead_square_boxes": 1,
+            "static_frozen_boxes": 1,
+            "tier_a_deadlocked": true,
+            "no_legal_pushes": false
+          }
+        },
+        {
+          "depth": 1,
+          "canonical_key_before": {
+            "boxes": [
+              [
+                5,
+                4
+              ],
+              [
+                5,
+                7
+              ],
+              [
+                7,
+                6
+              ],
+              [
+                7,
+                7
+              ]
+            ],
+            "player_component_min": [
+              2,
+              7
+            ]
+          },
+          "action": {
+            "box_index": 0,
+            "direction": 3,
+            "flat_index": 3
+          },
+          "flow": {
+            "source": [
+              5,
+              4
+            ],
+            "target": [
+              5,
+              5
+            ],
+            "direction": 3,
+            "edge_index": 41
+          },
+          "box_balance_l1": 0,
+          "tier_a_after": {
+            "solved": false,
+            "dead_square_boxes": 0,
+            "static_frozen_boxes": 0,
+            "tier_a_deadlocked": false,
+            "no_legal_pushes": false
+          }
+        }
+      ]
+    },
+    {
+      "level_id": "datasets/sokoban_boxoban/boxoban-levels/medium/train/000.txt:1",
+      "height": 10,
+      "width": 10,
+      "n_boxes": 4,
+      "floor_cells": 23,
+      "directed_edges": 62,
+      "states_checked": 3,
+      "transitions_checked": 6,
+      "reachable_players_checked": 11,
+      "box_mass_violations": 0,
+      "player_mass_violations": 0,
+      "flow_onehot_violations": 0,
+      "box_balance_violations": 0,
+      "step_mismatch_violations": 0,
+      "canonical_mismatches": 0,
+      "tier_a_counts": {
+        "tier_a_deadlocked": 1
+      },
+      "incidence_shape": [
+        23,
+        62
+      ],
+      "level_pass": true,
+      "samples": [
+        {
+          "depth": 0,
+          "canonical_key_before": {
+            "boxes": [
+              [
+                2,
+                1
+              ],
+              [
+                2,
+                2
+              ],
+              [
+                7,
+                2
+              ],
+              [
+                8,
+                4
+              ]
+            ],
+            "player_component_min": [
+              1,
+              1
+            ]
+          },
+          "action": {
+            "box_index": 0,
+            "direction": 1,
+            "flat_index": 1
+          },
+          "flow": {
+            "source": [
+              2,
+              1
+            ],
+            "target": [
+              3,
+              1
+            ],
+            "direction": 1,
+            "edge_index": 7
+          },
+          "box_balance_l1": 0,
+          "tier_a_after": {
+            "solved": false,
+            "dead_square_boxes": 0,
+            "static_frozen_boxes": 0,
+            "tier_a_deadlocked": false,
+            "no_legal_pushes": false
+          }
+        },
+        {
+          "depth": 0,
+          "canonical_key_before": {
+            "boxes": [
+              [
+                2,
+                1
+              ],
+              [
+                2,
+                2
+              ],
+              [
+                7,
+                2
+              ],
+              [
+                8,
+                4
+              ]
+            ],
+            "player_component_min": [
+              1,
+              1
+            ]
+          },
+          "action": {
+            "box_index": 1,
+            "direction": 1,
+            "flat_index": 5
+          },
+          "flow": {
+            "source": [
+              2,
+              2
+            ],
+            "target": [
+              3,
+              2
+            ],
+            "direction": 1,
+            "edge_index": 10
+          },
+          "box_balance_l1": 0,
+          "tier_a_after": {
+            "solved": false,
+            "dead_square_boxes": 0,
+            "static_frozen_boxes": 0,
+            "tier_a_deadlocked": false,
+            "no_legal_pushes": false
+          }
+        },
+        {
+          "depth": 1,
+          "canonical_key_before": {
+            "boxes": [
+              [
+                2,
+                2
+              ],
+              [
+                3,
+                1
+              ],
+              [
+                7,
+                2
+              ],
+              [
+                8,
+                4
+              ]
+            ],
+            "player_component_min": [
+              1,
+              1
+            ]
+          },
+          "action": {
+            "box_index": 0,
+            "direction": 1,
+            "flat_index": 1
+          },
+          "flow": {
+            "source": [
+              2,
+              2
+            ],
+            "target": [
+              3,
+              2
+            ],
+            "direction": 1,
+            "edge_index": 10
+          },
+          "box_balance_l1": 0,
+          "tier_a_after": {
+            "solved": false,
+            "dead_square_boxes": 0,
+            "static_frozen_boxes": 0,
+            "tier_a_deadlocked": false,
+            "no_legal_pushes": false
+          }
+        },
+        {
+          "depth": 1,
+          "canonical_key_before": {
+            "boxes": [
+              [
+                2,
+                2
+              ],
+              [
+                3,
+                1
+              ],
+              [
+                7,
+                2
+              ],
+              [
+                8,
+                4
+              ]
+            ],
+            "player_component_min": [
+              1,
+              1
+            ]
+          },
+          "action": {
+            "box_index": 1,
+            "direction": 1,
+            "flat_index": 5
+          },
+          "flow": {
+            "source": [
+              3,
+              1
+            ],
+            "target": [
+              4,
+              1
+            ],
+            "direction": 1,
+            "edge_index": 13
+          },
+          "box_balance_l1": 0,
+          "tier_a_after": {
+            "solved": false,
+            "dead_square_boxes": 0,
+            "static_frozen_boxes": 0,
+            "tier_a_deadlocked": false,
+            "no_legal_pushes": false
+          }
+        },
+        {
+          "depth": 1,
+          "canonical_key_before": {
+            "boxes": [
+              [
+                2,
+                1
+              ],
+              [
+                3,
+                2
+              ],
+              [
+                7,
+                2
+              ],
+              [
+                8,
+                4
+              ]
+            ],
+            "player_component_min": [
+              1,
+              1
+            ]
+          },
+          "action": {
+            "box_index": 0,
+            "direction": 1,
+            "flat_index": 1
+          },
+          "flow": {
+            "source": [
+              2,
+              1
+            ],
+            "target": [
+              3,
+              1
+            ],
+            "direction": 1,
+            "edge_index": 7
+          },
+          "box_balance_l1": 0,
+          "tier_a_after": {
+            "solved": false,
+            "dead_square_boxes": 0,
+            "static_frozen_boxes": 0,
+            "tier_a_deadlocked": false,
+            "no_legal_pushes": false
+          }
+        },
+        {
+          "depth": 1,
+          "canonical_key_before": {
+            "boxes": [
+              [
+                2,
+                1
+              ],
+              [
+                3,
+                2
+              ],
+              [
+                7,
+                2
+              ],
+              [
+                8,
+                4
+              ]
+            ],
+            "player_component_min": [
+              1,
+              1
+            ]
+          },
+          "action": {
+            "box_index": 1,
+            "direction": 1,
+            "flat_index": 5
+          },
+          "flow": {
+            "source": [
+              3,
+              2
+            ],
+            "target": [
+              4,
+              2
+            ],
+            "direction": 1,
+            "edge_index": 16
+          },
+          "box_balance_l1": 0,
+          "tier_a_after": {
+            "solved": false,
+            "dead_square_boxes": 1,
+            "static_frozen_boxes": 1,
+            "tier_a_deadlocked": true,
+            "no_legal_pushes": false
+          }
+        }
+      ]
+    },
+    {
+      "level_id": "datasets/sokoban_boxoban/boxoban-levels/medium/train/000.txt:2",
+      "height": 10,
+      "width": 10,
+      "n_boxes": 4,
+      "floor_cells": 23,
+      "directed_edges": 60,
+      "states_checked": 3,
+      "transitions_checked": 8,
+      "reachable_players_checked": 32,
+      "box_mass_violations": 0,
+      "player_mass_violations": 0,
+      "flow_onehot_violations": 0,
+      "box_balance_violations": 0,
+      "step_mismatch_violations": 0,
+      "canonical_mismatches": 0,
+      "tier_a_counts": {
+        "tier_a_deadlocked": 2
+      },
+      "incidence_shape": [
+        23,
+        60
+      ],
+      "level_pass": true,
+      "samples": [
+        {
+          "depth": 0,
+          "canonical_key_before": {
+            "boxes": [
+              [
+                6,
+                3
+              ],
+              [
+                7,
+                2
+              ],
+              [
+                7,
+                3
+              ],
+              [
+                8,
+                3
+              ]
+            ],
+            "player_component_min": [
+              6,
+              4
+            ]
+          },
+          "action": {
+            "box_index": 0,
+            "direction": 2,
+            "flat_index": 2
+          },
+          "flow": {
+            "source": [
+              6,
+              3
+            ],
+            "target": [
+              6,
+              2
+            ],
+            "direction": 2,
+            "edge_index": 26
+          },
+          "box_balance_l1": 0,
+          "tier_a_after": {
+            "solved": false,
+            "dead_square_boxes": 0,
+            "static_frozen_boxes": 0,
+            "tier_a_deadlocked": false,
+            "no_legal_pushes": false
+          }
+        },
+        {
+          "depth": 0,
+          "canonical_key_before": {
+            "boxes": [
+              [
+                6,
+                3
+              ],
+              [
+                7,
+                2
+              ],
+              [
+                7,
+                3
+              ],
+              [
+                8,
+                3
+              ]
+            ],
+            "player_component_min": [
+              6,
+              4
+            ]
+          },
+          "action": {
+            "box_index": 3,
+            "direction": 2,
+            "flat_index": 14
+          },
+          "flow": {
+            "source": [
+              8,
+              3
+            ],
+            "target": [
+              8,
+              2
+            ],
+            "direction": 2,
+            "edge_index": 50
+          },
+          "box_balance_l1": 0,
+          "tier_a_after": {
+            "solved": false,
+            "dead_square_boxes": 0,
+            "static_frozen_boxes": 0,
+            "tier_a_deadlocked": false,
+            "no_legal_pushes": false
+          }
+        },
+        {
+          "depth": 1,
+          "canonical_key_before": {
+            "boxes": [
+              [
+                6,
+                2
+              ],
+              [
+                7,
+                2
+              ],
+              [
+                7,
+                3
+              ],
+              [
+                8,
+                3
+              ]
+            ],
+            "player_component_min": [
+              1,
+              1
+            ]
+          },
+          "action": {
+            "box_index": 0,
+            "direction": 2,
+            "flat_index": 2
+          },
+          "flow": {
+            "source": [
+              6,
+              2
+            ],
+            "target": [
+              6,
+              1
+            ],
+            "direction": 2,
+            "edge_index": 22
+          },
+          "box_balance_l1": 0,
+          "tier_a_after": {
+            "solved": false,
+            "dead_square_boxes": 1,
+            "static_frozen_boxes": 0,
+            "tier_a_deadlocked": true,
+            "no_legal_pushes": false
+          }
+        },
+        {
+          "depth": 1,
+          "canonical_key_before": {
+            "boxes": [
+              [
+                6,
+                2
+              ],
+              [
+                7,
+                2
+              ],
+              [
+                7,
+                3
+              ],
+              [
+                8,
+                3
+              ]
+            ],
+            "player_component_min": [
+              1,
+              1
+            ]
+          },
+          "action": {
+            "box_index": 0,
+            "direction": 3,
+            "flat_index": 3
+          },
+          "flow": {
+            "source": [
+              6,
+              2
+            ],
+            "target": [
+              6,
+              3
+            ],
+            "direction": 3,
+            "edge_index": 23
+          },
+          "box_balance_l1": 0,
+          "tier_a_after": {
+            "solved": false,
+            "dead_square_boxes": 0,
+            "static_frozen_boxes": 0,
+            "tier_a_deadlocked": false,
+            "no_legal_pushes": false
+          }
+        },
+        {
+          "depth": 1,
+          "canonical_key_before": {
+            "boxes": [
+              [
+                6,
+                2
+              ],
+              [
+                7,
+                2
+              ],
+              [
+                7,
+                3
+              ],
+              [
+                8,
+                3
+              ]
+            ],
+            "player_component_min": [
+              1,
+              1
+            ]
+          },
+          "action": {
+            "box_index": 3,
+            "direction": 2,
+            "flat_index": 14
+          },
+          "flow": {
+            "source": [
+              8,
+              3
+            ],
+            "target": [
+              8,
+              2
+            ],
+            "direction": 2,
+            "edge_index": 50
+          },
+          "box_balance_l1": 0,
+          "tier_a_after": {
+            "solved": false,
+            "dead_square_boxes": 0,
+            "static_frozen_boxes": 0,
+            "tier_a_deadlocked": false,
+            "no_legal_pushes": false
+          }
+        },
+        {
+          "depth": 1,
+          "canonical_key_before": {
+            "boxes": [
+              [
+                6,
+                2
+              ],
+              [
+                7,
+                2
+              ],
+              [
+                7,
+                3
+              ],
+              [
+                8,
+                3
+              ]
+            ],
+            "player_component_min": [
+              1,
+              1
+            ]
+          },
+          "action": {
+            "box_index": 3,
+            "direction": 3,
+            "flat_index": 15
+          },
+          "flow": {
+            "source": [
+              8,
+              3
+            ],
+            "target": [
+              8,
+              4
+            ],
+            "direction": 3,
+            "edge_index": 51
+          },
+          "box_balance_l1": 0,
+          "tier_a_after": {
+            "solved": false,
+            "dead_square_boxes": 0,
+            "static_frozen_boxes": 0,
+            "tier_a_deadlocked": false,
+            "no_legal_pushes": false
+          }
+        },
+        {
+          "depth": 1,
+          "canonical_key_before": {
+            "boxes": [
+              [
+                6,
+                3
+              ],
+              [
+                7,
+                2
+              ],
+              [
+                7,
+                3
+              ],
+              [
+                8,
+                2
+              ]
+            ],
+            "player_component_min": [
+              6,
+              4
+            ]
+          },
+          "action": {
+            "box_index": 0,
+            "direction": 2,
+            "flat_index": 2
+          },
+          "flow": {
+            "source": [
+              6,
+              3
+            ],
+            "target": [
+              6,
+              2
+            ],
+            "direction": 2,
+            "edge_index": 26
+          },
+          "box_balance_l1": 0,
+          "tier_a_after": {
+            "solved": false,
+            "dead_square_boxes": 0,
+            "static_frozen_boxes": 0,
+            "tier_a_deadlocked": false,
+            "no_legal_pushes": false
+          }
+        },
+        {
+          "depth": 1,
+          "canonical_key_before": {
+            "boxes": [
+              [
+                6,
+                3
+              ],
+              [
+                7,
+                2
+              ],
+              [
+                7,
+                3
+              ],
+              [
+                8,
+                2
+              ]
+            ],
+            "player_component_min": [
+              6,
+              4
+            ]
+          },
+          "action": {
+            "box_index": 3,
+            "direction": 2,
+            "flat_index": 14
+          },
+          "flow": {
+            "source": [
+              8,
+              2
+            ],
+            "target": [
+              8,
+              1
+            ],
+            "direction": 2,
+            "edge_index": 47
+          },
+          "box_balance_l1": 0,
+          "tier_a_after": {
+            "solved": false,
+            "dead_square_boxes": 1,
+            "static_frozen_boxes": 1,
+            "tier_a_deadlocked": true,
+            "no_legal_pushes": false
+          }
+        }
+      ]
+    }
+  ]
+}

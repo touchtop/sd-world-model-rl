@@ -1,0 +1,409 @@
+{
+  "created_at_utc": "2026-05-05T08:36:16.381027+00:00",
+  "repo_root": "/home/data/round/code/sd_world_model_rl",
+  "log_root": "logs/hopper-hop",
+  "run_globs": [
+    "sd_hopper_100k_pureenv_sdinit_mech_sd_budget_seed*_20260501_run1",
+    "sd_hopper_200k_pureenv_sdinit_mech_sd_budget_seed*_resume100k_20260502_run1",
+    "sd_hopper_300k_pureenv_sdinit_mech_sd_official_budget_seed*_resume200k_20260504_run1"
+  ],
+  "write_policy": "results_only",
+  "runs": [
+    {
+      "seed": 1,
+      "run_name": "sd_hopper_100k_pureenv_sdinit_mech_sd_budget_seed1_20260501_run1",
+      "run_dir": "logs/hopper-hop/1/sd_hopper_100k_pureenv_sdinit_mech_sd_budget_seed1_20260501_run1",
+      "eval_csv": "logs/hopper-hop/1/sd_hopper_100k_pureenv_sdinit_mech_sd_budget_seed1_20260501_run1/eval.csv",
+      "eval_full_csv": "logs/hopper-hop/1/sd_hopper_100k_pureenv_sdinit_mech_sd_budget_seed1_20260501_run1/eval_full.csv",
+      "train_csv": "logs/hopper-hop/1/sd_hopper_100k_pureenv_sdinit_mech_sd_budget_seed1_20260501_run1/train.csv",
+      "eval_rows": [
+        {
+          "step": 25000,
+          "episode_reward": 19.483238584850916
+        },
+        {
+          "step": 50000,
+          "episode_reward": 33.67476492429851
+        },
+        {
+          "step": 75000,
+          "episode_reward": 49.95541505744477
+        },
+        {
+          "step": 100000,
+          "episode_reward": 52.930231307595385
+        }
+      ],
+      "official_eval_summaries": [
+        {
+          "step_dir": "step_0025000",
+          "summary_csv": "logs/hopper-hop/1/sd_hopper_100k_pureenv_sdinit_mech_sd_budget_seed1_20260501_run1/official_eval/step_0025000/eval_episode_summary.csv"
+        },
+        {
+          "step_dir": "step_0050000",
+          "summary_csv": "logs/hopper-hop/1/sd_hopper_100k_pureenv_sdinit_mech_sd_budget_seed1_20260501_run1/official_eval/step_0050000/eval_episode_summary.csv"
+        },
+        {
+          "step_dir": "step_0075000",
+          "summary_csv": "logs/hopper-hop/1/sd_hopper_100k_pureenv_sdinit_mech_sd_budget_seed1_20260501_run1/official_eval/step_0075000/eval_episode_summary.csv"
+        },
+        {
+          "step_dir": "step_0100000",
+          "summary_csv": "logs/hopper-hop/1/sd_hopper_100k_pureenv_sdinit_mech_sd_budget_seed1_20260501_run1/official_eval/step_0100000/eval_episode_summary.csv"
+        }
+      ]
+    },
+    {
+      "seed": 1,
+      "run_name": "sd_hopper_200k_pureenv_sdinit_mech_sd_budget_seed1_resume100k_20260502_run1",
+      "run_dir": "logs/hopper-hop/1/sd_hopper_200k_pureenv_sdinit_mech_sd_budget_seed1_resume100k_20260502_run1",
+      "eval_csv": "logs/hopper-hop/1/sd_hopper_200k_pureenv_sdinit_mech_sd_budget_seed1_resume100k_20260502_run1/eval.csv",
+      "eval_full_csv": "logs/hopper-hop/1/sd_hopper_200k_pureenv_sdinit_mech_sd_budget_seed1_resume100k_20260502_run1/eval_full.csv",
+      "train_csv": "logs/hopper-hop/1/sd_hopper_200k_pureenv_sdinit_mech_sd_budget_seed1_resume100k_20260502_run1/train.csv",
+      "eval_rows": [
+        {
+          "step": 125001,
+          "episode_reward": 90.33210812840844
+        },
+        {
+          "step": 150001,
+          "episode_reward": 72.57530751401791
+        },
+        {
+          "step": 175001,
+          "episode_reward": 75.04979734383524
+        },
+        {
+          "step": 200001,
+          "episode_reward": 185.62394375917793
+        }
+      ],
+      "official_eval_summaries": [
+        {
+          "step_dir": "step_0125001",
+          "summary_csv": "logs/hopper-hop/1/sd_hopper_200k_pureenv_sdinit_mech_sd_budget_seed1_resume100k_20260502_run1/official_eval/step_0125001/eval_episode_summary.csv"
+        },
+        {
+          "step_dir": "step_0150001",
+          "summary_csv": "logs/hopper-hop/1/sd_hopper_200k_pureenv_sdinit_mech_sd_budget_seed1_resume100k_20260502_run1/official_eval/step_0150001/eval_episode_summary.csv"
+        },
+        {
+          "step_dir": "step_0175001",
+          "summary_csv": "logs/hopper-hop/1/sd_hopper_200k_pureenv_sdinit_mech_sd_budget_seed1_resume100k_20260502_run1/official_eval/step_0175001/eval_episode_summary.csv"
+        },
+        {
+          "step_dir": "step_0200001",
+          "summary_csv": "logs/hopper-hop/1/sd_hopper_200k_pureenv_sdinit_mech_sd_budget_seed1_resume100k_20260502_run1/official_eval/step_0200001/eval_episode_summary.csv"
+        }
+      ]
+    },
+    {
+      "seed": 1,
+      "run_name": "sd_hopper_300k_pureenv_sdinit_mech_sd_official_budget_seed1_resume200k_20260504_run1",
+      "run_dir": "logs/hopper-hop/1/sd_hopper_300k_pureenv_sdinit_mech_sd_official_budget_seed1_resume200k_20260504_run1",
+      "eval_csv": "logs/hopper-hop/1/sd_hopper_300k_pureenv_sdinit_mech_sd_official_budget_seed1_resume200k_20260504_run1/eval.csv",
+      "eval_full_csv": "logs/hopper-hop/1/sd_hopper_300k_pureenv_sdinit_mech_sd_official_budget_seed1_resume200k_20260504_run1/eval_full.csv",
+      "train_csv": "logs/hopper-hop/1/sd_hopper_300k_pureenv_sdinit_mech_sd_official_budget_seed1_resume200k_20260504_run1/train.csv",
+      "eval_rows": [
+        {
+          "step": 225001,
+          "episode_reward": 191.45822749487706
+        },
+        {
+          "step": 250001,
+          "episode_reward": 230.84431540941006
+        },
+        {
+          "step": 275001,
+          "episode_reward": 198.35204498569948
+        },
+        {
+          "step": 300001,
+          "episode_reward": 251.59433085734491
+        }
+      ],
+      "official_eval_summaries": [
+        {
+          "step_dir": "step_0225001",
+          "summary_csv": "logs/hopper-hop/1/sd_hopper_300k_pureenv_sdinit_mech_sd_official_budget_seed1_resume200k_20260504_run1/official_eval/step_0225001/eval_episode_summary.csv"
+        },
+        {
+          "step_dir": "step_0250001",
+          "summary_csv": "logs/hopper-hop/1/sd_hopper_300k_pureenv_sdinit_mech_sd_official_budget_seed1_resume200k_20260504_run1/official_eval/step_0250001/eval_episode_summary.csv"
+        },
+        {
+          "step_dir": "step_0275001",
+          "summary_csv": "logs/hopper-hop/1/sd_hopper_300k_pureenv_sdinit_mech_sd_official_budget_seed1_resume200k_20260504_run1/official_eval/step_0275001/eval_episode_summary.csv"
+        },
+        {
+          "step_dir": "step_0300001",
+          "summary_csv": "logs/hopper-hop/1/sd_hopper_300k_pureenv_sdinit_mech_sd_official_budget_seed1_resume200k_20260504_run1/official_eval/step_0300001/eval_episode_summary.csv"
+        }
+      ]
+    },
+    {
+      "seed": 2,
+      "run_name": "sd_hopper_100k_pureenv_sdinit_mech_sd_budget_seed2_20260501_run1",
+      "run_dir": "logs/hopper-hop/2/sd_hopper_100k_pureenv_sdinit_mech_sd_budget_seed2_20260501_run1",
+      "eval_csv": "logs/hopper-hop/2/sd_hopper_100k_pureenv_sdinit_mech_sd_budget_seed2_20260501_run1/eval.csv",
+      "eval_full_csv": "logs/hopper-hop/2/sd_hopper_100k_pureenv_sdinit_mech_sd_budget_seed2_20260501_run1/eval_full.csv",
+      "train_csv": "logs/hopper-hop/2/sd_hopper_100k_pureenv_sdinit_mech_sd_budget_seed2_20260501_run1/train.csv",
+      "eval_rows": [
+        {
+          "step": 25000,
+          "episode_reward": 24.166950619686396
+        },
+        {
+          "step": 50000,
+          "episode_reward": 18.42960290243791
+        },
+        {
+          "step": 75000,
+          "episode_reward": 47.47044242471456
+        },
+        {
+          "step": 100000,
+          "episode_reward": 52.849931326508525
+        }
+      ],
+      "official_eval_summaries": [
+        {
+          "step_dir": "step_0025000",
+          "summary_csv": "logs/hopper-hop/2/sd_hopper_100k_pureenv_sdinit_mech_sd_budget_seed2_20260501_run1/official_eval/step_0025000/eval_episode_summary.csv"
+        },
+        {
+          "step_dir": "step_0050000",
+          "summary_csv": "logs/hopper-hop/2/sd_hopper_100k_pureenv_sdinit_mech_sd_budget_seed2_20260501_run1/official_eval/step_0050000/eval_episode_summary.csv"
+        },
+        {
+          "step_dir": "step_0075000",
+          "summary_csv": "logs/hopper-hop/2/sd_hopper_100k_pureenv_sdinit_mech_sd_budget_seed2_20260501_run1/official_eval/step_0075000/eval_episode_summary.csv"
+        },
+        {
+          "step_dir": "step_0100000",
+          "summary_csv": "logs/hopper-hop/2/sd_hopper_100k_pureenv_sdinit_mech_sd_budget_seed2_20260501_run1/official_eval/step_0100000/eval_episode_summary.csv"
+        }
+      ]
+    },
+    {
+      "seed": 2,
+      "run_name": "sd_hopper_200k_pureenv_sdinit_mech_sd_budget_seed2_resume100k_20260502_run1",
+      "run_dir": "logs/hopper-hop/2/sd_hopper_200k_pureenv_sdinit_mech_sd_budget_seed2_resume100k_20260502_run1",
+      "eval_csv": "logs/hopper-hop/2/sd_hopper_200k_pureenv_sdinit_mech_sd_budget_seed2_resume100k_20260502_run1/eval.csv",
+      "eval_full_csv": "logs/hopper-hop/2/sd_hopper_200k_pureenv_sdinit_mech_sd_budget_seed2_resume100k_20260502_run1/eval_full.csv",
+      "train_csv": "logs/hopper-hop/2/sd_hopper_200k_pureenv_sdinit_mech_sd_budget_seed2_resume100k_20260502_run1/train.csv",
+      "eval_rows": [
+        {
+          "step": 125001,
+          "episode_reward": 160.04720333566655
+        },
+        {
+          "step": 150001,
+          "episode_reward": 97.18074970189483
+        },
+        {
+          "step": 175001,
+          "episode_reward": 235.16273203901946
+        },
+        {
+          "step": 200001,
+          "episode_reward": 265.8724420160055
+        }
+      ],
+      "official_eval_summaries": [
+        {
+          "step_dir": "step_0125001",
+          "summary_csv": "logs/hopper-hop/2/sd_hopper_200k_pureenv_sdinit_mech_sd_budget_seed2_resume100k_20260502_run1/official_eval/step_0125001/eval_episode_summary.csv"
+        },
+        {
+          "step_dir": "step_0150001",
+          "summary_csv": "logs/hopper-hop/2/sd_hopper_200k_pureenv_sdinit_mech_sd_budget_seed2_resume100k_20260502_run1/official_eval/step_0150001/eval_episode_summary.csv"
+        },
+        {
+          "step_dir": "step_0175001",
+          "summary_csv": "logs/hopper-hop/2/sd_hopper_200k_pureenv_sdinit_mech_sd_budget_seed2_resume100k_20260502_run1/official_eval/step_0175001/eval_episode_summary.csv"
+        },
+        {
+          "step_dir": "step_0200001",
+          "summary_csv": "logs/hopper-hop/2/sd_hopper_200k_pureenv_sdinit_mech_sd_budget_seed2_resume100k_20260502_run1/official_eval/step_0200001/eval_episode_summary.csv"
+        }
+      ]
+    },
+    {
+      "seed": 2,
+      "run_name": "sd_hopper_300k_pureenv_sdinit_mech_sd_official_budget_seed2_resume200k_20260504_run1",
+      "run_dir": "logs/hopper-hop/2/sd_hopper_300k_pureenv_sdinit_mech_sd_official_budget_seed2_resume200k_20260504_run1",
+      "eval_csv": "logs/hopper-hop/2/sd_hopper_300k_pureenv_sdinit_mech_sd_official_budget_seed2_resume200k_20260504_run1/eval.csv",
+      "eval_full_csv": "logs/hopper-hop/2/sd_hopper_300k_pureenv_sdinit_mech_sd_official_budget_seed2_resume200k_20260504_run1/eval_full.csv",
+      "train_csv": "logs/hopper-hop/2/sd_hopper_300k_pureenv_sdinit_mech_sd_official_budget_seed2_resume200k_20260504_run1/train.csv",
+      "eval_rows": [
+        {
+          "step": 225001,
+          "episode_reward": 260.8341222384479
+        },
+        {
+          "step": 250001,
+          "episode_reward": 272.1411587475799
+        },
+        {
+          "step": 275001,
+          "episode_reward": 273.05527300904504
+        },
+        {
+          "step": 300001,
+          "episode_reward": 273.912998560071
+        }
+      ],
+      "official_eval_summaries": [
+        {
+          "step_dir": "step_0225001",
+          "summary_csv": "logs/hopper-hop/2/sd_hopper_300k_pureenv_sdinit_mech_sd_official_budget_seed2_resume200k_20260504_run1/official_eval/step_0225001/eval_episode_summary.csv"
+        },
+        {
+          "step_dir": "step_0250001",
+          "summary_csv": "logs/hopper-hop/2/sd_hopper_300k_pureenv_sdinit_mech_sd_official_budget_seed2_resume200k_20260504_run1/official_eval/step_0250001/eval_episode_summary.csv"
+        },
+        {
+          "step_dir": "step_0275001",
+          "summary_csv": "logs/hopper-hop/2/sd_hopper_300k_pureenv_sdinit_mech_sd_official_budget_seed2_resume200k_20260504_run1/official_eval/step_0275001/eval_episode_summary.csv"
+        },
+        {
+          "step_dir": "step_0300001",
+          "summary_csv": "logs/hopper-hop/2/sd_hopper_300k_pureenv_sdinit_mech_sd_official_budget_seed2_resume200k_20260504_run1/official_eval/step_0300001/eval_episode_summary.csv"
+        }
+      ]
+    },
+    {
+      "seed": 3,
+      "run_name": "sd_hopper_100k_pureenv_sdinit_mech_sd_budget_seed3_20260501_run1",
+      "run_dir": "logs/hopper-hop/3/sd_hopper_100k_pureenv_sdinit_mech_sd_budget_seed3_20260501_run1",
+      "eval_csv": "logs/hopper-hop/3/sd_hopper_100k_pureenv_sdinit_mech_sd_budget_seed3_20260501_run1/eval.csv",
+      "eval_full_csv": "logs/hopper-hop/3/sd_hopper_100k_pureenv_sdinit_mech_sd_budget_seed3_20260501_run1/eval_full.csv",
+      "train_csv": "logs/hopper-hop/3/sd_hopper_100k_pureenv_sdinit_mech_sd_budget_seed3_20260501_run1/train.csv",
+      "eval_rows": [
+        {
+          "step": 25000,
+          "episode_reward": 0.0
+        },
+        {
+          "step": 50000,
+          "episode_reward": 2.2807555375760784
+        },
+        {
+          "step": 75000,
+          "episode_reward": 1.1241382136940956
+        },
+        {
+          "step": 100000,
+          "episode_reward": 77.64762263695302
+        }
+      ],
+      "official_eval_summaries": [
+        {
+          "step_dir": "step_0025000",
+          "summary_csv": "logs/hopper-hop/3/sd_hopper_100k_pureenv_sdinit_mech_sd_budget_seed3_20260501_run1/official_eval/step_0025000/eval_episode_summary.csv"
+        },
+        {
+          "step_dir": "step_0050000",
+          "summary_csv": "logs/hopper-hop/3/sd_hopper_100k_pureenv_sdinit_mech_sd_budget_seed3_20260501_run1/official_eval/step_0050000/eval_episode_summary.csv"
+        },
+        {
+          "step_dir": "step_0075000",
+          "summary_csv": "logs/hopper-hop/3/sd_hopper_100k_pureenv_sdinit_mech_sd_budget_seed3_20260501_run1/official_eval/step_0075000/eval_episode_summary.csv"
+        },
+        {
+          "step_dir": "step_0100000",
+          "summary_csv": "logs/hopper-hop/3/sd_hopper_100k_pureenv_sdinit_mech_sd_budget_seed3_20260501_run1/official_eval/step_0100000/eval_episode_summary.csv"
+        }
+      ]
+    },
+    {
+      "seed": 3,
+      "run_name": "sd_hopper_200k_pureenv_sdinit_mech_sd_budget_seed3_resume100k_20260502_run1",
+      "run_dir": "logs/hopper-hop/3/sd_hopper_200k_pureenv_sdinit_mech_sd_budget_seed3_resume100k_20260502_run1",
+      "eval_csv": "logs/hopper-hop/3/sd_hopper_200k_pureenv_sdinit_mech_sd_budget_seed3_resume100k_20260502_run1/eval.csv",
+      "eval_full_csv": "logs/hopper-hop/3/sd_hopper_200k_pureenv_sdinit_mech_sd_budget_seed3_resume100k_20260502_run1/eval_full.csv",
+      "train_csv": "logs/hopper-hop/3/sd_hopper_200k_pureenv_sdinit_mech_sd_budget_seed3_resume100k_20260502_run1/train.csv",
+      "eval_rows": [
+        {
+          "step": 125001,
+          "episode_reward": 69.90150531149848
+        },
+        {
+          "step": 150001,
+          "episode_reward": 122.80763178049044
+        },
+        {
+          "step": 175001,
+          "episode_reward": 161.45956042059697
+        },
+        {
+          "step": 200001,
+          "episode_reward": 169.19294960862607
+        }
+      ],
+      "official_eval_summaries": [
+        {
+          "step_dir": "step_0125001",
+          "summary_csv": "logs/hopper-hop/3/sd_hopper_200k_pureenv_sdinit_mech_sd_budget_seed3_resume100k_20260502_run1/official_eval/step_0125001/eval_episode_summary.csv"
+        },
+        {
+          "step_dir": "step_0150001",
+          "summary_csv": "logs/hopper-hop/3/sd_hopper_200k_pureenv_sdinit_mech_sd_budget_seed3_resume100k_20260502_run1/official_eval/step_0150001/eval_episode_summary.csv"
+        },
+        {
+          "step_dir": "step_0175001",
+          "summary_csv": "logs/hopper-hop/3/sd_hopper_200k_pureenv_sdinit_mech_sd_budget_seed3_resume100k_20260502_run1/official_eval/step_0175001/eval_episode_summary.csv"
+        },
+        {
+          "step_dir": "step_0200001",
+          "summary_csv": "logs/hopper-hop/3/sd_hopper_200k_pureenv_sdinit_mech_sd_budget_seed3_resume100k_20260502_run1/official_eval/step_0200001/eval_episode_summary.csv"
+        }
+      ]
+    },
+    {
+      "seed": 3,
+      "run_name": "sd_hopper_300k_pureenv_sdinit_mech_sd_official_budget_seed3_resume200k_20260504_run1",
+      "run_dir": "logs/hopper-hop/3/sd_hopper_300k_pureenv_sdinit_mech_sd_official_budget_seed3_resume200k_20260504_run1",
+      "eval_csv": "logs/hopper-hop/3/sd_hopper_300k_pureenv_sdinit_mech_sd_official_budget_seed3_resume200k_20260504_run1/eval.csv",
+      "eval_full_csv": "logs/hopper-hop/3/sd_hopper_300k_pureenv_sdinit_mech_sd_official_budget_seed3_resume200k_20260504_run1/eval_full.csv",
+      "train_csv": "logs/hopper-hop/3/sd_hopper_300k_pureenv_sdinit_mech_sd_official_budget_seed3_resume200k_20260504_run1/train.csv",
+      "eval_rows": [
+        {
+          "step": 225001,
+          "episode_reward": 188.8037293693982
+        },
+        {
+          "step": 250001,
+          "episode_reward": 177.11258652016403
+        },
+        {
+          "step": 275001,
+          "episode_reward": 193.49150011586025
+        },
+        {
+          "step": 300001,
+          "episode_reward": 239.82775833962077
+        }
+      ],
+      "official_eval_summaries": [
+        {
+          "step_dir": "step_0225001",
+          "summary_csv": "logs/hopper-hop/3/sd_hopper_300k_pureenv_sdinit_mech_sd_official_budget_seed3_resume200k_20260504_run1/official_eval/step_0225001/eval_episode_summary.csv"
+        },
+        {
+          "step_dir": "step_0250001",
+          "summary_csv": "logs/hopper-hop/3/sd_hopper_300k_pureenv_sdinit_mech_sd_official_budget_seed3_resume200k_20260504_run1/official_eval/step_0250001/eval_episode_summary.csv"
+        },
+        {
+          "step_dir": "step_0275001",
+          "summary_csv": "logs/hopper-hop/3/sd_hopper_300k_pureenv_sdinit_mech_sd_official_budget_seed3_resume200k_20260504_run1/official_eval/step_0275001/eval_episode_summary.csv"
+        },
+        {
+          "step_dir": "step_0300001",
+          "summary_csv": "logs/hopper-hop/3/sd_hopper_300k_pureenv_sdinit_mech_sd_official_budget_seed3_resume200k_20260504_run1/official_eval/step_0300001/eval_episode_summary.csv"
+        }
+      ]
+    }
+  ]
+}

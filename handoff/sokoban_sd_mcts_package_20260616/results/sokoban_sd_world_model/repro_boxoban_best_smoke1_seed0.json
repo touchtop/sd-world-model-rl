@@ -1,0 +1,1444 @@
+{
+  "material_passport": {
+    "origin": "sokoban_gft_sdmcts_rebuild",
+    "verification_status": "VERIFIED",
+    "version_label": "gft_sd_two_layer_closed_loop_v1"
+  },
+  "config": {
+    "levels": "datasets/sokoban_boxoban/boxoban-levels/unfiltered/test/000.txt",
+    "level_offset": 0,
+    "max_levels": 1,
+    "horizon": 20,
+    "budget": 4096,
+    "max_steps": 80,
+    "seed": 0,
+    "uct_c": 1.25,
+    "gamma": 0.95,
+    "goal_value": 10.0,
+    "push_cost": 0.05,
+    "deadend_value": -10.0,
+    "leaf_value": "tva",
+    "constraint_mode": "tier_a",
+    "select_by": "visits",
+    "revisit_penalty": 1.0,
+    "transposition": true,
+    "reuse_tree": false,
+    "action_prior": "none",
+    "planner_action_prior": "sd_delta",
+    "gft_prior": "gft_delta",
+    "gft_prior_temperature": 2.0,
+    "gft_prior_uniform_mix": 0.1,
+    "gft_prior_weights": {
+      "progress": 1.0,
+      "goal": 1.0,
+      "mobility": 0.0,
+      "access": 0.0,
+      "capacity": 0.0,
+      "deadlock": 0.0,
+      "ordering": 0.05,
+      "commitment": 0.05,
+      "bottleneck": 0.0,
+      "revisit": 1.0
+    },
+    "gft_transport_cost_weights": {
+      "turn": 0.1,
+      "access": 0.25,
+      "zone": 0.25
+    },
+    "gft_soft_deadlock_weights": {
+      "mobility_loss": 1.0,
+      "matching_fragility": 1.0,
+      "capacity_stress": 1.0,
+      "access_loss": 1.0,
+      "order_violation": 1.0
+    },
+    "gft_commitment_beta": 1.0,
+    "gft_sinkhorn_iterations": 25,
+    "gft_sd_leaf_mode": "discounted_progress",
+    "gft_sd_leaf_weights": {
+      "mobility": 0.0,
+      "access": 0.0,
+      "capacity": 0.05,
+      "deadlock": 0.0,
+      "ordering": 0.05,
+      "commitment": 0.05
+    },
+    "tva_value_blend": 0.25,
+    "tva_dynamic_blend": false,
+    "tva_dynamic_high_risk_threshold": 0.95,
+    "tva_dynamic_negative_delta_threshold": 1.0,
+    "tva_dynamic_high_risk_blend": 0.75,
+    "tva_dynamic_low_risk_threshold": 0.3,
+    "tva_dynamic_positive_delta_threshold": 0.25,
+    "tva_dynamic_positive_blend": -1.0,
+    "tva_dynamic_revisit_penalty": 0.0,
+    "tva_dynamic_prior_penalty_weight": 0.0,
+    "tva_dynamic_prior_penalty_cap": 4.0,
+    "tva_dynamic_leaf_penalty_weight": 0.0,
+    "tva_dynamic_leaf_penalty_cap": 4.0,
+    "tva_dynamic_root_select": true,
+    "tva_dynamic_root_select_margin": 0.0,
+    "tva_state_gated_blend": true,
+    "tva_state_gated_default_blend": 0.0,
+    "tva_state_gated_positive_blend": 0.25,
+    "tva_state_gated_positive_risk_max": 0.3,
+    "tva_state_gated_positive_delta_min": 0.25,
+    "tva_state_gated_negative_blend": 0.0,
+    "tva_state_gated_negative_risk_min": 0.95,
+    "tva_state_gated_negative_delta_min": 1.0,
+    "tva_state_gated_ood_z_threshold": -1.0,
+    "tva_state_gated_ood_blend": 0.0,
+    "tva_transport_phase_blend": 0.6,
+    "tva_transport_phase_high_progress_min": 20.0,
+    "tva_transport_phase_low_progress_max": 10.0,
+    "tva_transport_phase_commitment_min": 0.25,
+    "tva_transport_phase_max_closed_loop_step": 5,
+    "tva_transport_phase_require_root_eligible": true
+  },
+  "framework_contract": {
+    "sd_provider": "gft_sd_v1",
+    "transition_provider": "exact_grid_stock_flow_v1",
+    "ledger_state": "exact_sokoban_grid_state",
+    "resource_state": "gft_phi_y_readout",
+    "gft_spec_alignment": {
+      "design_document": "sokoban_gptpro.md",
+      "two_layer_state": {
+        "ledger_state_y": "y_t=(B_t,R_t), exact box positions plus player reachable component",
+        "resource_state_z": "z_t=Phi(y_t)=(P,M,A,K,D,Q,C,I)",
+        "transition_provider": "exact_grid_stock_flow_v1",
+        "resource_layer_replaces_transition_provider": false
+      },
+      "resource_stocks": {
+        "P": "goal-conditioned transport progress / remaining transport work",
+        "M": "box mobility",
+        "A": "player push-position accessibility",
+        "K": "goal-region capacity slack",
+        "D": "hard deadlock debt plus soft deadlock pressure",
+        "Q": "ordering-dependency debt",
+        "C": "goal commitment clarity from Sinkhorn assignment entropy",
+        "I": "action relevance for the soft MCTS prior"
+      },
+      "transport_cost": {
+        "formula": "d_g(b_i)+lambda_turn*turns+lambda_access*access_risk+lambda_zone*zone_risk",
+        "default_weights": {
+          "turn": 0.0,
+          "access": 0.0,
+          "zone": 0.0
+        },
+        "default_reduces_to_matching_lower_bound": true
+      },
+      "soft_deadlock": {
+        "formula": "alpha1*mobilityLoss+alpha2*matchingFragility+alpha3*capacityStress+alpha4*accessLoss+alpha5*orderViolation",
+        "default_weights": {
+          "mobility_loss": 1.0,
+          "matching_fragility": 1.0,
+          "capacity_stress": 1.0,
+          "access_loss": 1.0,
+          "order_violation": 1.0
+        }
+      },
+      "interfaces": {
+        "resource_vector": "gft_resource_vector(state)",
+        "resource_flow": "gft_resource_flow(state, child_state)",
+        "sd_reward": "gft_sd_reward(state, child_state)",
+        "sd_value": "gft_sd_value(state)",
+        "tva_features": "gft_tva_feature_dict(state)",
+        "action_prior": "gft_action_prior_rows(state, candidates)"
+      },
+      "learnable_parameters": {
+        "sd_layer": 0,
+        "tva_layer": "external; consumes ledger and GFT feature vectors when trained"
+      }
+    },
+    "planner_action": "push_level_grid_flow",
+    "legacy_six_stock_rollout_used": false,
+    "teacher_used_online": false,
+    "gft_resource_layer_replaces_transition_provider": false,
+    "inactive_resources": [],
+    "tva_checkpoint": "results/sokoban_sd_world_model/sokoban_gft_online_tva_guarded_v1_file001_o0_n40_h8_b192_s40_ep300_failfinal_anchor0p85_rp1p0_seed0.json",
+    "tva_dynamic_blend_uses_risk_as_gate": false,
+    "tva_dynamic_blend_changes_transition_provider": false,
+    "tva_dynamic_prior_penalty_uses_risk_as_gate": false,
+    "tva_dynamic_prior_penalty_changes_transition_provider": false,
+    "tva_dynamic_leaf_penalty_uses_risk_as_gate": false,
+    "tva_dynamic_leaf_penalty_changes_transition_provider": false,
+    "tva_dynamic_root_select_changes_transition_provider": false,
+    "tva_state_gated_blend_changes_transition_provider": false,
+    "tva_state_gated_blend_can_set_alpha_zero": true,
+    "tva_transport_phase_blend_changes_transition_provider": false,
+    "tva_leaf_formula": "V_leaf=(1-alpha(s))*V_SD+alpha(s)*V_psi"
+  },
+  "independent_gate_status": {
+    "require_independent_gates": true,
+    "sd_validation_path": "results/sokoban_sd_world_model/grid_stock_flow_design_smoke_quick.json",
+    "tva_audit_path": "results/sokoban_sd_world_model/gft_online_tva_guarded_v1_file001_o0_n40_ep300_failfinal_anchor0p85_rp1p0_blend0p25_trunc_audit_file002_o0_n10_h8_b192_teacher4k_seed0.json",
+    "grid_sd_gate": "PASS",
+    "tva_independent_gate": "PASS",
+    "tva_independent_gate_source": "gft_tva_independent_accuracy_gate",
+    "failed_checks": []
+  },
+  "aggregate": {
+    "levels_evaluated": 1,
+    "solved_count": 1,
+    "success_rate": 1.0,
+    "mean_pushes_solved": 13.0,
+    "total_deadlock_prunes": 1385,
+    "status_counts": {
+      "solved": 1
+    }
+  },
+  "levels": [
+    {
+      "level_index": 0,
+      "level_id": "datasets/sokoban_boxoban/boxoban-levels/unfiltered/test/000.txt:0",
+      "height": 10,
+      "width": 10,
+      "n_boxes": 4,
+      "solved": true,
+      "status": "solved",
+      "pushes": 13,
+      "steps_executed": 13,
+      "deadlock_prunes": 1385,
+      "elapsed_sec": 16.88768286490813,
+      "trace": [
+        {
+          "step": 0,
+          "action": {
+            "box_index": 3,
+            "direction": 0,
+            "direction_name": "up",
+            "flat_index": 12
+          },
+          "root_visits": 4096,
+          "root_value": 4.47818589041043,
+          "child_count": 1,
+          "top_children": [
+            {
+              "action": {
+                "box_index": 3,
+                "direction": 0,
+                "direction_name": "up",
+                "flat_index": 12
+              },
+              "visits": 4096,
+              "mean_value": 4.47818589041043,
+              "prior": 1.0,
+              "prior_score": 2.225,
+              "solved_child": false,
+              "blocked_child": false
+            }
+          ],
+          "boxes_on_goals_after": 0,
+          "tier_a_after": {
+            "solved": false,
+            "dead_square_boxes": 0,
+            "static_frozen_boxes": 0,
+            "tier_a_deadlocked": false,
+            "no_legal_pushes": false
+          }
+        },
+        {
+          "step": 1,
+          "action": {
+            "box_index": 2,
+            "direction": 0,
+            "direction_name": "up",
+            "flat_index": 8
+          },
+          "root_visits": 4096,
+          "root_value": 4.760291958524626,
+          "child_count": 2,
+          "top_children": [
+            {
+              "action": {
+                "box_index": 2,
+                "direction": 0,
+                "direction_name": "up",
+                "flat_index": 8
+              },
+              "visits": 3932,
+              "mean_value": 4.794834637336377,
+              "prior": 0.367623587702414,
+              "prior_score": -0.21250000000000002,
+              "solved_child": false,
+              "blocked_child": false
+            },
+            {
+              "action": {
+                "box_index": 3,
+                "direction": 0,
+                "direction_name": "up",
+                "flat_index": 12
+              },
+              "visits": 164,
+              "mean_value": 3.9321101714028344,
+              "prior": 0.632376412297586,
+              "prior_score": 1.0,
+              "solved_child": false,
+              "blocked_child": false
+            }
+          ],
+          "boxes_on_goals_after": 0,
+          "tier_a_after": {
+            "solved": false,
+            "dead_square_boxes": 0,
+            "static_frozen_boxes": 0,
+            "tier_a_deadlocked": false,
+            "no_legal_pushes": false
+          }
+        },
+        {
+          "step": 2,
+          "action": {
+            "box_index": 2,
+            "direction": 0,
+            "direction_name": "up",
+            "flat_index": 8
+          },
+          "root_visits": 4096,
+          "root_value": 5.0095881703152845,
+          "child_count": 2,
+          "top_children": [
+            {
+              "action": {
+                "box_index": 2,
+                "direction": 0,
+                "direction_name": "up",
+                "flat_index": 8
+              },
+              "visits": 3620,
+              "mean_value": 5.100570285255894,
+              "prior": 0.6875365919290943,
+              "prior_score": 2.795833333333334,
+              "solved_child": false,
+              "blocked_child": false
+            },
+            {
+              "action": {
+                "box_index": 3,
+                "direction": 0,
+                "direction_name": "up",
+                "flat_index": 12
+              },
+              "visits": 476,
+              "mean_value": 4.317665363412882,
+              "prior": 0.31246340807090567,
+              "prior_score": 1.020833333333334,
+              "solved_child": false,
+              "blocked_child": false
+            }
+          ],
+          "boxes_on_goals_after": 0,
+          "tier_a_after": {
+            "solved": false,
+            "dead_square_boxes": 0,
+            "static_frozen_boxes": 0,
+            "tier_a_deadlocked": false,
+            "no_legal_pushes": false
+          }
+        },
+        {
+          "step": 3,
+          "action": {
+            "box_index": 3,
+            "direction": 0,
+            "direction_name": "up",
+            "flat_index": 12
+          },
+          "root_visits": 4096,
+          "root_value": 5.1566707615939125,
+          "child_count": 7,
+          "top_children": [
+            {
+              "action": {
+                "box_index": 3,
+                "direction": 0,
+                "direction_name": "up",
+                "flat_index": 12
+              },
+              "visits": 2942,
+              "mean_value": 5.416683756705489,
+              "prior": 0.12936843577325902,
+              "prior_score": 0.4166666666666661,
+              "solved_child": false,
+              "blocked_child": false
+            },
+            {
+              "action": {
+                "box_index": 1,
+                "direction": 3,
+                "direction_name": "right",
+                "flat_index": 7
+              },
+              "visits": 588,
+              "mean_value": 4.515559650097343,
+              "prior": 0.18323042763506026,
+              "prior_score": 1.1845073354563935,
+              "solved_child": false,
+              "blocked_child": false
+            },
+            {
+              "action": {
+                "box_index": 2,
+                "direction": 0,
+                "direction_name": "up",
+                "flat_index": 8
+              },
+              "visits": 384,
+              "mean_value": 4.508562616674939,
+              "prior": 0.16833350506431646,
+              "prior_score": 0.9998900605485346,
+              "solved_child": false,
+              "blocked_child": false
+            },
+            {
+              "action": {
+                "box_index": 1,
+                "direction": 2,
+                "direction_name": "left",
+                "flat_index": 6
+              },
+              "visits": 90,
+              "mean_value": 4.462621355719942,
+              "prior": 0.10840417680046284,
+              "prior_score": 0.014472749250184694,
+              "solved_child": false,
+              "blocked_child": false
+            },
+            {
+              "action": {
+                "box_index": 0,
+                "direction": 2,
+                "direction_name": "left",
+                "flat_index": 2
+              },
+              "visits": 74,
+              "mean_value": 4.481804089451876,
+              "prior": 0.07576913687491349,
+              "prior_score": -0.8371005332928063,
+              "solved_child": false,
+              "blocked_child": false
+            }
+          ],
+          "boxes_on_goals_after": 0,
+          "tier_a_after": {
+            "solved": false,
+            "dead_square_boxes": 0,
+            "static_frozen_boxes": 0,
+            "tier_a_deadlocked": false,
+            "no_legal_pushes": false
+          }
+        },
+        {
+          "step": 4,
+          "action": {
+            "box_index": 3,
+            "direction": 0,
+            "direction_name": "up",
+            "flat_index": 12
+          },
+          "root_visits": 4096,
+          "root_value": 5.786559723818781,
+          "child_count": 2,
+          "top_children": [
+            {
+              "action": {
+                "box_index": 3,
+                "direction": 0,
+                "direction_name": "up",
+                "flat_index": 12
+              },
+              "visits": 3958,
+              "mean_value": 5.821329675129818,
+              "prior": 0.43026624246229433,
+              "prior_score": 0.9583333333333339,
+              "solved_child": false,
+              "blocked_child": false
+            },
+            {
+              "action": {
+                "box_index": 2,
+                "direction": 0,
+                "direction_name": "up",
+                "flat_index": 8
+              },
+              "visits": 138,
+              "mean_value": 4.789317207230356,
+              "prior": 0.5697337575377057,
+              "prior_score": 1.5832233938818685,
+              "solved_child": false,
+              "blocked_child": false
+            }
+          ],
+          "boxes_on_goals_after": 0,
+          "tier_a_after": {
+            "solved": false,
+            "dead_square_boxes": 0,
+            "static_frozen_boxes": 0,
+            "tier_a_deadlocked": false,
+            "no_legal_pushes": false
+          }
+        },
+        {
+          "step": 5,
+          "action": {
+            "box_index": 2,
+            "direction": 0,
+            "direction_name": "up",
+            "flat_index": 8
+          },
+          "root_visits": 4096,
+          "root_value": 6.180836473383064,
+          "child_count": 2,
+          "top_children": [
+            {
+              "action": {
+                "box_index": 2,
+                "direction": 0,
+                "direction_name": "up",
+                "flat_index": 8
+              },
+              "visits": 4041,
+              "mean_value": 6.197075033690223,
+              "prior": 0.3540485852372296,
+              "prior_score": 0.9790567272152024,
+              "solved_child": false,
+              "blocked_child": false
+            },
+            {
+              "action": {
+                "box_index": 3,
+                "direction": 0,
+                "direction_name": "up",
+                "flat_index": 12
+              },
+              "visits": 55,
+              "mean_value": 4.987745160633053,
+              "prior": 0.6459514147627705,
+              "prior_score": 2.325,
+              "solved_child": false,
+              "blocked_child": false
+            }
+          ],
+          "boxes_on_goals_after": 0,
+          "tier_a_after": {
+            "solved": false,
+            "dead_square_boxes": 0,
+            "static_frozen_boxes": 0,
+            "tier_a_deadlocked": false,
+            "no_legal_pushes": false
+          }
+        },
+        {
+          "step": 6,
+          "action": {
+            "box_index": 1,
+            "direction": 0,
+            "direction_name": "up",
+            "flat_index": 4
+          },
+          "root_visits": 4096,
+          "root_value": 6.565010095880147,
+          "child_count": 3,
+          "top_children": [
+            {
+              "action": {
+                "box_index": 1,
+                "direction": 0,
+                "direction_name": "up",
+                "flat_index": 4
+              },
+              "visits": 3994,
+              "mean_value": 6.59436848467776,
+              "prior": 0.36735554045568214,
+              "prior_score": 1.748735911807406,
+              "solved_child": false,
+              "blocked_child": false
+            },
+            {
+              "action": {
+                "box_index": 3,
+                "direction": 0,
+                "direction_name": "up",
+                "flat_index": 12
+              },
+              "visits": 84,
+              "mean_value": 5.422260361899386,
+              "prior": 0.48356226476637004,
+              "prior_score": 2.345833333333333,
+              "solved_child": false,
+              "blocked_child": false
+            },
+            {
+              "action": {
+                "box_index": 3,
+                "direction": 3,
+                "direction_name": "right",
+                "flat_index": 15
+              },
+              "visits": 18,
+              "mean_value": 5.383541917919895,
+              "prior": 0.14908219477794774,
+              "prior_score": -0.37083333333333357,
+              "solved_child": false,
+              "blocked_child": false
+            }
+          ],
+          "boxes_on_goals_after": 0,
+          "tier_a_after": {
+            "solved": false,
+            "dead_square_boxes": 0,
+            "static_frozen_boxes": 0,
+            "tier_a_deadlocked": false,
+            "no_legal_pushes": false
+          }
+        },
+        {
+          "step": 7,
+          "action": {
+            "box_index": 3,
+            "direction": 0,
+            "direction_name": "up",
+            "flat_index": 12
+          },
+          "root_visits": 4096,
+          "root_value": 6.982418106300827,
+          "child_count": 12,
+          "top_children": [
+            {
+              "action": {
+                "box_index": 3,
+                "direction": 0,
+                "direction_name": "up",
+                "flat_index": 12
+              },
+              "visits": 3936,
+              "mean_value": 7.029281968987919,
+              "prior": 0.17111260501399447,
+              "prior_score": 1.7,
+              "solved_child": false,
+              "blocked_child": false
+            },
+            {
+              "action": {
+                "box_index": 0,
+                "direction": 2,
+                "direction_name": "left",
+                "flat_index": 2
+              },
+              "visits": 79,
+              "mean_value": 5.9181253489190855,
+              "prior": 0.1233721367587037,
+              "prior_score": 1.0057487418130457,
+              "solved_child": false,
+              "blocked_child": false
+            },
+            {
+              "action": {
+                "box_index": 2,
+                "direction": 3,
+                "direction_name": "right",
+                "flat_index": 11
+              },
+              "visits": 14,
+              "mean_value": 5.748161235216052,
+              "prior": 0.13416789596706943,
+              "prior_score": 1.1851458552295282,
+              "solved_child": false,
+              "blocked_child": false
+            },
+            {
+              "action": {
+                "box_index": 1,
+                "direction": 3,
+                "direction_name": "right",
+                "flat_index": 7
+              },
+              "visits": 11,
+              "mean_value": 5.2978668512466305,
+              "prior": 0.18550409768953946,
+              "prior_score": 1.8694378324456824,
+              "solved_child": false,
+              "blocked_child": false
+            },
+            {
+              "action": {
+                "box_index": 3,
+                "direction": 2,
+                "direction_name": "left",
+                "flat_index": 14
+              },
+              "visits": 10,
+              "mean_value": 5.85616866460871,
+              "prior": 0.04842513965852945,
+              "prior_score": -1.1024462784832185,
+              "solved_child": false,
+              "blocked_child": false
+            }
+          ],
+          "boxes_on_goals_after": 1,
+          "tier_a_after": {
+            "solved": false,
+            "dead_square_boxes": 0,
+            "static_frozen_boxes": 0,
+            "tier_a_deadlocked": false,
+            "no_legal_pushes": false
+          }
+        },
+        {
+          "step": 8,
+          "action": {
+            "box_index": 0,
+            "direction": 2,
+            "direction_name": "left",
+            "flat_index": 2
+          },
+          "root_visits": 4106,
+          "root_value": 7.432432221058132,
+          "child_count": 8,
+          "top_children": [
+            {
+              "action": {
+                "box_index": 0,
+                "direction": 2,
+                "direction_name": "left",
+                "flat_index": 2
+              },
+              "visits": 4028,
+              "mean_value": 7.457323775446929,
+              "prior": 0.2201052548121021,
+              "prior_score": 1.0057487418130457,
+              "solved_child": false,
+              "blocked_child": false
+            },
+            {
+              "action": {
+                "box_index": 1,
+                "direction": 3,
+                "direction_name": "right",
+                "flat_index": 7
+              },
+              "visits": 60,
+              "mean_value": 6.39212994205503,
+              "prior": 0.40220875385410054,
+              "prior_score": 2.2652711657790157,
+              "solved_child": false,
+              "blocked_child": false
+            },
+            {
+              "action": {
+                "box_index": 2,
+                "direction": 0,
+                "direction_name": "up",
+                "flat_index": 8
+              },
+              "visits": 5,
+              "mean_value": 6.372829197967816,
+              "prior": 0.05975340376159535,
+              "prior_score": -1.9544788072685069,
+              "solved_child": false,
+              "blocked_child": false
+            },
+            {
+              "action": {
+                "box_index": 1,
+                "direction": 2,
+                "direction_name": "left",
+                "flat_index": 6
+              },
+              "visits": 4,
+              "mean_value": 6.095859332180659,
+              "prior": 0.0795528965271705,
+              "prior_score": -1.2545645679137953,
+              "solved_child": false,
+              "blocked_child": false
+            },
+            {
+              "action": {
+                "box_index": 0,
+                "direction": 1,
+                "direction_name": "down",
+                "flat_index": 1
+              },
+              "visits": 4,
+              "mean_value": 6.056623051839339,
+              "prior": 0.08483533975419123,
+              "prior_score": -1.102902578474073,
+              "solved_child": false,
+              "blocked_child": false
+            }
+          ],
+          "boxes_on_goals_after": 1,
+          "tier_a_after": {
+            "solved": false,
+            "dead_square_boxes": 0,
+            "static_frozen_boxes": 0,
+            "tier_a_deadlocked": false,
+            "no_legal_pushes": false
+          }
+        },
+        {
+          "step": 9,
+          "action": {
+            "box_index": 1,
+            "direction": 3,
+            "direction_name": "right",
+            "flat_index": 7
+          },
+          "root_visits": 4096,
+          "root_value": 7.922233077675625,
+          "child_count": 8,
+          "top_children": [
+            {
+              "action": {
+                "box_index": 1,
+                "direction": 3,
+                "direction_name": "right",
+                "flat_index": 7
+              },
+              "visits": 3357,
+              "mean_value": 7.930548524882734,
+              "prior": 0.3672295573550629,
+              "prior_score": 2.264104208684346,
+              "solved_child": false,
+              "blocked_child": false
+            },
+            {
+              "action": {
+                "box_index": 0,
+                "direction": 2,
+                "direction_name": "left",
+                "flat_index": 2
+              },
+              "visits": 721,
+              "mean_value": 7.917176212721278,
+              "prior": 0.3162140003606631,
+              "prior_score": 1.9535657715179182,
+              "solved_child": false,
+              "blocked_child": false
+            },
+            {
+              "action": {
+                "box_index": 2,
+                "direction": 1,
+                "direction_name": "down",
+                "flat_index": 9
+              },
+              "visits": 5,
+              "mean_value": 6.840090241501453,
+              "prior": 0.06137683608424162,
+              "prior_score": -1.7,
+              "solved_child": false,
+              "blocked_child": false
+            },
+            {
+              "action": {
+                "box_index": 1,
+                "direction": 2,
+                "direction_name": "left",
+                "flat_index": 6
+              },
+              "visits": 5,
+              "mean_value": 6.577720474514329,
+              "prior": 0.08170221543921993,
+              "prior_score": -1.0045414148242633,
+              "solved_child": false,
+              "blocked_child": false
+            },
+            {
+              "action": {
+                "box_index": 2,
+                "direction": 0,
+                "direction_name": "up",
+                "flat_index": 8
+              },
+              "visits": 4,
+              "mean_value": 6.950801570967502,
+              "prior": 0.05553391699403004,
+              "prior_score": -1.9546300249155517,
+              "solved_child": false,
+              "blocked_child": false
+            }
+          ],
+          "boxes_on_goals_after": 2,
+          "tier_a_after": {
+            "solved": false,
+            "dead_square_boxes": 0,
+            "static_frozen_boxes": 0,
+            "tier_a_deadlocked": false,
+            "no_legal_pushes": false
+          }
+        },
+        {
+          "step": 10,
+          "action": {
+            "box_index": 3,
+            "direction": 0,
+            "direction_name": "up",
+            "flat_index": 12
+          },
+          "root_visits": 4106,
+          "root_value": 8.37830921936178,
+          "child_count": 9,
+          "top_children": [
+            {
+              "action": {
+                "box_index": 3,
+                "direction": 0,
+                "direction_name": "up",
+                "flat_index": 12
+              },
+              "visits": 2192,
+              "mean_value": 8.403067949460493,
+              "prior": 0.24077190716154553,
+              "prior_score": 1.0870720346936769,
+              "solved_child": false,
+              "blocked_child": false
+            },
+            {
+              "action": {
+                "box_index": 0,
+                "direction": 2,
+                "direction_name": "left",
+                "flat_index": 2
+              },
+              "visits": 1892,
+              "mean_value": 8.364456048258845,
+              "prior": 0.3741524797689353,
+              "prior_score": 2.002898775616437,
+              "solved_child": false,
+              "blocked_child": false
+            },
+            {
+              "action": {
+                "box_index": 2,
+                "direction": 0,
+                "direction_name": "up",
+                "flat_index": 8
+              },
+              "visits": 6,
+              "mean_value": 7.352537093707215,
+              "prior": 0.0656823071807542,
+              "prior_score": -1.7871224083394923,
+              "solved_child": false,
+              "blocked_child": false
+            },
+            {
+              "action": {
+                "box_index": 0,
+                "direction": 3,
+                "direction_name": "right",
+                "flat_index": 3
+              },
+              "visits": 5,
+              "mean_value": 6.8823581842320944,
+              "prior": 0.09181417256991437,
+              "prior_score": -1.0045817847183762,
+              "solved_child": false,
+              "blocked_child": false
+            },
+            {
+              "action": {
+                "box_index": 1,
+                "direction": 1,
+                "direction_name": "down",
+                "flat_index": 5
+              },
+              "visits": 4,
+              "mean_value": 7.255156599528621,
+              "prior": 0.06225965731972208,
+              "prior_score": -1.916666666666666,
+              "solved_child": false,
+              "blocked_child": false
+            }
+          ],
+          "boxes_on_goals_after": 2,
+          "tier_a_after": {
+            "solved": false,
+            "dead_square_boxes": 0,
+            "static_frozen_boxes": 0,
+            "tier_a_deadlocked": false,
+            "no_legal_pushes": false
+          }
+        },
+        {
+          "step": 11,
+          "action": {
+            "box_index": 0,
+            "direction": 2,
+            "direction_name": "left",
+            "flat_index": 2
+          },
+          "root_visits": 4096,
+          "root_value": 8.905393208284016,
+          "child_count": 11,
+          "top_children": [
+            {
+              "action": {
+                "box_index": 0,
+                "direction": 2,
+                "direction_name": "left",
+                "flat_index": 2
+              },
+              "visits": 4062,
+              "mean_value": 8.9187305710863,
+              "prior": 0.30171550867948344,
+              "prior_score": 2.003110567809578,
+              "solved_child": false,
+              "blocked_child": false
+            },
+            {
+              "action": {
+                "box_index": 1,
+                "direction": 0,
+                "direction_name": "up",
+                "flat_index": 4
+              },
+              "visits": 9,
+              "mean_value": 6.611754240668804,
+              "prior": 0.2790432402588754,
+              "prior_score": 1.8418202372389132,
+              "solved_child": false,
+              "blocked_child": false
+            },
+            {
+              "action": {
+                "box_index": 2,
+                "direction": 1,
+                "direction_name": "down",
+                "flat_index": 9
+              },
+              "visits": 4,
+              "mean_value": 7.734384789955527,
+              "prior": 0.050314139413154886,
+              "prior_score": -1.916666666666667,
+              "solved_child": false,
+              "blocked_child": false
+            },
+            {
+              "action": {
+                "box_index": 3,
+                "direction": 1,
+                "direction_name": "down",
+                "flat_index": 13
+              },
+              "visits": 4,
+              "mean_value": 7.715881036822045,
+              "prior": 0.04963277934715156,
+              "prior_score": -1.95,
+              "solved_child": false,
+              "blocked_child": false
+            },
+            {
+              "action": {
+                "box_index": 3,
+                "direction": 2,
+                "direction_name": "left",
+                "flat_index": 14
+              },
+              "visits": 4,
+              "mean_value": 7.71278866764632,
+              "prior": 0.04957586094628671,
+              "prior_score": -1.9528098552426834,
+              "solved_child": false,
+              "blocked_child": false
+            }
+          ],
+          "boxes_on_goals_after": 3,
+          "tier_a_after": {
+            "solved": false,
+            "dead_square_boxes": 0,
+            "static_frozen_boxes": 0,
+            "tier_a_deadlocked": false,
+            "no_legal_pushes": false
+          }
+        },
+        {
+          "step": 12,
+          "action": {
+            "box_index": 1,
+            "direction": 0,
+            "direction_name": "up",
+            "flat_index": 4
+          },
+          "root_visits": 4096,
+          "root_value": 9.439458273830391,
+          "child_count": 9,
+          "top_children": [
+            {
+              "action": {
+                "box_index": 1,
+                "direction": 0,
+                "direction_name": "up",
+                "flat_index": 4
+              },
+              "visits": 4070,
+              "mean_value": 9.450000000000006,
+              "prior": 0.4515460460284179,
+              "prior_score": 1.890648569268669,
+              "solved_child": true,
+              "blocked_child": false
+            },
+            {
+              "action": {
+                "box_index": 1,
+                "direction": 1,
+                "direction_name": "down",
+                "flat_index": 5
+              },
+              "visits": 5,
+              "mean_value": 7.650108839778514,
+              "prior": 0.11047577228396943,
+              "prior_score": -1.0872838268868177,
+              "solved_child": false,
+              "blocked_child": false
+            },
+            {
+              "action": {
+                "box_index": 2,
+                "direction": 1,
+                "direction_name": "down",
+                "flat_index": 9
+              },
+              "visits": 4,
+              "mean_value": 7.964496338036929,
+              "prior": 0.07512532233990808,
+              "prior_score": -1.9666666666666668,
+              "solved_child": false,
+              "blocked_child": false
+            },
+            {
+              "action": {
+                "box_index": 3,
+                "direction": 2,
+                "direction_name": "left",
+                "flat_index": 14
+              },
+              "visits": 4,
+              "mean_value": 7.940877726516019,
+              "prior": 0.07401428820639155,
+              "prior_score": -2.001683539607561,
+              "solved_child": false,
+              "blocked_child": false
+            },
+            {
+              "action": {
+                "box_index": 3,
+                "direction": 0,
+                "direction_name": "up",
+                "flat_index": 12
+              },
+              "visits": 4,
+              "mean_value": 7.939681626448619,
+              "prior": 0.0739047834580231,
+              "prior_score": -2.0051682658057928,
+              "solved_child": false,
+              "blocked_child": false
+            }
+          ],
+          "boxes_on_goals_after": 4,
+          "tier_a_after": {
+            "solved": true,
+            "dead_square_boxes": 0,
+            "static_frozen_boxes": 0,
+            "tier_a_deadlocked": false,
+            "no_legal_pushes": false
+          }
+        }
+      ],
+      "final_features": {
+        "reachable_count": 27,
+        "legal_push_count": 10,
+        "viable_push_count": 6,
+        "boxes_on_goals": 4,
+        "matching_lower_bound": 0.0,
+        "dead_square_boxes": 0,
+        "frozen_boxes": 0,
+        "matching_deadlock": false,
+        "solved": true,
+        "deadlocked": false
+      },
+      "final_gft_state": {
+        "ledger_key": {
+          "boxes": [
+            [
+              1,
+              7
+            ],
+            [
+              2,
+              3
+            ],
+            [
+              2,
+              8
+            ],
+            [
+              3,
+              6
+            ]
+          ],
+          "player_component_min": [
+            1,
+            3
+          ]
+        },
+        "resources": {
+          "P": {
+            "code": "P",
+            "name": "transport_progress",
+            "value": 0.25,
+            "active": true,
+            "implemented": true,
+            "components": {
+              "matching_lower_bound": 0.25,
+              "cost_formula": "d_g(b_i)+lambda_turn*turns+lambda_access*access_risk+lambda_zone*zone_risk",
+              "transport_cost_weights": {
+                "turn": 0.1,
+                "access": 0.25,
+                "zone": 0.25
+              },
+              "matching_assignment": [
+                0.0,
+                1.0,
+                2.0,
+                3.0
+              ],
+              "feasible": true,
+              "boxes_on_goals": 4.0,
+              "lower_is_better": true
+            },
+            "description": "Remaining goal-conditioned transport work from the document cost matrix."
+          },
+          "M": {
+            "code": "M",
+            "name": "box_mobility",
+            "value": 6.0,
+            "active": true,
+            "implemented": true,
+            "components": {
+              "legal_push_count": 10.0,
+              "viable_push_count": 6.0,
+              "higher_is_better": true
+            },
+            "description": "Future push freedom, measured by legal and viable push counts."
+          },
+          "A": {
+            "code": "A",
+            "name": "push_accessibility",
+            "value": 10.0,
+            "active": true,
+            "implemented": true,
+            "components": {
+              "reachable_count": 27.0,
+              "legal_push_count": 10.0,
+              "floor_count": 32.0,
+              "higher_is_better": true
+            },
+            "description": "Player reachability support for feasible push positions."
+          },
+          "K": {
+            "code": "K",
+            "name": "region_capacity_slack",
+            "value": 0.0,
+            "active": true,
+            "implemented": true,
+            "components": {
+              "capacity_health": 0.0,
+              "capacity_debt": 0.0,
+              "min_raw_slack": 0.0,
+              "stressed_region_count": 0.0,
+              "region_count": 1.0,
+              "decomposition": "floor_components_after_cut_vertices",
+              "higher_is_better": true,
+              "hard_constraint": false,
+              "regions": [
+                {
+                  "region_id": 0.0,
+                  "cell_count": 28.0,
+                  "goal_count": 4.0,
+                  "box_count": 4.0,
+                  "committed_box_count": 4.0,
+                  "boxes_on_region_goals": 4.0,
+                  "entry_count": 5.0,
+                  "blocked_entry_count": 0.0,
+                  "wrong_box_count": 0.0,
+                  "overcapacity": 0.0,
+                  "raw_slack": 0.0,
+                  "capacity_debt": 0.0,
+                  "goals": [
+                    [
+                      1.0,
+                      7.0
+                    ],
+                    [
+                      2.0,
+                      3.0
+                    ],
+                    [
+                      2.0,
+                      8.0
+                    ],
+                    [
+                      3.0,
+                      6.0
+                    ]
+                  ],
+                  "blocked_entries": [],
+                  "wrong_boxes": []
+                }
+              ]
+            },
+            "description": "Goal-region capacity health from cut-vertex region decomposition; higher is better."
+          },
+          "D": {
+            "code": "D",
+            "name": "deadlock_debt",
+            "value": 1.0586726691760786,
+            "active": true,
+            "implemented": true,
+            "components": {
+              "deadlock_debt": 1.0586726691760786,
+              "hard_deadlock_debt": 0.0,
+              "soft_deadlock_pressure": 1.0586726691760786,
+              "soft_deadlock_components": {
+                "mobility_loss": 0.625,
+                "matching_fragility": 0.058672669176078524,
+                "capacity_stress": 0.0,
+                "access_loss": 0.375,
+                "order_violation": 0.0
+              },
+              "soft_deadlock_weights": {
+                "mobility_loss": 1.0,
+                "matching_fragility": 1.0,
+                "capacity_stress": 1.0,
+                "access_loss": 1.0,
+                "order_violation": 1.0
+              },
+              "dead_square_boxes": 0.0,
+              "static_frozen_boxes": 0.0,
+              "matching_deadlock": false,
+              "higher_is_worse": true
+            },
+            "description": "Hard deadlock debt plus normalized soft deadlock pressure."
+          },
+          "Q": {
+            "code": "Q",
+            "name": "ordering_debt",
+            "value": 0.0,
+            "active": true,
+            "implemented": true,
+            "components": {
+              "ordering_debt": 0.0,
+              "violated_edge_count": 0.0,
+              "cycle_count": 0.0,
+              "goal_order_edge_count": 3.0,
+              "entry_order_edge_count": 5.0,
+              "constraint_builder": "entry_depth_goal_partial_order_v1",
+              "higher_is_worse": true,
+              "hard_constraint": false,
+              "goal_order_violations": [],
+              "entry_violations": []
+            },
+            "description": "Goal-region ordering debt from entry-depth partial-order constraints; higher is worse."
+          },
+          "C": {
+            "code": "C",
+            "name": "goal_commitment",
+            "value": 0.9413273308239215,
+            "active": true,
+            "implemented": true,
+            "components": {
+              "commitment_confidence": 0.9413273308239215,
+              "assignment_entropy": 0.3253503617226019,
+              "normalized_entropy": 0.058672669176078524,
+              "feasible": true,
+              "sinkhorn_beta": 1.0,
+              "sinkhorn_iterations": 25.0,
+              "transport_cost_weights": {
+                "turn": 0.1,
+                "access": 0.25,
+                "zone": 0.25
+              },
+              "mean_best_goal_probability": 0.9847415441327637,
+              "min_best_goal_probability": 0.9659587238268063,
+              "cost_matrix": [
+                [
+                  0.0,
+                  null,
+                  null,
+                  null
+                ],
+                [
+                  5.0,
+                  0.0,
+                  5.0,
+                  4.0
+                ],
+                [
+                  null,
+                  null,
+                  0.0,
+                  null
+                ],
+                [
+                  3.0,
+                  4.0,
+                  3.0,
+                  0.0
+                ]
+              ],
+              "assignment_matrix": [
+                [
+                  1.0,
+                  0.0,
+                  0.0,
+                  0.0
+                ],
+                [
+                  0.002151,
+                  0.973007,
+                  0.002361,
+                  0.022481
+                ],
+                [
+                  0.0,
+                  0.0,
+                  1.0,
+                  0.0
+                ],
+                [
+                  0.011319,
+                  0.011483,
+                  0.011239,
+                  0.965959
+                ]
+              ],
+              "best_goal_indices": [
+                0.0,
+                1.0,
+                2.0,
+                3.0
+              ],
+              "higher_is_better": true,
+              "hard_constraint": false
+            },
+            "description": "Box-goal assignment commitment from Sinkhorn-normalized transport costs; higher is better."
+          },
+          "I": {
+            "code": "I",
+            "name": "action_relevance",
+            "value": 0.0,
+            "active": true,
+            "implemented": true,
+            "components": {
+              "status": "action_dependent",
+              "state_scalar": "not_applicable"
+            },
+            "description": "Action-dependent relevance score consumed as a soft MCTS prior."
+          }
+        }
+      }
+    }
+  ]
+}

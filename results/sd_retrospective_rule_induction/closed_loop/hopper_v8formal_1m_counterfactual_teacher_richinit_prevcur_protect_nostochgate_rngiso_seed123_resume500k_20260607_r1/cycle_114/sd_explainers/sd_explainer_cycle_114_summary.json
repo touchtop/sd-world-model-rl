@@ -1,0 +1,51 @@
+{
+  "checkpoint": "results/sd_retrospective_rule_induction/closed_loop/hopper_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1/cycle_114/sd_explainers/sd_explainer_cycle_114.pt",
+  "epochs": 3,
+  "history_tail": [
+    {
+      "best_val_loss": 0.980897068977356,
+      "epoch": 1.0,
+      "train_loss": 1.1695359200239182,
+      "val_loss": 0.980897068977356
+    },
+    {
+      "best_val_loss": 0.9807584881782532,
+      "epoch": 2.0,
+      "train_loss": 1.1681252839890393,
+      "val_loss": 0.9807584881782532
+    },
+    {
+      "best_val_loss": 0.980446457862854,
+      "epoch": 3.0,
+      "train_loss": 1.1697148531675339,
+      "val_loss": 0.980446457862854
+    }
+  ],
+  "init_checkpoint": "results/sd_retrospective_rule_induction/closed_loop/hopper_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1/cycle_113/sd_explainers/sd_explainer_cycle_113.pt",
+  "init_loaded_tensors": 30,
+  "metrics": {
+    "body_contact_z_mae": 0.022203799337148666,
+    "full_foot_support_mae": 0.29499149322509766,
+    "height_mae": 0.009147146716713905,
+    "one_step_struct_rmse": 2.197646379470825,
+    "pitch_mae": 0.07197693735361099,
+    "pitch_rate_mae": 2.8655731678009033,
+    "rollout_10_rmse": 2.0306950230151415,
+    "rollout_1_rmse": 1.2897769769188017,
+    "rollout_20_rmse": 1.9546239082701504,
+    "rollout_3_rmse": 1.9457455726806074,
+    "rollout_5_rmse": 2.033216504380107,
+    "support_contact_mae": 0.39394405484199524,
+    "vx_mae": 0.19619262218475342,
+    "vz_mae": 0.3648395538330078
+  },
+  "model_config": {
+    "transition_residual_scale": 1.0,
+    "use_transition_residual": true
+  },
+  "num_transitions": 50000,
+  "seed": 20260621,
+  "selection": "results/sd_retrospective_rule_induction/closed_loop/hopper_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1/cycle_114/manifests/selected_trajectories.json",
+  "train_size": 45010,
+  "val_size": 4990
+}

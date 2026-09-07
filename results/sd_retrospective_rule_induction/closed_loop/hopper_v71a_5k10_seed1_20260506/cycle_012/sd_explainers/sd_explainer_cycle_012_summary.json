@@ -1,0 +1,51 @@
+{
+  "checkpoint": "results/sd_retrospective_rule_induction/closed_loop/hopper_v71a_5k10_seed1_20260506/cycle_012/sd_explainers/sd_explainer_cycle_012.pt",
+  "epochs": 3,
+  "history_tail": [
+    {
+      "best_val_loss": 0.4660174548625946,
+      "epoch": 1.0,
+      "train_loss": 0.580596923828125,
+      "val_loss": 0.4660174548625946
+    },
+    {
+      "best_val_loss": 0.4660174548625946,
+      "epoch": 2.0,
+      "train_loss": 0.573565773665905,
+      "val_loss": 0.466379851102829
+    },
+    {
+      "best_val_loss": 0.4660174548625946,
+      "epoch": 3.0,
+      "train_loss": 0.5653250142931938,
+      "val_loss": 0.4669705033302307
+    }
+  ],
+  "init_checkpoint": "results/sd_retrospective_rule_induction/closed_loop/hopper_v71a_5k10_seed1_20260506/cycle_011/sd_explainers/sd_explainer_cycle_011.pt",
+  "init_loaded_tensors": 30,
+  "metrics": {
+    "body_contact_z_mae": 0.01036563329398632,
+    "full_foot_support_mae": 0.0022256101947277784,
+    "height_mae": 0.00836676824837923,
+    "one_step_struct_rmse": 1.147223711013794,
+    "pitch_mae": 0.038050249218940735,
+    "pitch_rate_mae": 1.6428874731063843,
+    "rollout_10_rmse": 1.5757009291555732,
+    "rollout_1_rmse": 1.028180027322378,
+    "rollout_20_rmse": 1.7745950748212636,
+    "rollout_3_rmse": 1.5078137837117538,
+    "rollout_5_rmse": 1.4468057465273887,
+    "support_contact_mae": 0.016733335331082344,
+    "vx_mae": 0.2039794921875,
+    "vz_mae": 0.33027616143226624
+  },
+  "model_config": {
+    "transition_residual_scale": 1.0,
+    "use_transition_residual": true
+  },
+  "num_transitions": 4491,
+  "seed": 13,
+  "selection": "results/sd_retrospective_rule_induction/closed_loop/hopper_v71a_5k10_seed1_20260506/cycle_012/manifests/selected_trajectories.json",
+  "train_size": 3992,
+  "val_size": 499
+}

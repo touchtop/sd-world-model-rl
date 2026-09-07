@@ -1,0 +1,51 @@
+{
+  "checkpoint": "results/sd_retrospective_rule_induction/closed_loop/hopper_v8formal_100k_teacher_core_strict_minrepro_noprotect_currentphase_seed123_20260525_r1/cycle_018/sd_explainers/sd_explainer_cycle_018.pt",
+  "epochs": 3,
+  "history_tail": [
+    {
+      "best_val_loss": 0.4603346288204193,
+      "epoch": 1.0,
+      "train_loss": 0.5931622623042627,
+      "val_loss": 0.4603346288204193
+    },
+    {
+      "best_val_loss": 0.45995643734931946,
+      "epoch": 2.0,
+      "train_loss": 0.5909893397580493,
+      "val_loss": 0.45995643734931946
+    },
+    {
+      "best_val_loss": 0.4596989154815674,
+      "epoch": 3.0,
+      "train_loss": 0.592106041583148,
+      "val_loss": 0.4596989154815674
+    }
+  ],
+  "init_checkpoint": "results/sd_retrospective_rule_induction/closed_loop/hopper_v8formal_100k_teacher_core_strict_minrepro_noprotect_currentphase_seed123_20260525_r1/cycle_017/sd_explainers/sd_explainer_cycle_017.pt",
+  "init_loaded_tensors": 30,
+  "metrics": {
+    "body_contact_z_mae": 0.00916934385895729,
+    "full_foot_support_mae": 0.18397562205791473,
+    "height_mae": 0.008108220994472504,
+    "one_step_struct_rmse": 1.241396427154541,
+    "pitch_mae": 0.030199186876416206,
+    "pitch_rate_mae": 1.3059346675872803,
+    "rollout_10_rmse": 1.2059085931396112,
+    "rollout_1_rmse": 1.0702068989630789,
+    "rollout_20_rmse": 1.1941338435281068,
+    "rollout_3_rmse": 1.263996660709381,
+    "rollout_5_rmse": 1.193347406340763,
+    "support_contact_mae": 0.43070393800735474,
+    "vx_mae": 0.14988598227500916,
+    "vz_mae": 0.2478885054588318
+  },
+  "model_config": {
+    "transition_residual_scale": 1.0,
+    "use_transition_residual": true
+  },
+  "num_transitions": 50000,
+  "seed": 20260525,
+  "selection": "results/sd_retrospective_rule_induction/closed_loop/hopper_v8formal_100k_teacher_core_strict_minrepro_noprotect_currentphase_seed123_20260525_r1/cycle_018/manifests/selected_trajectories.json",
+  "train_size": 45010,
+  "val_size": 4990
+}

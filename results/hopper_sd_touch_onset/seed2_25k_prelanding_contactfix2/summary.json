@@ -1,0 +1,195 @@
+{
+  "agent_checkpoint": "/home/data/round/code/sd_world_model_rl/logs/hopper-hop/2/sd_hopper_100k_pureenv_sdinit_seed2_20260428_run1/models/25000.pt",
+  "trace_dir": "/home/data/round/code/sd_world_model_rl/logs/hopper-hop/2/sd_hopper_100k_pureenv_sdinit_seed2_20260428_run1/official_eval/step_0025000/episode_csv",
+  "num_samples": 20,
+  "horizon": 6,
+  "samples_per_trace": 2,
+  "state_name_filter": [
+    "falling_air"
+  ],
+  "require_trace_landing_within": 6,
+  "touch_threshold": 0.5,
+  "ground_eps": 0.03,
+  "events": {
+    "toe_touch": {
+      "num_records": 20,
+      "onset_error": {
+        "count": 0
+      },
+      "classification_accuracy_by_horizon": [
+        0.8,
+        0.75,
+        0.8,
+        0.8,
+        0.85,
+        0.75
+      ],
+      "exact_match_rate": 0.0,
+      "pred_early_rate": 0.0,
+      "pred_late_rate": 0.0,
+      "both_missing_rate": 0.6,
+      "pred_missing_rate": 0.0,
+      "spurious_pred_rate": 0.4
+    },
+    "heel_touch": {
+      "num_records": 20,
+      "onset_error": {
+        "count": 6,
+        "mean": 1.3333333333333333,
+        "std": 2.9249881291307074,
+        "p50": 2.0,
+        "p90": 4.5,
+        "p95": 4.75,
+        "max": 5.0
+      },
+      "classification_accuracy_by_horizon": [
+        0.45,
+        0.4,
+        0.35,
+        0.4,
+        0.45,
+        0.3
+      ],
+      "exact_match_rate": 0.0,
+      "pred_early_rate": 0.1,
+      "pred_late_rate": 0.2,
+      "both_missing_rate": 0.1,
+      "pred_missing_rate": 0.3,
+      "spurious_pred_rate": 0.3
+    },
+    "grounded_any": {
+      "num_records": 20,
+      "onset_error": {
+        "count": 19,
+        "mean": 0.21052631578947367,
+        "std": 0.6942582083301537,
+        "p50": 0.0,
+        "p90": 1.0,
+        "p95": 1.0999999999999979,
+        "max": 2.0
+      },
+      "classification_accuracy_by_horizon": [
+        0.95,
+        0.95,
+        0.85,
+        0.9,
+        0.75,
+        0.85
+      ],
+      "exact_match_rate": 0.6,
+      "pred_early_rate": 0.1,
+      "pred_late_rate": 0.25,
+      "both_missing_rate": 0.0,
+      "pred_missing_rate": 0.05,
+      "spurious_pred_rate": 0.0
+    },
+    "foot_grounded": {
+      "num_records": 20,
+      "onset_error": {
+        "count": 7,
+        "mean": 1.5714285714285714,
+        "std": 2.770102775666474,
+        "p50": 2.0,
+        "p90": 4.4,
+        "p95": 4.699999999999999,
+        "max": 5.0
+      },
+      "classification_accuracy_by_horizon": [
+        0.4,
+        0.35,
+        0.35,
+        0.35,
+        0.3,
+        0.3
+      ],
+      "exact_match_rate": 0.0,
+      "pred_early_rate": 0.1,
+      "pred_late_rate": 0.25,
+      "both_missing_rate": 0.05,
+      "pred_missing_rate": 0.25,
+      "spurious_pred_rate": 0.35
+    },
+    "airborne_false": {
+      "num_records": 20,
+      "onset_error": {
+        "count": 20,
+        "mean": 0.9,
+        "std": 2.022374841615669,
+        "p50": 0.5,
+        "p90": 3.1000000000000014,
+        "p95": 4.050000000000001,
+        "max": 5.0
+      },
+      "classification_accuracy_by_horizon": [
+        0.65,
+        0.65,
+        0.65,
+        0.75,
+        0.65,
+        0.95
+      ],
+      "exact_match_rate": 0.25,
+      "pred_early_rate": 0.25,
+      "pred_late_rate": 0.5,
+      "both_missing_rate": 0.0,
+      "pred_missing_rate": 0.0,
+      "spurious_pred_rate": 0.0
+    }
+  },
+  "near_true_ground_onset_abs_error": {
+    "vx": {
+      "count": 49,
+      "mean": 0.3851915851463469,
+      "std": 0.3880788600607456,
+      "p50": 0.2617615759372711,
+      "p90": 0.7528563559055331,
+      "p95": 1.1255795180797576,
+      "max": 1.8138784915208817
+    },
+    "vz": {
+      "count": 49,
+      "mean": 1.337525326986702,
+      "std": 0.8816594349949736,
+      "p50": 1.0648655891418457,
+      "p90": 2.692981606721878,
+      "p95": 3.0844519495964047,
+      "max": 3.8824862241744995
+    },
+    "omega": {
+      "count": 49,
+      "mean": 3.2536751113223787,
+      "std": 2.2805442092221377,
+      "p50": 2.6561630964279175,
+      "p90": 6.843957781791687,
+      "p95": 6.921823406219482,
+      "max": 7.83086359500885
+    },
+    "any_contact_z": {
+      "count": 49,
+      "mean": 0.04350455888375944,
+      "std": 0.03238104597230523,
+      "p50": 0.03363722562789917,
+      "p90": 0.0827302098274231,
+      "p95": 0.090594694763422,
+      "max": 0.1507980078458786
+    },
+    "touch_toe": {
+      "count": 49,
+      "mean": 0.23530985604045374,
+      "std": 0.32997159374799395,
+      "p50": 0.02452949434518814,
+      "p90": 0.8084783077239991,
+      "p95": 0.8464763283729553,
+      "max": 0.9238249063491821
+    },
+    "touch_heel": {
+      "count": 49,
+      "mean": 0.681323711271665,
+      "std": 0.32459205864720536,
+      "p50": 0.8094475269317627,
+      "p90": 0.9889451931696385,
+      "p95": 0.9916401003909414,
+      "max": 0.9932758315553656
+    }
+  }
+}

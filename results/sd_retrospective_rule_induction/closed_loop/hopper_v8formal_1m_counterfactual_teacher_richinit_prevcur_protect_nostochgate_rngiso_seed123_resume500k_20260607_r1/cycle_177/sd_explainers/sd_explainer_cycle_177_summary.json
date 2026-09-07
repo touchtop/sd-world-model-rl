@@ -1,0 +1,51 @@
+{
+  "checkpoint": "results/sd_retrospective_rule_induction/closed_loop/hopper_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1/cycle_177/sd_explainers/sd_explainer_cycle_177.pt",
+  "epochs": 3,
+  "history_tail": [
+    {
+      "best_val_loss": 0.8097236752510071,
+      "epoch": 1.0,
+      "train_loss": 1.2331877770749005,
+      "val_loss": 0.8097236752510071
+    },
+    {
+      "best_val_loss": 0.8095420598983765,
+      "epoch": 2.0,
+      "train_loss": 1.2318375327370383,
+      "val_loss": 0.8095420598983765
+    },
+    {
+      "best_val_loss": 0.8095276951789856,
+      "epoch": 3.0,
+      "train_loss": 1.231099845333533,
+      "val_loss": 0.8095276951789856
+    }
+  ],
+  "init_checkpoint": "results/sd_retrospective_rule_induction/closed_loop/hopper_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1/cycle_176/sd_explainers/sd_explainer_cycle_176.pt",
+  "init_loaded_tensors": 30,
+  "metrics": {
+    "body_contact_z_mae": 0.018437834456562996,
+    "full_foot_support_mae": 0.24401146173477173,
+    "height_mae": 0.009412980638444424,
+    "one_step_struct_rmse": 1.9547289609909058,
+    "pitch_mae": 0.057781267911195755,
+    "pitch_rate_mae": 2.2245659828186035,
+    "rollout_10_rmse": 5.062095053493977,
+    "rollout_1_rmse": 2.437575017567724,
+    "rollout_20_rmse": 4.352986923418939,
+    "rollout_3_rmse": 4.130361622199416,
+    "rollout_5_rmse": 4.733353281393647,
+    "support_contact_mae": 0.29217252135276794,
+    "vx_mae": 0.16951188445091248,
+    "vz_mae": 0.3515954315662384
+  },
+  "model_config": {
+    "transition_residual_scale": 1.0,
+    "use_transition_residual": true
+  },
+  "num_transitions": 50000,
+  "seed": 20260684,
+  "selection": "results/sd_retrospective_rule_induction/closed_loop/hopper_v8formal_1m_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume500k_20260607_r1/cycle_177/manifests/selected_trajectories.json",
+  "train_size": 45010,
+  "val_size": 4990
+}

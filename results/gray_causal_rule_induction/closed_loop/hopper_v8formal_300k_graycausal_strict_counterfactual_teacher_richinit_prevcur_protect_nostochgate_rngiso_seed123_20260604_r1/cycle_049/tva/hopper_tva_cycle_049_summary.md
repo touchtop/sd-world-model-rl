@@ -1,0 +1,17 @@
+# Hopper TVA Explainer
+
+Selection: `results/gray_causal_rule_induction/closed_loop/hopper_v8formal_300k_graycausal_strict_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_20260604_r1/cycle_049/manifests/selected_trajectories.json`
+SD checkpoint: `results/gray_causal_rule_induction/closed_loop/hopper_v8formal_300k_graycausal_strict_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_20260604_r1/cycle_049/sd_explainers/sd_explainer_cycle_049.pt`
+TVA checkpoint: `results/gray_causal_rule_induction/closed_loop/hopper_v8formal_300k_graycausal_strict_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_20260604_r1/cycle_049/tva/hopper_tva_cycle_049.pt`
+Init checkpoint: `results/gray_causal_rule_induction/closed_loop/hopper_v8formal_300k_graycausal_strict_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_20260604_r1/cycle_048/tva/hopper_tva_cycle_048.pt`
+Transitions: `5000`
+Train loss: `14.420292`
+Eval smooth-l1: `14.310797`
+Eval MSE: `570.531067`
+
+## Target Statistics
+
+- `mean`: `27.843241`
+- `std`: `50.201256`
+- `min`: `-50.443039`
+- `max`: `102.542313`

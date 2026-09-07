@@ -1,0 +1,1268 @@
+AI planning in the imagination: High-level planning on learned
+abstract search spaces
+
+arXiv:2308.08693v2 [cs.AI] 3 Dec 2023
+
+Carlos Martin1 and Tuomas Sandholm1,2,3,4
+cgmartin@cs.cmu.edu, sandholm@cs.cmu.edu
+1
+Carnegie Mellon University
+2
+Strategy Robot, Inc.
+3
+Optimized Markets, Inc.
+4
+Strategic Machine, Inc.
+
+Abstract
+
+ulator at execution time.
+
+Search and planning algorithms have been a cornerstone
+of artificial intelligence since the field’s inception. Giving
+reinforcement learning agents the ability to plan during
+execution time has resulted in significant performance improvements in various domains. However, in real-world
+environments, the model with respect to which the agent
+plans has been constrained to be grounded in the real environment itself, as opposed to a more abstract model which
+allows for planning over compound actions and behaviors.
+We propose a new method, called PiZero, that gives an
+agent the ability to plan in an abstract search space that the
+agent learns during training, which is completely decoupled from the real environment. Unlike prior approaches,
+this enables the agent to perform high-level planning at
+arbitrary timescales and reason in terms of compound
+or temporally-extended actions, which can be useful in
+environments where large numbers of base-level microactions are needed to perform relevant macro-actions. In
+addition, our method is more general than comparable
+prior methods because it seamlessly handles settings with
+continuous action spaces, combinatorial action spaces,
+and partial observability. We evaluate our method on multiple domains, including the traveling salesman problem,
+Sokoban, 2048, the facility location problem, and Pacman. Experimentally, it outperforms comparable prior
+methods without assuming access to an environment sim-
+
+1
+
+Introduction
+
+In many domains, planning at execution time significantly
+improves performance. In games like chess and Go, and
+single-agent domains like Sokoban, Pacman, and 2048,
+all state-of-the-art approaches use planning. No planningfree, reactive approach has matched their performance.
+We present a new method that gives agents the ability to plan in a learned abstract search space that is completely decoupled from the real environment. Unlike
+prior approaches, this allows agents to perform high-level
+planning at arbitrary timescales, and reason in terms of
+compound or temporally-extended actions, which can be
+useful in environments where many “micro” actions are
+needed to perform relevant “macro” actions.
+Lookahead search and reasoning is a central paradigm
+in artificial intelligence. Traditionally, the search space is
+first formulated and then solved 1;2;3;4;5;6 . Here, the formulation of the search space happens during the solve. This
+breaks the traditional paradigm because it does not require
+the search space to be formulated up front.
+Our method augments a standard neural-network-based
+agent with a planning module that it can query before
+selecting actions in the real environment. The planning
+module uses a learned dynamics model and a learned pre1
+
+diction model. The dynamics model takes a state and action as input and returns a reward and new state as output.
+The prediction model takes a state as input and returns an
+estimated abstract value and abstract action probabilities.
+The states, actions, and rewards of the planning module
+are purely abstract and do not need to have any direct relation or correspondence with those of the real environment.
+They need not have the same dimensionality or even type
+(discrete versus continuous).
+In each step of an episode, the following occurs. First,
+the agent encodes its current memory and observation into
+an abstract state for its planning module (where the encoding itself is learned). Second, the planning module
+performs Monte Carlo Tree Search (MCTS) in an abstract search space created by a learned abstract dynamics
+model. In our case, we assume the abstract action space is
+a discrete set of k actions, where k is a fixed hyperparameter. Third, the results of the MCTS subroutine are passed
+into another network which outputs an action for the real
+environment. Fourth, the observation and generated action are used to update the agent’s memory.
+In §4, we describe prior algorithms in the literature and
+related research. In §2, we formulate the problem we are
+tackling in detail. In §3, we motivate and describe our
+method. In §5, we present our experiments. In §6, we
+present conclusions and future research.
+
+actions.
+An episode or trajectory τ = (m, s, o, a, r) is a tuple of sequences of memories, states, actions, and rewards. A trajectory is generated as follows. First, an
+initial state s0 ∼ ρ is sampled. Then, the agent and environment are updated in tandem for all t ∈ [H]: The agent
+is updated with environment’s observation, at , mt+1 ∼
+π(o(st ), mt ), and the environment is updated with agent’s
+action, st+1 , rt ∼ δ(st , at ). The score P
+or return of a trajectory is the sum of its rewards, R = t∈[H] rt . Given
+an environment, our goal is to obtain an agent that maximizes the expected return Eτ R.
+
+3
+
+Proposed method
+
+In this section, we describe our proposed method.
+
+3.1
+
+Agent architecture
+
+The core architecture of the agent is illustrated below.
+state
+policy
+action
+concrete
+
+2
+
+encoder
+
+Background
+
+state
+planner
+
+decoder
+
+action
+abstract
+
+The agent’s current memory and observation constitute
+the agent’s concrete state. The concrete state is passed
+to an encoder, which transforms it into an abstract state.
+This is a state in an abstract space whose dynamics is
+learned by the agent. The abstract state is passed to a planner, which performs planning in the abstract space and
+returns an abstract action. The abstract action is passed
+to a decoder, which transforms it into a concrete action
+for the real environment.1 The agent’s memory is then
+
+We use the following notation throughout the paper:
+△X is the set of probability distributions on X , [n] =
+{0, . . . , n − 1}, a ∥ b is the concatenation of vectors a and
+b, dim X is the dimensionality of a space X , and |X | is
+the cardinality of a set X .
+A finite-horizon partially-observable Markov decision
+process (FH-POMDP), henceforth called an environment,
+is a tuple (S, O, A, ρ, δ, H) where S is a state space, O
+is an observation space, A is an action space, ρ : △S is
+an initial state distribution, o : S → O is an observation
+function, δ : S × A → △(S × R) is a transition function,
+and H ∈ N is a horizon.
+An agent is a tuple (M, m0 , π) where M is a memory
+space, m0 ∈ M is an initial memory, and π : O × M →
+△(A × M) is a transition function. The agent’s memory
+can implicitly encode the history of past observations and
+
+1 If stochastic actions are desired, the abstract action can be concatenated with latent noise, e.g. from a standard normal distribution, before
+being passed to the decoder. There are situations where randomizing
+over actions is beneficial, e.g., when the agent has imperfect recall or
+the environment is adversarial (e.g., due to the presence of other agents).
+The approach of feeding noise as input to induce a stochastic output is
+called an implicit density model or deep generative model in the literature 7 , and has the advantage of creating flexible classes of distributions.
+For example, sampling from a categorical distribution is equivalent to
+perturbing its logits with Gumbel noise and applying argmax.
+
+2
+
+updated with the resulting action and input observation.
+shown in Equation 1.
+For the agent’s memory, we use a recurrent unit. Many
+p
+P
+1 + b N (s, b)
+recurrent units have been proposed in the literature 8;9 .
+×
+(1)
+Q(s, a) + P (s, a)
+1 + N (s, a)
+Among the most popular are Long Short-Term Memory
+P
+
+
+10
+11;12
+(LSTM) and Gated Recurrent Unit (GRU)
+. We use
+N (s, b) + c2 + 1
+c1 + log b
+(2)
+GRU since it is simpler, faster, and has comparable perc2
+formance to LSTM 13;14;15 . For the encoder and decoder,
+we use standard feedforward networks.
+Here, c1 , c2 are constants that control the relative importance of the value estimates and prior probabilities. We
+use the same values as sAntonoglou et al. 21 . After a
+3.2 Planner architecture
+is selected, the reward r = R(s, a) and successor state
+s′ = S(s, a) are queried from the node’s lookup table,
+Our planner performs MCTS in an abstract space learned
+and the successor state’s node becomes the new node.
+by the agent. More precisely, let S be a state space and A
+be an action space (we use A = [n] for some n ∈ N). The
+dynamics function δ : S × A → R × S maps a state and Expansion When a leaf edge is reached, the reward and
+′
+action to a reward and new state. The prediction function successor state (r, s ) = gθ (s, a) are computed from the
+ϕ : S → R × RA maps a state to a predicted value and ac- dynamics function and stored in the node’s lookup table.
+tion logits. The parameters of both of these functions are The policy and value are computed by the prediction funclearned. The planner runs an MCTS algorithm (described tion (p, v) = fθ (s). A new node is created corresponding
+′
+in the next section) on the resulting space, starting at the to s and added to the search tree. The lookup table is iniabstract state fed into the planner, and outputs the abstract tialized, for each action a, with N (s, a) = 0, Q(s, a) =
+0, P (s, a) = p.
+action returned by the MCTS algorithm.
+For δ, we use a GRU and apply a one-hot encoding to
+its input action. For ϕ, we use a standard feedforward net- Backpropagation The value estimate of the newly
+work. For the MCTS algorithm, we use the open-source added edge is backpropagated up the tree along the trajectory from the root to the leaf using an n-step return
+JAX 16 library called mctx 17 .
+This architecture is inspired by MuZero 18 , but there are estimate. Specifically, from t = T to 0, where T is the
+length of the trajectory, we compute a T − t-step estimate
+some important differences that we describe in §4.
+of the cumulative discounted reward that bootstraps from
+Pl−1−t
+the value function vl : Gt = t=0 γ t rt+1+t + γ T −t vl .
+3.3 Planning algorithm
+For each such t, we also update the statistics for the edge
+t )Q(st ,at )+Gt
+,
+(st , at ) as follows: Q(st , at ) := N (st ,a
+N (st ,at )+1
+PiZero uses variant of MCTS introduced by Silver
+et al. 19 . This algorithm iteratively constructs a search N (st , at ) := N (st , at ) + 1. This algorithm can be exin the search tree, as detree starting from some given state s0 . Each node in tended to include chance nodes
+21
+scribed
+in
+Antonoglou
+et
+al.
+.
+The
+action probabilities at
+this search tree contains a state s and, for each action a
+a
+chance
+node
+are
+output
+by
+a
+learned
+function.
+from s, the visit count N (s, a), value estimate Q(s, a),
+prior probability P (s, a), reward R(s, a), and successor
+state S(s, a). Each iteration of the algorithm consists of 3
+phases: selection, expansion, and backpropagation.
+
+3.4
+
+Training procedure
+
+Once we have fixed an architecture for the agent, we seek
+to find parameters that maximize its expected return in
+Selection The tree is traversed starting from the root the environment. One way to do this is by using stochasnode until a leaf edge is reached. At each internal node tic gradient ascent. Stochastic gradient ascent requires an
+s the algorithm selects the action a which maximizes the estimator of the gradient of the expected return with reupper confidence bound proposed in Silver et al. 20 and spect to the parameters. This is called the policy gradient.
+3
+
+Algorithm 1 Distributed training.
+The following algorithm runs on each worker. All workers are initialized with the same random seed.
+The function f samples an episode with the input parameters for the agent and outputs its score.
+x ← agent.initialize params()
+S ← optimizer.initialize state(x)
+loop
+x ← optimizer.get params(S)
+I ← set of available workers
+for i ∈ I
+zi ∼ N
+j ← own worker rank
+δj ← f (x + σzj ) − f (x − σzj )
+send δj to other workers
+receive {δi }i∈I−{j} from other workers
+P
+1
+g ← 2σ|I|
+i∈I δi zi
+S ← optimizer.update state(S, g)
+
+There is a vast literature on policy gradient methods, including REINFORCE 22 and actor-critic methods 23;24 .
+However, there is a problem: Most of these methods assume that the policy is differentiable—that is, that its output (an action distribution) is differentiable with respect
+to the parameters of the policy. However, our planning
+policy uses MCTS as a subroutine, and standard MCTS
+is not differentiable. Because our policy contains a nondifferentiable submodule, we need to find an alternative
+way to optimize the policy’s parameters.
+Fortunately, we can turn to black-box (i.e., zerothorder) optimization. Black-box optimization uses only
+function evaluations to optimize a black-box function
+with respect to a set of inputs. In particular, it does not require gradients. In our case, the black-box function maps
+our policy’s parameters to a sampled episode score.
+There is a class of black-box optimization algorithms
+called evolution strategies (ES) 25;26;27 that maintain and
+evolve a population of parameter vectors. Natural evolution strategies (NES) 28;29;30 represent the population as
+a distribution over parameters and maximize its average
+objective value using the score function estimator.
+For many parameter distributions, such as Gaussian
+smoothing, this is equivalent to evaluating the function at
+randomly-sampled points and estimating the gradient as a
+sum of estimates of directional derivatives along random
+directions 31;32;33;34 .
+ES has been shown to be a scalable alternative to standard reinforcement learning 35 . Lenc et al. 36 show that
+ES is also a viable method for learning non-differentiable
+parameters of large supervised models. We use OpenAIES 35 , an NES algorithm that is based on the identity
+∇x Ez∼N f (x + σz) = σ1 Ez∼N f (x + σz)z, where N
+is the standard multivariate normal distribution with the
+same dimension as x. The algorithm computes works as
+follows. Let I be a set of indices. For each i ∈ I in
+parallel, sample zi ∼ N and compute δi = fP
+(x + σzi ).
+1
+Finally, compute the pseudogradient g = σ|I|
+i∈I δi zi .
+To reduce variance, like Salimans et al. 35 , we use antithetic sampling 37 , also called mirrored sampling 38 , which
+uses pairs of perturbations ±σzi . The resulting gradient
+estimate is fed into a standard optimizer. For the latter, we
+use Adaptive Momentum (Adam) 39 .
+OpenAI-ES is massively parallelizable. Each δi can be
+evaluated on a separate worker. Furthermore, the entire
+
+optimization procedure can be performed with minimal
+communication bandwidth between workers. All workers
+are initialized with the same random seed. Worker i evaluates δi , sends it to the remaining workers, and receives the
+other workers’ values (this is called an allgather operation
+in distributed computing). Thus the workers compute the
+same g and stay synchronized. This process is described
+in Algorithm 2 of Salimans et al. 35 . The full training process is summarized in Algorithm 1.
+
+4
+
+Related work
+
+Monte-Carlo evaluation estimates the value of a position
+by averaging the return of several random rollouts. It
+can serve as an evaluation function for the leaves of a
+search tree. Monte-Carlo Tree Search (MCTS) 40 combines Monte-Carlo evaluation with tree search. Instead of
+backing-up the min-max value close to the root, and the
+average value at some depth, a more general backup operator is defined that progressively changes from averaging
+to min-max as the number of simulations grows. This provides a fine-grained control of the tree growth and allows
+efficient selectivity. Świechowski et al. 41 present a survey
+of recent modifications and applications of MCTS.
+4
+
+AlphaGo 20 used a variant of MCTS to tackle the game
+of Go. This variant uses a neural network to evaluate
+board positions and select moves. These networks are
+trained using a combination of supervised learning from
+human expert games and reinforcement learning from
+self-play. It was the first computer program to defeat a
+human professional player.
+AlphaGo Zero 42 used reinforcement learning alone,
+without any human data, guidance or domain knowledge
+beyond game rules. AlphaZero 19 generalized AlphaGo
+Zero into a single algorithm that achieved superhuman
+performance in many challenging games, including chess
+and shogi.
+MuZero 18 combined AlphaZero’s tree-based search
+with a learned dynamics model. The latter allows it
+to plan in environments where the agent does not have
+access to a simulator of the environment at execution
+time. In the authors’ words, “All parameters of the model
+are trained jointly to accurately match the policy, value,
+and reward, for every hypothetical step k, to corresponding target values observed after k actual time-steps have
+elapsed.” In other words, unlike our method, its dynamics and prediction models are coupled to the real environment. Furthermore, since the action probabilities returned
+by the MCTS process are treated as fixed targets to train
+the prediction model, MuZero does not need to differentiate through the nondifferentiable MCTS process.
+Hubert et al. 43 proposed Sampled MuZero, an extension of the MuZero algorithm that is able to learn in domains with arbitrarily complex action spaces (including
+ones that are continuous and high-dimensional) by planning over sampled actions.
+Stochastic MuZero 21 extended MuZero to environments that are inherently stochastic, partially observed,
+or so large and complex that they appear stochastic to a
+finite agent. It learns a stochastic model incorporating
+afterstates, and uses this model to perform a stochastic
+tree search. It matches the performance of MuZero in Go
+while matching or exceeding the state of the art in a set of
+canonical single and multiagent environments, including
+2048 and backgammon.
+Our method has some important differences to prior
+methods. While some prior methods use a learned dynamics model, like ours, their training objective is different. In particular, they train a model to predict accurate
+rewards and values for the real environment. In contrast,
+
+our method completely decouples the dynamics and evaluation models from the real environment. This gives agents
+the ability to perform arbitrarily high-level planning in a
+learned abstract search space whose rewards and values
+are not tied to those of the real environment in any way.
+Since neither states, actions, rewards, nor values in the
+abstract space are tied to the timescale of the environment,
+the agent has the ability to reason in terms of compound,
+temporally-extended actions or behaviors. This is useful
+in environments, such as real-time strategy (RTS) games,
+where it takes a very large number of “micro-actions”
+to perform “macro-actions” that are relevant to planning,
+such as reaching a target across the map and destroying it.
+Because they are so fine-grained, performing MCTS on
+the environment’s real “micro-actions” would not yield
+useful information for any reasonable simulation budget.
+Another difference to prior methods is that ours can
+straightforwardly handle continuous-action environments
+and does not require computing probabilities of actions.
+Computing action probabilities for continuous action distributions requires constraining to a model class such as a
+parametric distribution or a normalizing flow 44;45 .
+In terms of the optimization objective, a crucial difference between PiZero and prior methods like AlphaZero
+and MuZero is that, while the latter try to minimize a
+planning loss for the value and policy networks, ours simply tries to directly maximize the episode score in any way
+it can, which more directly corresponds to the overarching
+goal of reinforcement learning and brings advantages.
+For example, our method can straightforwardly handle
+partially-observable environments where the agent must
+also learn what to remember from observations, as opposed to having access to some fixed representation of
+the observation history that is not learned. Since PiZero
+learns to maximize the episode score in an end-to-end
+fashion, it can learn what to remember without requiring
+any separate loss or objective function.
+Table 1 summarizes some of the differences between
+our method and prior ones. Additional related work can
+be found in the appendix.
+
+5
+
+Experiments
+
+We evaluate our method on multiple domains. We note
+that we are not trying to develop the best special-purpose
+5
+
+No simulator
+Stochastic model
+Continuous actions
+No observation storage
+No action probabilities
+Low bandwidth
+No episode storage
+Backprop-free
+
+AlphaZero
+✗
+✗
+✗
+✗
+✗
+✗
+✗
+✗
+
+MuZero
+✓
+✗
+✗
+✗
+✗
+✗
+✗
+✗
+
+Sampled MuZero
+✓
+✗
+✓
+✗
+✗
+✗
+✗
+✗
+
+Stochastic MuZero
+✓
+✓
+✗
+✗
+✗
+✗
+✗
+✗
+
+PiZero
+✓
+✓
+✓
+✓
+✓
+✓
+✓
+✓
+
+Table 1: Comparison to prior methods.
+shortest tour through all the cities. The agent observes the
+flattened matrix M together with the current timestep.
+An example state is shown in Figure 1. Dots are cities,
+the filled dot is the initial city, and lines constitute the
+path constructed so far. Results are shown in Figure 2,
+with equal run-time for each method. PiZero outperforms
+AlphaZero, despite lacking access to an environment simulator.
+
+solver for any one of these benchmarks. Rather, our goal
+is to create a general agent that can tackle a wide range
+of environments. Unless otherwise noted, our experimental hyperparameters are those listed in Table 2. In our
+plots, solid lines indicate the mean across trials. Bands
+indicate a confidence interval for this mean with a confidence level of 0.95. The latter is computed using bootstrapping 46 , specifically the bias-corrected and accelerated (BCa) method 47 .
+
+5.2
+5.1
+
+Traveling salesman problem
+
+Sokoban
+
+Sokoban is a puzzle in which an agent pushes boxes
+around a warehouse to get them to storage locations. It
+is played on a grid of tiles. Each tile may be a floor or
+a wall, and may contain a box or the agent. Some floor
+tiles are marked as storage locations. The agent can move
+horizontally or vertically onto empty tiles. The agent can
+also move a box by walking up to it and push it to the
+tile beyond, if the latter is empty. Boxes cannot be pulled,
+and they cannot be pushed to squares with walls or other
+boxes. The number of boxes equals the number of storage locations. The puzzle is solved when all boxes are
+placed at storage locations. In this puzzle, planning ahead
+is crucial since an agent can easily get stuck if it makes
+the wrong move.
+Sokoban has been studied in the field of computational
+complexity and shown to be PSPACE-complete 51 . It has
+received significant interest in artificial intelligence research because of its relevance to automated planning
+(e.g., for autonomous robots), and is used as a benchmark.
+Sokoban’s large branching factor and search tree depth
+contribute to its difficulty. Skilled human players rely
+mostly on heuristics and can quickly discard several fu-
+
+The traveling salesman problem (TSP) is a classic problem in combinatorial optimization. Given a set of cities
+and their pairwise distances, the goal is to find a shortest
+route that visits each city once and returns to the starting
+city. This problem has important applications in operations research, including logistics, computer wiring, vehicle routing, and various other planning problems 48 . TSP
+is known to be NP-hard 49 . Various approximation algorithms and heuristics 50 have been developed for it.
+Our environment is as follows. We seek to learn to
+solve TSP in general, not just one particular instance of it.
+Thus, on every episode, a new problem instance is generated by sampling a matrix M ∼ Uniform([0, 1]n×2 ),
+representing a sequence of n cities (in our experiments,
+we use 10 cities). At timestep t ∈ [n], the agent chooses a
+city a ∈ [n] to swap with the city in the tth position (possibly the same city, which leaves the sequence unchanged).
+At the end of the episode, the length of the tour through
+this sequence of cities (including the segment from the final city to the initial one) is computed, and treated as the
+negative score. Thus the agent is incentivized to find the
+6
+
+tile or redundant lines of play by recognizing patterns and
+subgoals, narrowing down the search significantly. Various automatic solvers have been developed in the literature 52;53;54;55 , many of which rely on heuristics, but more
+complex Sokoban levels remain a challenge.
+Our environment is as follows. We use the unfiltered
+Boxoban training set 56 , which contains levels of size 10×
+10. At the beginning of each episode, a level is sampled
+from this dataset. The agent has four actions available to
+it, for motion in each of the four cardinal directions. The
+level ends after a given number of timesteps H ∈ N (we
+use H = 50). The return at the end of an episode is the
+number of goals that are covered with boxes. Thus the
+agent is incentivized to cover all of the goals.
+An example state is shown in Figure 1. This image
+was rendered by JSoko 57 , an open-source Sokoban implementation. The yellow vehicle is the agent, who must
+push the brown boxes into the goal squares marked with
+Xs. (Boxes tagged “OK” are on top of goal squares.) Results are shown in Figure 2, with equal run-time for each
+method. PiZero outperforms AlphaZero, despite lacking
+access to an environment simulator.
+
+5.3
+
+terms of such compound “macro” actions in some imagined abstract space.
+An example state is shown in Figure 1. Brick tiles are
+walls, yellow circles are coins, and the human figure is the
+agent. Results are shown in Figure 2, with equal run-time
+for each method. PiZero outperforms even AlphaZero,
+despite lacking access to an environment simulator.
+
+5.4
+
+2048 game
+
+We use the 2048 implementation of Jumanji 59 , a library
+of reinforcement learning environments written in JAX 16 .
+Quoting from their documentation: “2048 is a popular
+single-player puzzle game that is played on a 4x4 grid.
+The game board consists of cells, each containing a power
+of 2, and the objective is to reach a score of at least 2048
+by merging cells together. The player can shift the entire grid in one of the four directions (up, down, right,
+left) to combine cells of the same value. When two adjacent cells have the same value, they merge into a single cell with a value equal to the sum of the two cells.
+The game ends when the player is no longer able to make
+any further moves. The ultimate goal is to achieve the
+highest-valued tile possible, with the hope of surpassing
+2048. With each move, the player must carefully plan
+and strategize to reach the highest score possible.” An example state is shown in Figure 1. Results are shown in
+Figure 2.
+
+Collection problem
+
+In this environment, an agent must navigate an 8 × 8 2D
+gridworld to collect as many coins as possible within a
+time limit. At the beginning of each episode, coins are
+placed uniformly at random, as is the agent. On each
+timestep, the agent can move up, down, left, or right. The
+agent collects a coin when it moves into the same tile as
+the latter. After 20 timesteps, the score is minus the number of remaining coins. Thus the agent is incentivized to
+collect as many coins as possible within the time limit. A
+variant of this environment was used by Oh et al. 58 , §4.2
+as a benchmark.
+This problem resembles a traveling salesman-like problem in which several “micro” actions are required to perform the “macro” actions of moving from one city to another. (Also, the agent can visit cities multiple times and
+does not need to return to its starting city.) This models
+situations where several fine-grained actions are required
+to perform relevant tasks, such as moving a unit in a realtime strategy game a large distance across the map. In order to plan effectively, an agent should be able reason in
+
+5.5
+
+Facility location problem
+
+The facility location problem (FLP) is as follows. Given
+a set of clients, output a set of m facilities that minimizes
+the maximum (or mean) distance between a client and its
+closest facility. This is a well-studied problem in location analysis, which is a branch of operations research and
+computational geometry that studies the optimal placement of facilities to minimize transportation costs. It it
+also used for cluster analysis. Computing an exact solution to this problem is NP-hard 60 .
+Formally, let n ∈ N be the number of clients, m ∈ N
+be the number of facilities, and d : R2 × R2 → R be
+the Euclidean distance. Then, given a set of clients C ∈
+Rn×2 , the goal is to minimize maxi∈n minj∈m d(Ci , Fj )
+with respect to F ∈ Rm×2 . (In the mean-variant of this
+problem, the maximum is replaced with a mean.) At the
+7
+
+beginning of each episode, we randomly sample n points
+from the unit square [0, 1]2 , which are the clients. On
+each step, the agent chooses a point on the unit square
+[0, 1]2 , which is a new facility to be placed. The final score
+is the max-min metric described above. Unlike previous
+environments, this environment has a continuous action
+space.
+An example state is shown in Figure 1. Red dots are
+clients, blue dots are facilities placed so far, and black
+lines connect clients to their closest facility. Results are
+shown in Figure 2.
+
+5.6
+
+Pacman
+
+This is a simplified version of the classic video game
+called Pacman. An example state is shown in Figure 1.
+The yellow circle is the player, which moves around a
+maze trying to eat as many dots as possible, while avoiding four colored ghosts that also move around the maze.
+We also experiment on a partially-observable version
+of Pacman where, at each step, the player can only see a
+fragment of the maze centered at their current position. In
+this situation, it is important for the agent to be able to
+remember what it has seen before (e.g., where they last
+saw each ghost). To give the agent memory, we use a
+recurrent cell with a memory vector that is updated with
+the observation and action of the player at each step of the
+episode. Since our method is able to train the entire agent
+architecture in an end-to-end fashion, the agent can learn
+what to remember from previous timesteps.
+An example state is shown in Figure 1. Results are
+shown in Figure 2.
+
+6
+
+Conclusions and future research
+Figure 1: States for TSP, Sokoban, Collect, 2048, FLP,
+and Pacman.
+
+In this paper, we introduced a new method, called PiZero,
+that gives an agent the ability to plan in an abstract search
+space of its own creation that is completely decoupled
+from the real environment. Unlike prior approaches, it
+allows the agent to perform high-level planning at arbitrary timescales and reason in terms of compound or
+temporally-extended actions. In addition, the method is
+more general than comparable prior methods because it
+is able to handle settings with continuous action spaces
+8
+
+Figure 2: Results on TSP, Sokoban, Collect, 2048, FLP, and Pacman.
+and partial observability. In experiments on multiple domains, it outperformed comparable prior methods access
+to an environment simulator at execution time.
+
+side imperfect-information games could potentially also
+be used, such as subgame solving 74;75;76 , depth-limited
+subgame solving 6;77 , ReBeL 78 , and Student of Games
+79
+In the future, we would like to also apply the method to (SoG) . SoG uses an algorithm called growing-tree CFR
+multiagent settings where high-level planning is useful. (GT-CFR), which expands a tree asymmetrically toward
+Such settings include real-time strategy (RTS) games like the most relevant future states while iteratively refining
+MicroRTS 61 , ELF Mini-RTS 62 , and Starcraft II 63;64;65 . values and policies.
+Indeed, RTS games often contain various optimization
+There are also challenges that need to be addressed
+problems as subtasks, like TSP (moving units around the in order to scale this approach to more complex envimap), FLP (deciding how to place units or buildings), and ronments. The environment may have complex action
+scheduling (management of resource production and con- and observation spaces—including high-dimensional arsumption).
+rays like images—that may require more sophisticated
+architectures. These include convolutional netWe would also like to investigate extending our network
+80;81
+works
+, pointer networks 82 , transformers 83 , and scatmethod to partially-observable multiagent settings, that
+that integrate spatial and non-spatial inis, imperfect-information games. One possible ap- ter connections
+84
+formation
+.
+proach would be to replace MCTS in our method with
+
+an algorithm for solving imperfect-information games,
+such as counterfactual regret minimization (CFR) 66 , its
+fastest modern variants discounted CFR 67 and predictive CFR+ 68 , techniques that use deep learning for state
+generalization 69;70;71 , or Fictitious Self-Play (FSP) 72;73 .
+Further techniques for speeding up the planning in-
+
+One may be able to get further speedups by using other
+ES algorithms instead 85;86 and by reducing variance of
+the smoothed gradient estimator using variance reduction
+techniques such as importance sampling (which samples
+from a different distribution than that being optimized)
+and control variates (which add random variates with zero
+9
+
+mean, leaving the expectation unchanged).
+Finally, some environments have very sparse rewards.
+This makes it difficult for the agent to learn since it receives little feedback from episode scores, especially in
+the initial stage of training when it acts randomly. In those
+cases, more sophisticated exploration techniques could be
+used, including approaches that seek novel observations,
+reward diverse behaviors, and create internal subgoals for
+the agent 87;88;89 .
+
+eration over the entire state space, which requires that 1)
+the state space is small and representable as a vector with
+each dimension corresponding to a separate state and 2)
+the states have a topology with local transition dynamics
+(such as a 2D grid). VPN does not have these limitations.
+VPN is trained to make its predicted values, rewards, and
+discounts match up with those of the real environment 58
+§3.3. In contrast, we do not use any kind of supervised
+training against the real environment’s values, rewards,
+and discounts. We only seek to optimize the final episode
+score with respect to the policy’s parameters.
+7 Acknowledgements
+Imagination-Augmented Agent (I2A) 92 augments a
+model-free agent with imagination by using environment
+This material is based on work supported by the Van- models to simulate imagined trajectories, which are pronevar Bush Faculty Fellowship ONR N00014-23-1-2876, vided as additional context to a policy network. An enNational Science Foundation grants IIS-1901403, CCF- vironment model is any recurrent architecture which can
+1733556, RI-2312342, and RI-1901403, ARO award be trained in an unsupervised fashion from agent trajectoW911NF2210266, and NIH award A240108S001.
+ries: given a past state and current action, the environment
+model predicts the next state and observation. The imagined trajectory is initialized with the current observation
+and rolled out multiple time steps into the future by feeding simulated observations.
+TreeQN 93 is an end-to-end differentiable architecture
+that substitutes value function networks in discrete-action
+A Additional related work
+domains. Instead of directly estimating the state-action
+Value Iteration Network (VIN) 90 is a fully differentiable value from the current encoded state, as in Deep Qnetwork with a planning module embedded within. It can Networks (DQN) 94 , it uses a learned dynamics model to
+learn to plan and predict outcomes that involve planning- perform planning up to some fixed-depth. The result is
+based reasoning, such as policies for reinforcement learn- a recursive, tree-structured network between the encoded
+ing. It uses a differentiable approximation of the value- state and the predicted state-action values at the leafs. The
+iteration algorithm, which can be represented as a convo- authors also propose ATreeC, an actor-critic variant that
+lutional network, and is trained end-to-end using standard augments TreeQN with a softmax layer to form a stochasbackpropagation.
+tic policy network. Unlike our method, TreeQN/ATreeC
+Predictron 91 consists of a fully abstract model, repre- performs limited-depth search rather than MCTS, which
+sented by a Markov reward process, that can be rolled for- can grow the search tree asymmetrically and focus on
+ward multiple “imagined” planning steps. Each forward more promising paths, thus scaling better.
+pass accumulates internal rewards and values over multiMCTSnet 95 incorporates simulation-based search inple planning depths. The model is trained end-to-end so side a neural network, by expanding, evaluating and
+as to make these accumulated values accurately approxi- backing-up a vector embedding. The parameters of the
+mate the true value function.
+network are trained end-to-end using gradient-based opValue Prediction Network (VPN) 58 integrates model- timisation. When applied to small searches in the wellfree and model-based RL methods into a single network. known planning problem Sokoban, it significantly outperIn contrast to previous model-based methods, it learns formed MCTS baselines.
+a dynamics model with abstract states that is trained
+Aleph* 96 is a model-based reinforcement learning alto make action-conditional predictions of future returns gorithm that combines A* search with a heuristic reprerather than future observations. VIN performs value it- sented by a deep neural network. The weights are learned
+
+Appendices
+
+10
+
+Hyperparameter
+Learning rate
+Standard deviation
+Batch size
+Trials
+Hidden layers
+Neurons per layer
+Abstract state dimension
+Abstract actions
+Abstract chance outcomes
+Planing loss unrolling steps
+Simulation budget
+
+through reinforcement learning: interacting with a simulated environment by performing actions and earning rewards. State transitions are kept in a tree structure, and
+action values are backpropagated along the tree to satisfy
+a time-difference equation.
+Guez et al. 97 propose that an entirely model-free approach, without special structure beyond standard neural network components such as convolutional networks
+and LSTMs, and without any strong inductive bias toward
+planning, can learn to exhibit many of the characteristics
+typically associated with a model-based planner.
+Dreamer 98 is a reinforcement learning agent that solves
+long-horizon tasks from images purely by latent imagination. It efficiently learns behaviors by propagating analytic gradients of learned state values back through trajectories imagined in the compact state space of a learned
+world model.
+
+Value
+10−3
+10−1
+103
+5
+1
+64
+64
+4
+3
+5
+10
+
+Table 2: Experimental hyperparameters.
+
+B
+
+Experimental details
+
+The hyperparameters we used are shown in Table 2. We
+Neural A* is a data-driven search method for path ran our experiments using the Slurm Workload Manager.
+planning problems. It reformulates a canonical A* search We used two nodes with 8 NVIDIA A100 SXM4 40 GB
+algorithm to be differentiable and couples it with a con- GPUs each.
+volutional encoder to form an end-to-end trainable neural
+network planner. It solves a path planning problem by
+encoding a problem instance to a guidance map and then References
+performing the differentiable A* search with the guidance
+[1] Allen Newell and George Ernst. The search for
+map. By learning to match the search results with groundgenerality. In Proc. IFIP Congress, volume 65,
+truth paths provided by experts, Neural A* can produce a
+pages 17–24, 1965.
+path consistent with the ground truth accurately and efficiently.
+[2] Peter E Hart, Nils J Nilsson, and Bertram Raphael.
+A formal basis for the heuristic determination
+Ye et al. 100 proposed a sample efficient model-based
+of minimum cost paths. IEEE transactions on
+visual RL algorithm built on MuZero, called EffiSystems Science and Cybernetics, 4(2):100–107,
+cientZero. Schrittwieser et al. 101 introduce MuZero Un1968.
+plugged, which combines MuZero with Reanalyze, an
+algorithm which uses model-based policy and value im[3] Nils J Nilsson. Problem-solving methods in. Artiprovement operators to compute new improved training
+ficial Intelligence, 5, 1971.
+targets on existing data points, allowing efficient learning
+for data budgets.
+[4] Peter E Hart, Nils J Nilsson, and Bertram Raphael.
+Gumbel MuZero 102 is a policy improvement algorithm
+Correction to ”a formal basis for the heuristic deterbased on sampling actions without replacement. It remination of minimum cost paths”. ACM SIGART
+places the more heuristic mechanisms by which AlpBulletin, 37:28–29, 1972.
+haZero selects and uses actions, both at root nodes and
+[5] Marc Lanctot, Vinicius Zambaldi, Audrunas
+at non-root nodes. It matches the state of the art on Go,
+Gruslys, Angeliki Lazaridou, Karl Tuyls, Julien
+chess, and Atari, and significantly improves prior perforPérolat, David Silver, and Thore Graepel. A unified
+mance when planning with few simulations.
+99
+
+11
+
+game-theoretic approach to multiagent reinforcement learning. Conference on Neural Information
+Processing Systems (NeurIPS), 30, 2017.
+[6] Noam Brown, Tuomas Sandholm, and Brandon
+Amos.
+Depth-limited solving for imperfectinformation games. In Conference on Neural Information Processing Systems (NeurIPS), 2018.
+[7] Lars Ruthotto and Eldad Haber. An introduction to
+deep generative modeling. GAMM-Mitteilungen,
+2021.
+[8] Hojjat Salehinejad, Sharan Sankar, Joseph Barfett,
+Errol Colak, and Shahrokh Valaee. Recent advances in recurrent neural networks. arXiv preprint
+arXiv:1801.01078, 2017.
+[9] Yong Yu, Xiaosheng Si, Changhua Hu, and Jianxun
+Zhang. A review of recurrent neural networks:
+LSTM cells and network architectures. Neural
+computation, 2019.
+[10] Sepp Hochreiter and Jürgen Schmidhuber. Long
+short-term memory. Neural Computation, 1997.
+[11] Kyunghyun Cho, Bart Van Merriënboer, Caglar
+Gulcehre, Dzmitry Bahdanau, Fethi Bougares,
+Holger Schwenk, and Yoshua Bengio. Learning phrase representations using RNN encoderdecoder for statistical machine translation. arXiv
+preprint arXiv:1406.1078, 2014.
+[12] Kyunghyun Cho, Bart van Merrienboer, Dzmitry
+Bahdanau, and Yoshua Bengio. On the properties
+of neural machine translation: encoder-decoder approaches, 2014.
+[13] Rafal Jozefowicz, Wojciech Zaremba, and Ilya
+Sutskever. An empirical exploration of recurrent
+network architectures. In International Conference
+on Machine Learning (ICML), 2015.
+[14] Shubham Khandelwal, Benjamin Lecouteux, and
+Laurent Besacier. Comparing GRU and LSTM for
+automatic speech recognition. PhD thesis, LIG,
+2016.
+12
+
+[15] Shudong Yang, Xueying Yu, and Ying Zhou.
+LSTM and GRU neural network performance comparison study: taking Yelp review dataset as an example. In 2020 International Workshop on Electronic Communication and Artificial Intelligence
+(IWECAI), 2020.
+[16] James Bradbury, Roy Frostig, Peter Hawkins,
+Matthew James Johnson, Chris Leary, Dougal
+Maclaurin, George Necula, Adam Paszke, Jake
+VanderPlas, Skye Wanderman-Milne, and Qiao
+Zhang.
+JAX: composable transformations of
+Python+NumPy programs, 2018.
+[17] Igor Babuschkin, Kate Baumli, Alison Bell, Surya
+Bhupatiraju, Jake Bruce, Peter Buchlovsky, David
+Budden, Trevor Cai, Aidan Clark, Ivo Danihelka,
+Antoine Dedieu, Claudio Fantacci, Jonathan Godwin, Chris Jones, Ross Hemsley, Tom Hennigan, Matteo Hessel, Shaobo Hou, Steven Kapturowski, Thomas Keck, Iurii Kemaev, Michael King,
+Markus Kunesch, Lena Martens, Hamza Merzic,
+Vladimir Mikulik, Tamara Norman, George Papamakarios, John Quan, Roman Ring, Francisco
+Ruiz, Alvaro Sanchez, Rosalia Schneider, Eren
+Sezener, Stephen Spencer, Srivatsan Srinivasan,
+Wojciech Stokowiec, Luyu Wang, Guangyao
+Zhou, and Fabio Viola. The DeepMind JAX
+Ecosystem, 2020.
+[18] Julian Schrittwieser, Ioannis Antonoglou, Thomas
+Hubert, Karen Simonyan, Laurent Sifre, Simon
+Schmitt, Arthur Guez, Edward Lockhart, Demis
+Hassabis, Thore Graepel, Timothy Lillicrap, and
+David Silver. Mastering atari, Go, chess and shogi
+by planning with a learned model. Nature, 2020.
+[19] David Silver, Thomas Hubert, Julian Schrittwieser,
+Ioannis Antonoglou, Matthew Lai, Arthur Guez,
+Marc Lanctot, Laurent Sifre, Dharshan Kumaran,
+Thore Graepel, Timothy Lillicrap, Karen Simonyan, and Demis Hassabis. A general reinforcement learning algorithm that masters chess, shogi,
+and Go through self-play. Science, 2018.
+[20] David Silver, Aja Huang, Chris J. Maddison, Arthur Guez, Laurent Sifre, George
+
+van den Driessche, Julian Schrittwieser, Ioannis Antonoglou, Veda Panneershelvam, Marc
+Lanctot, Sander Dieleman, Dominik Grewe, John
+Nham, Nal Kalchbrenner, Ilya Sutskever, Timothy
+Lillicrap, Madeleine Leach, Koray Kavukcuoglu,
+Thore Graepel, and Demis Hassabis. Mastering
+the game of Go with deep neural networks and tree
+search. Nature, 2016.
+
+[29] Daan Wierstra, Tom Schaul, Tobias Glasmachers,
+Yi Sun, Jan Peters, and Jürgen Schmidhuber. Natural evolution strategies. Journal of Machine Learning Research, 2014.
+[30] Sun Yi, Daan Wierstra, Tom Schaul, and Jürgen
+Schmidhuber. Stochastic search using the natural
+gradient. In International Conference on Machine
+Learning (ICML), 2009.
+
+[21] Ioannis Antonoglou, Julian Schrittwieser, Sherjil
+Ozair, Thomas K Hubert, and David Silver. Planning in stochastic environments with a learned
+model. In International Conference on Learning
+Representations (ICLR), 2022.
+[22] Ronald J. Williams. Simple statistical gradientfollowing algorithms for connectionist reinforcement learning. Machine Learning, 1992.
+
+[31] John C. Duchi, Michael I. Jordan, Martin J. Wainwright, and Andre Wibisono. Optimal rates for
+zero-order convex optimization: the power of two
+function evaluations. IEEE Transactions on Information Theory, 2015.
+[32] Yurii Nesterov and Vladimir Spokoiny. Random
+gradient-free minimization of convex functions.
+Foundations of Computational Mathematics, 2017.
+
+[23] Vijay Konda and John Tsitsiklis. Actor-critic algorithms. In Conference on Neural Information Processing Systems (NeurIPS), 1999.
+
+[33] Ohad Shamir. An optimal algorithm for bandit
+and zero-order convex optimization with two-point
+feedback. Journal of Machine Learning Research,
+2017.
+
+[24] Ivo Grondman, Lucian Busoniu, Gabriel AD
+Lopes, and Robert Babuska. A survey of actorcritic reinforcement learning: standard and natural
+policy gradients. IEEE Transactions on Systems,
+Man, and Cybernetics, Part C (Applications and
+Reviews), 2012.
+
+[34] Albert S. Berahas, Liyuan Cao, Krzysztof Choromanski, and Katya Scheinberg. A theoretical and
+empirical comparison of gradient approximations
+in derivative-free optimization. Foundations of
+Computational Mathematics, 2022.
+
+[25] Ingo Rechenberg and Manfred Eigen. Evolutionsstrategie: optimierung technischer systeme nach
+prinzipien der biologischen evolution. FrommannHolzboog Stuttgart, 1973.
+
+[35] Tim Salimans, Jonathan Ho, Xi Chen, Szymon
+Sidor, and Ilya Sutskever. Evolution strategies
+as a scalable alternative to reinforcement learning,
+2017.
+
+[26] Hans-Paul Schwefel. Numerische optimierung von
+computer-modellen mittels der evolutionsstrategie.
+Birkhäuser Basel, 1977.
+
+[36] Karel Lenc, Erich Elsen, Tom Schaul, and Karen
+Simonyan. Non-differentiable supervised learning with evolution strategies and hybrid methods.
+arXiv preprint arXiv:1906.03139, 2019.
+
+[27] Ingo Rechenberg. Evolutionsstrategien. In Simulationsmethoden in der medizin und biologie, pages
+83–114. Springer, 1978.
+[28] Daan Wierstra, Tom Schaul, Jan Peters, and Juergen Schmidhuber. Natural evolution strategies. In
+2008 IEEE Congress on Evolutionary Computation (IEEE World Congress on Computational Intelligence), 2008.
+
+[37] John Geweke. Antithetic acceleration of Monte
+Carlo integration in Bayesian inference. Journal
+of Econometrics, 1988.
+[38] Dimo Brockhoff, Anne Auger, Nikolaus Hansen,
+Dirk V Arnold, and Tim Hohm. Mirrored sampling and sequential selection for evolution strategies. In Parallel Problem Solving from Nature,
+
+13
+
+PPSN XI: 11th International Conference, Kraków,
+Poland, September 11-15, 2010, Proceedings, Part
+I 11, 2010.
+[39] Diederik P Kingma and Jimmy Ba. Adam: A
+method for stochastic optimization. arXiv preprint
+arXiv:1412.6980, 2014.
+[40] Rémi Coulom. Efficient selectivity and backup operators in Monte-Carlo tree search. In Computers
+and Games, 2007.
+[41] Maciej Świechowski, Konrad Godlewski, Bartosz
+Sawicki, and Jacek Mańdziuk. Monte Carlo tree
+search: a review of recent modifications and applications. Artificial Intelligence Review, 2023.
+
+[48] Rajesh Matai, Surya Prakash Singh, and Murari Lal Mittal. Traveling salesman problem: an
+overview of applications, formulations, and solution approaches. Traveling salesman problem, theory and applications, 2010.
+[49] Richard M Karp. Reducibility among combinatorial problems. Springer, 2010.
+[50] Christian Nilsson. Heuristics for the traveling
+salesman problem. Linkoping University, 2003.
+[51] Joseph Culberson. Sokoban is PSPACE-complete,
+1997.
+
+[42] David Silver, Julian Schrittwieser, Karen Simonyan, Ioannis Antonoglou, Aja Huang, Arthur
+Guez, Thomas Hubert, Lucas Baker, Matthew Lai,
+Adrian Bolton, Yutian Chen, Timothy Lillicrap,
+Fan Hui, Laurent Sifre, George van den Driessche,
+Thore Graepel, and Demis Hassabis. Mastering the
+game of Go without human knowledge. Nature,
+2017.
+[43] Thomas Hubert, Julian Schrittwieser, Ioannis
+Antonoglou, Mohammadamin Barekatain, Simon
+Schmitt, and David Silver. Learning and planning
+in complex action spaces. In International Conference on Machine Learning (ICML), pages 4476–
+4486. PMLR, 2021.
+[44] Ivan Kobyzev, Simon J.D. Prince, and Marcus A.
+Brubaker. Normalizing flows: an introduction and
+review of current methods. PAMI, 2021.
+[45] George
+Papamakarios,
+Eric
+Nalisnick,
+Danilo Jimenez Rezende, Shakir Mohamed,
+and Balaji Lakshminarayanan. Normalizing flows
+for probabilistic modeling and inference. Journal
+of Machine Learning Research, 2021.
+
+[52] Andreas Junghanns and Jonathan Schaeffer.
+Sokoban: A challenging single-agent search
+problem. In IJCAI Workshop on Using Games as
+an Experimental Testbed for AI Reasearch, 1997.
+[53] Andreas Junghanns and Jonathan Schaeffer.
+Sokoban: Enhancing general single-agent search
+methods using domain knowledge.
+Artificial
+Intelligence, 2001.
+[54] Nils Froleyks and Tomás Balyo. Using an algorithm portfolio to solve sokoban. PhD thesis, Karlsruher Institut für Technologie (KIT), 2016.
+[55] Yaron Shoham and Jonathan Schaeffer. The fess
+algorithm: A feature based approach to singleagent search. In 2020 IEEE Conference on Games
+(CoG), 2020.
+[56] Arthur Guez, Mehdi Mirza, Karol Gregor, Rishabh
+Kabra, Sebastien Racaniere, Theophane Weber,
+David Raposo, Adam Santoro, Laurent Orseau,
+Tom Eccles, Greg Wayne, David Silver, Timothy
+Lillicrap, and Victor Valdes. An investigation of
+model-free planning: boxoban levels, 2018.
+
+[46] B. Efron. Bootstrap methods: another look at the
+jackknife. The Annals of Statistics, 1979.
+
+[57] Matthias Meger. JSoko - website of the open source
+Sokoban game JSoko, 2023. Accessed: 2023-1019.
+
+[47] Bradley Efron. Better bootstrap confidence intervals. Journal of the American Statistical Association, 1987.
+
+[58] Junhyuk Oh, Satinder Singh, and Honglak Lee.
+Value prediction network. In Conference on Neural
+Information Processing Systems (NeurIPS), 2017.
+14
+
+[59] Clément Bonnet, Daniel Luo, Donal Byrne,
+Shikha Surana, Vincent Coyette, Paul Duckworth,
+Laurence I. Midgley, Tristan Kalloniatis, Sasha
+Abramowitz, Cemlyn N. Waters, Andries P. Smit,
+Nathan Grinsztajn, Ulrich A. Mbou Sob, Omayma
+Mahjoub, Elshadai Tegegn, Mohamed A. Mimouni, Raphael Boige, Ruan de Kock, Daniel
+Furelos-Blanco, Victor Le, Arnu Pretorius, and
+Alexandre Laterre. Jumanji: a diverse suite of scalable reinforcement learning environments in JAX,
+2023.
+
+[66] Martin Zinkevich, Michael Bowling, Michael Johanson, and Carmelo Piccione. Regret minimization in games with incomplete information. In Conference on Neural Information Processing Systems
+(NeurIPS), 2007.
+[67] Noam Brown and Tuomas Sandholm. Solving
+imperfect-information games via discounted regret
+minimization. In AAAI Conference on Artificial Intelligence (AAAI), 2019.
+
+[60] Robert J Fowler, Michael S Paterson, and Steven L
+Tanimoto. Optimal packing and covering in the
+plane are NP-complete. Information processing
+letters, 12(3):133–137, 1981.
+
+[68] Gabriele Farina, Christian Kroer, and Tuomas
+Sandholm.
+Faster game solving via predictive Blackwell approachability: Connecting regret
+matching and mirror descent. In AAAI Conference
+on Artificial Intelligence (AAAI), 2021.
+
+[61] Santiago Ontañón, Nicolas A Barriga, Cleyton R
+Silva, Rubens O Moraes, and Levi HS Lelis. The
+first microRTS artificial intelligence competition.
+AI Magazine, 2018.
+
+[69] Michael Bowling, Neil Burch, Michael Johanson,
+and Oskari Tammelin. Heads-up limit hold’em
+poker is solved. Science, 347(6218), January 2015.
+
+[62] Yuandong Tian, Qucheng Gong, Wenling Shang,
+Yuxin Wu, and C. Lawrence Zitnick. Elf: An extensive, lightweight and flexible research platform
+for real-time strategy games. Conference on Neural
+Information Processing Systems (NeurIPS), 2017.
+[63] Oriol Vinyals, Timo Ewalds, Sergey Bartunov,
+Petko Georgiev, Alexander Sasha Vezhnevets,
+Michelle Yeo, Alireza Makhzani, Heinrich Küttler,
+John Agapiou, Julian Schrittwieser, et al. StarCraft II: A new challenge for reinforcement learning. arXiv preprint arXiv:1708.04782, 2017.
+[64] Mikayel Samvelyan, Tabish Rashid, Christian Schroeder De Witt, Gregory Farquhar, Nantas
+Nardelli, Tim GJ Rudner, Chia-Man Hung,
+Philip HS Torr, Jakob Foerster, and Shimon
+Whiteson. The StarCraft multi-agent challenge.
+arXiv preprint arXiv:1902.04043, 2019.
+[65] Oriol Vinyals, Igor Babuschkin, Wojciech M. Czarnecki, Michaël Mathieu, Andrew Dudzik, Junyoung Chung, David H. Choi, Richard Powell, Timo
+Ewalds, Petko Georgiev, et al. Grandmaster level in
+StarCraft II using multi-agent reinforcement learning. Nature, 575(7782):350–354, 2019.
+15
+
+[70] Noam Brown, Adam Lerer, Sam Gross, and Tuomas Sandholm. Deep counterfactual regret minimization. In International Conference on Machine
+Learning (ICML), 2019.
+[71] Stephen Marcus McAleer, Gabriele Farina, Marc
+Lanctot, and Tuomas Sandholm. ESCHER: Eschewing importance sampling in games by computing a history value function to estimate regret. In The Eleventh International Conference on
+Learning Representations, 2023.
+[72] Johannes Heinrich, Marc Lanctot, and David Silver. Fictitious self-play in extensive-form games.
+In International Conference on Machine Learning
+(ICML), 2015.
+[73] Johannes Heinrich and David Silver.
+Deep
+reinforcement learning from self-play in
+imperfect-information games.
+arXiv preprint
+arXiv:1603.01121, 2016.
+[74] Noam Brown and Tuomas Sandholm. Safe and
+nested subgame solving for imperfect-information
+games. In Conference on Neural Information Processing Systems (NeurIPS), 2017.
+
+[75] Matej Moravčı́k, Martin Schmid, Neil Burch, Viliam Lisý, Dustin Morrill, Nolan Bard, Trevor
+Davis, Kevin Waugh, Michael Johanson, and
+Michael Bowling. Deepstack: Expert-level artificial intelligence in heads-up no-limit poker. Science, May 2017.
+
+[84] Oriol Vinyals, Igor Babuschkin, Wojciech M Czarnecki, Michaël Mathieu, Andrew Dudzik, Junyoung Chung, David H. Choi, Richard Powell, Timo
+Ewalds, Petko Georgiev, et al. Grandmaster level in
+StarCraft II using multi-agent reinforcement learning. Nature, 575(7782):350–354, 2019.
+
+[76] Noam Brown and Tuomas Sandholm. Superhuman
+AI for heads-up no-limit poker: Libratus beats top
+professionals. Science, 359(6374):418–424, 2018.
+
+[85] Niru Maheswaranathan, Luke Metz, George
+Tucker, Dami Choi, and Jascha Sohl-Dickstein.
+Guided evolutionary strategies: augmenting random search with surrogate gradients. In International Conference on Machine Learning (ICML),
+2019.
+
+[77] Noam Brown and Tuomas Sandholm. Superhuman
+AI for multiplayer poker. Science, 365(6456):885–
+890, 2019.
+[78] Noam Brown, Anton Bakhtin, Adam Lerer, and
+Qucheng Gong.
+Combining deep reinforcement learning and search for imperfect-information
+games. In Conference on Neural Information Processing Systems (NeurIPS), 2020.
+[79] Martin Schmid, Matej Moravčı́k, Neil Burch,
+Rudolf Kadlec, Josh Davidson, Kevin Waugh,
+Nolan Bard, Finbarr Timbers, Marc Lanctot,
+G Zacharias Holland, et al. Student of games: A
+unified learning algorithm for both perfect and imperfect information games. Science Advances, 9
+(46):eadg3256, 2023.
+
+[86] Sergey Shirobokov, Vladislav Belavin, Michael
+Kagan, Andrei Ustyuzhanin, and Atilim Gunes
+Baydin. Black-box optimization with local generative surrogates. In Conference on Neural Information Processing Systems (NeurIPS), 2020.
+[87] Audrey Houillon, RC Lorenz, Wendelin Böhmer,
+MA Rapp, Andreas Heinz, J Gallinat, and Klaus
+Obermayer. The effect of novelty on reinforcement
+learning. Progress in brain research, 2013.
+[88] Arthur Aubret, Laetitia Matignon, and Salima Hassas. A survey on intrinsic motivation in reinforcement learning. arXiv preprint arXiv:1908.06976,
+2019.
+[89] Pawel Ladosz, Lilian Weng, Minwoo Kim, and
+Hyondong Oh. Exploration in deep reinforcement
+learning: A survey. Information Fusion, 2022.
+
+[80] Y. LeCun, L. Bottou, Y. Bengio, and P. Haffner.
+Gradient-based learning applied to document
+recognition. Proceedings of the IEEE, 1998.
+
+[90] Aviv Tamar, YI WU, Garrett Thomas, Sergey
+Levine, and Pieter Abbeel. Value iteration networks. In Conference on Neural Information Processing Systems (NeurIPS), 2016.
+
+[81] Y. LeCun, B. Boser, J. S. Denker, D. Henderson,
+R. E. Howard, W. Hubbard, and L. D. Jackel. Backpropagation applied to handwritten zip code recognition. Neural Computation, 1989.
+[82] Oriol Vinyals, Meire Fortunato, and Navdeep
+Jaitly. Pointer networks. In Conference on Neural
+Information Processing Systems (NeurIPS), 2015.
+[83] Ashish Vaswani, Noam Shazeer, Niki Parmar,
+Jakob Uszkoreit, Llion Jones, Aidan N Gomez,
+Ł ukasz Kaiser, and Illia Polosukhin. Attention is
+all you need. In Conference on Neural Information
+Processing Systems (NeurIPS), 2017.
+16
+
+[91] David Silver, Hado van Hasselt, Matteo Hessel,
+Tom Schaul, Arthur Guez, Tim Harley, Gabriel
+Dulac-Arnold, David Reichert, Neil Rabinowitz,
+Andre Barreto, and Thomas Degris. The predictron: end-to-end learning and planning. In International Conference on Machine Learning (ICML),
+2017.
+[92] Sébastien
+Racanière,
+Théophane
+Weber,
+David Reichert, Lars Buesing, Arthur Guez,
+
+Danilo Jimenez Rezende, Adrià Puigdomènech
+Badia, Oriol Vinyals, Nicolas Heess, Yujia Li,
+et al. Imagination-augmented agents for deep
+reinforcement learning. Conference on Neural
+Information Processing Systems (NeurIPS), 2017. [100]
+[93] Gregory Farquhar, Tim Rocktaeschel, Maximilian
+Igl, and Shimon Whiteson. TreeQN and ATreeC:
+Differentiable tree planning for deep reinforcement
+learning. In International Conference on Learning
+Representations (ICLR), 2018.
+
+Path planning using neural A* search. In International Conference on Machine Learning (ICML),
+2021.
+Weirui Ye, Shaohuai Liu, Thanard Kurutach, Pieter
+Abbeel, and Yang Gao. Mastering atari games with
+limited data. Conference on Neural Information
+Processing Systems (NeurIPS), 34:25476–25488,
+2021.
+
+[101] Julian Schrittwieser, Thomas Hubert, Amol
+Mandhane, Mohammadamin Barekatain, Ioannis
+Antonoglou, and David Silver. Online and offline reinforcement learning by planning with a
+learned model. Conference on Neural Information
+Processing Systems (NeurIPS), 34:27580–27591,
+2021.
+
+[94] Volodymyr Mnih, Koray Kavukcuoglu, David Silver, Andrei A. Rusu, Joel Veness, Marc G. Bellemare, Alex Graves, Martin Riedmiller, Andreas K.
+Fidjeland, Georg Ostrovski, Stig Petersen, Charles
+Beattie, Amir Sadik, Ioannis Antonoglou, Helen
+King, Dharshan Kumaran, Daan Wierstra, Shane [102] Ivo Danihelka, Arthur Guez, Julian Schrittwieser,
+Legg, and Demis Hassabis. Human-level conand David Silver. Policy improvement by plantrol through deep reinforcement learning. Nature,
+ning with Gumbel. In International Conference on
+2015.
+Learning Representations (ICLR), 2022.
+[95] Arthur Guez, Theophane Weber, Ioannis
+Antonoglou, Karen Simonyan, Oriol Vinyals,
+Daan Wierstra, Remi Munos, and David Silver.
+Learning to search with MCTSnets. In International Conference on Machine Learning (ICML),
+2018.
+[96] Ariel Keselman, Sergey Ten, Adham Ghazali, and
+Majed Jubeh. Reinforcement learning with A* and
+a deep heuristic, 2018.
+[97] Arthur Guez, Mehdi Mirza, Karol Gregor, Rishabh
+Kabra, Sébastien Racanière, Théophane Weber,
+David Raposo, Adam Santoro, Laurent Orseau,
+Tom Eccles, et al. An investigation of model-free
+planning. In International Conference on Machine
+Learning (ICML), pages 2464–2473. PMLR, 2019.
+[98] Danijar Hafner, Timothy Lillicrap, Jimmy Ba, and
+Mohammad Norouzi. Dream to control: Learning
+behaviors by latent imagination. In International
+Conference on Machine Learning (ICML), 2020.
+[99] Ryo Yonetani, Tatsunori Taniai, Mohammadamin
+Barekatain, Mai Nishimura, and Asako Kanezaki.
+17
+
+

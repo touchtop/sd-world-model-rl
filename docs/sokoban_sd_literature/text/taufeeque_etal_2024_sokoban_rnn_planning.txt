@@ -1,0 +1,2882 @@
+Planning in a recurrent neural
+network that plays Sokoban
+
+arXiv:2407.15421v3 [cs.LG] 30 May 2025
+
+Mohammad Taufeeque, Philip Quirke, Maximilian Li∗ ,
+Chris Cundy, Aaron David Tucker, Adam Gleave, Adrià Garriga-Alonso
+{taufeeque,adria}@far.ai
+∗
+FAR.AI, Berkeley, California, United States of America.
+Jane Street.
+
+its internal plan. We show similar results in Appendix B for another
+DRC network and causal plan representation in a ResNet model.
+
+Planning is essential for solving complex tasks, yet the internal mechanisms underlying planning in neural networks remain
+poorly understood. Building on prior work, we analyze a recurrent
+neural network (RNN) trained on Sokoban, a challenging puzzle
+requiring sequential, irreversible decisions. We find that the RNN
+has a causal plan representation which predicts its future actions
+about 50 steps in advance. The quality and length of the represented plan increases over the first few steps. We uncover a
+surprising behavior: the RNN “paces” in cycles to give itself extra
+computation at the start of a level, and show that this behavior is
+incentivized by training. Leveraging these insights, we extend the
+trained RNN to significantly larger, out-of-distribution Sokoban
+puzzles, demonstrating robust representations beyond the training regime. We open-source our model and code, and believe the
+neural network’s interesting behavior makes it an excellent model
+organism to deepen our understanding of learned planning.
+
+1.1. Definitions
+Guez et al. [2019] showed that the DRC is very capable, generalizes well, and its performance improves with thinking steps at the
+beginning of an episode. Based on this, they claimed that DRC
+internally plans, but did not make precise what this means. To
+clarify our contributions, we introduce a distinction between plans
+and search algorithms.
+Definition 1.1 (Plan). A plan is a sequence of future actions
+{at for all t > t0 }.
+Definition 1.2 (Causally represented plan). Let m ∈ M be a simple model (e.g. logistic regression). A plan is causally represented
+if, for the current neural state zt , and a hypothetical future environment state sk , k > t:
+
+1. Introduction
+
+1. Prediction: we can extract the plan using m with sufficient
+accuracy: ak ≈ m(zt , sk ) on average for k > t.
+
+In many tasks, the performance of both humans and some neural
+networks (NNs) improves with more reasoning: whether by giving a
+human time to think before making a chess move, or by prompting
+or training a large language model (LLM) to reason step by step
+[Kojima et al., 2022, OpenAI, 2024].
+Among other reasoning capabilities, goal-oriented reasoning is
+particularly relevant to AI alignment. So-called “mesa-optimizers”
+– AIs that have learned to pursue goals through internal reasoning
+[Hubinger et al., 2019] – may internalize goals different from the
+training objective, leading to goal misgeneralization [Di Langosco
+et al., 2022, Shah et al., 2022]. Understanding how NNs learn to
+plan and represent the objective could be key to detect, prevent or
+correct goal misgeneralization.
+In this work, we focus on interpreting a Deep Repeating ConvLSTM [Guez et al., 2019, DRC] trained on Sokoban, a puzzle game
+often used as a planning benchmark [Peters et al., 2023]. We interpret the best network from Guez et al. [2019], DRC(3, 3), with
+3 recurrent layers that are applied 3 times per environment step.
+Further details of the network are provided in Section 2. We find
+that its internal plan representation [Bush et al., 2025] is causal,
+improves with more computation, and that the DRC learns to take
+advantage of that by often “pacing” to get enough time to refine
+
+2. Causality: modifying zt alters the plan according to m, that
+is, preserves ak ≈ m(zt , sk ).
+Definition 1.3 (Search). A search algorithm is a decision-making
+process that involves generating multiple possible partial or complete plans, evaluating their predicted outcomes, and selecting the
+plan with the highest value.
+Unlike traditional planning algorithms, search in neural networks
+may use heuristics or partial models to evaluate plans, rather than
+specifying an exact world state they correspond to. The key feature
+of search is the explicit representation and selection among competing plans. The competing plans do not have to be complete
+and could be a partial rollout.
+Definition 1.4 (Thinking steps). Timesteps where the agent receives the same observation repeatedly, with its predicted actions
+not executed in the environment.
+Definition 1.5 (Cycle). A sequence of environment steps that starts
+and ends at the same state.
+
+1
+
+1.2. Contribution statement
+
+2. Setting up the test subject
+
+Finding 1 (The DRC causally represents its plan). The DRC maintains a plan that is consistently selected and causally represented
+in its hidden states. This plan predicts and drives the agent’s behavior, and intervening on these representations alters the agent’s
+actions. See Section 3.
+
+We train an agent closely following the setup from Guez et al.
+[2019], using the IMPALA V-trace actor-critic [Espeholt et al.,
+2018] reinforcement learning (RL) algorithm with Guez et al.’s
+Deep Repeating ConvLSTM (DRC) recurrent architecture. We
+also train a ResNet baseline. For further architectural and training
+details, see Appendix A.
+
+Concurrently, Bush et al. [2025] also demonstrated Finding 1
+on handcrafted toy levels similar to the ones in Appendix D, by
+intervening on a key step. We further test the causality of similar
+representations on random perturbations on difficult levels and propose a more precise causal intervention method, which works on
+any level and lets us alter any step in a plan.
+
+DRC(D, N ) architecture. This paper primarily focuses on the behavior and representations of a DRC(3, 3) neural network [Guez
+et al., 2019]. The core component of this network is a D-layer
+ConvLSTM [Shi et al., 2015], which is repeatedly applied N times
+per environment step (Figure 2, left). The output of the final ConvLSTM layer (the Dth layer) is fed back into the input of the first
+layer at the next tick, effectively giving the network D · N layers
+of sequential computation to determine the next action. In our
+setup, D = N = 3 and C = 32. Appendix B contains results on
+DRC(1, 1) and a ResNet model.
+A linear combination of the mean- and max-pooled ConvLSTM
+activations is injected into the next step, enabling quick communication across the receptive field, known as (pool-and-inject). An
+encoder block consisting of two 4×4 convolutions process the input,
+which is fed to each ConvLSTM layer. Each ConvLSTM layer’s hidden states (h, c) have the same number of channels C. Finally, an
+MLP with 256 hidden units transforms the flattened ConvLSTM
+outputs into the policy (actor) and value function (critic) heads.
+
+Finding 2 (Plan improves with computation). With each internal
+iteration, the DRC network refines its plan, akin to doing a heuristic
+search, bringing it closer to the agent’s eventual sequence of actions.
+See Section 4.
+Finding 3 (Pacing behavior). The DRC sometimes delays irreversible actions to allocate more computation time for refining its
+plan. This behavior is discovered during training and is not an
+artifact. See Section 5.
+Evidence for 3: the DRC’s probed plans change 60% faster during cycles compared to non-cycle steps. Additionally, training the
+DRC with a bonus for NOOPs (smaller than the per-step penalty)
+increases the proportion of NOOPs in cycle steps while keeping the
+total number of cycle steps the same. We believe Finding 3 is likely
+the correct explanation for Guez et al. [2019]’s finding that forced
+thinking time improves performance.
+
+Dataset. Sokoban is a grid-based puzzle game with walls, floors,
+movable boxes, and target tiles. The goal is to push all boxes onto
+target tiles while avoiding obstacles. We use the Boxoban dataset
+[Guez et al., 2018], consisting of 10 × 10 procedurally generated
+levels, each with 4 boxes and targets. The edge tiles are always
+walls, so the playable area is 8 × 8. Boxoban separates levels into
+train, validation, and test sets with three difficulty levels: unfiltered,
+medium, and hard. Guez et al. [2019] generated these sets by filtering levels unsolvable by progressively better-trained DRC networks.
+So easier sets occasionally contain difficult levels. In this paper, we
+train agents on the unfiltered-train (900k levels). For evaluation,
+we use the unfiltered-test (1k levels)2 , medium-validation (50k levels), and hard (∼3.4k levels) sets, which do not overlap. To test
+DRC(3, 3) generalization to different sizes, we use the levels collected by Þorsteinsson [2009] (see Appendix C).
+
+Finding 4 (Generalization to OOD larger levels.). Using action
+probes, we are able to make the convolutional core of the DRC
+generalize to novel, significantly larger Sokoban puzzles beyond its
+training distribution. See Section 6.
+Previous work takes significant out-of-distribution generalization
+as evidence of algorithmic reasoning [Bansal et al., 2022, Guez
+et al., 2019].
+Finding 5 (Lack of explicit search, low confidence). The DRC(3, 3)
+does not perform search by generating and evaluating multiple
+plans, before selecting the one with the highest predicted value.
+We were unsuccessful at finding a representation of the value
+of each plan using a value probe (Appendix F), and at correlating
+thinking steps with A* expanded nodes (Figure 20). It is possible that DRC performs search but with a different heuristic. The
+rest of the evidence is compatible with search, and with the DRC
+iteratively refining its plan with heuristics.
+We demonstrate these findings on DRC(3, 3) in the main text.
+In Appendix B, we show that the major Findings 3−3 also hold
+true for DRC(1, 1), while only Finding 3 holds true for a ResNet
+model.
+Open-source resources. We open-source all models, tools, and
+interpretability data, offering a comprehensive resource for future
+research into planning behaviors1 . The DRC achieves an ideal balance of complexity and tractability for interpretability research with
+just 1.29M parameters.
+1
+
+Environment. The observations are 10 × 10 RGB images, normalized by dividing each pixel component by 255. Each tile type is
+represented by a unique pixel color [Schrader, 2018], illustrated in
+Figure 1 (right). The player has four actions available to move in
+cardinal directions (Up, Down, Left, Right). The reward is -0.1 per
+step, +1 for placing a box on a target, -1 for removing it, and +10
+for finishing the level by placing all of the boxes. The time limit
+for evaluation is 120 steps, although large levels in Section 6 use
+1000 steps. In the NOOP training part of Section 5, we modify the
+environment by adding an explicit NOOP action that has a fraction
+of the penalty as the other action.
+2
+
+URL references removed during double-blind review. Code is available in the
+supplementary material.
+
+2
+
+We use unfiltered-test rather than unfiltered-validation to ensure direct comparability with Guez et al. [2019].
+
+80
+% solved
+
+60
+
+3
+
+40
+0
+2
+4
+
+20
+Planning Effect
+
+0
+
+16
+resnet
+
+2
+
+4
+
+5
+0
+
+8
+12
+
+valid_medium
+70M
+
+1
+
+hard
+
+500M
+1B
+1.5B
+Environment steps, training
+
+2B
+
+Figure 1: Top left: Validation success rate on medium-difficulty levels solved vs. training steps, with varying numbers of initial thinking
+steps (forced NOOP actions) and a ResNet baseline. Bottom left: Estimated planning effect (8-steps minus 0-steps) showing
+that planning emerges within 70M steps and increases for the hard levels (red) but decreases for medium levels (blue). Middle:
+Linear probe predictions for box movement direction. Green arrows indicate correct predictions and incorrect red arrows indicate
+plausible alternatives for Box 4. Opacity reflects frequency during the episode. This probe causally affects agent actions as
+described in Section 3. Boxes are numbered in their order of placement on targets. Right: The same level’s input representation
+to the NN, where each pixel is a single tile. Walls are black, boxes are brown, targets are pink, and the robot is green.
+of probes: (1) Grid-wise inputs treat each square in the 10 × 10
+grid as a different data point, with inputs consisting of the 64dimensional LSTM state (h, c) at a square, concatenated for the
+3 layers. (2) Global inputs aggregate information from the entire
+10x10 grid, resulting in a 6400-dimensional input for each layer at
+every timestep.
+The train and test dataset comprises states collected by evaluating the DRC(3, 3) on the hard Boxoban levels, excluding the first
+5 steps of each episode as the plan is still forming. Bush et al.
+[2025] evaluated their probes on simple toy-levels similar to Appendix D, which don’t require long-term planning for most levels
+whereas we evaluate our probes on the hard set that can’t be solved
+greedily and thus require long-term plans. For evaluation of multiclass probes, F1 scores are computed as one-vs-all: the presence
+or absence of a particular class is the probe label. We search the
+best learning rate and L1 decay with grid-search by evaluating the
+F1 on a validation split of 20% of timesteps from the hard levels
+(Table 1).
+
+3. The DRC(3, 3) causally represents its plan
+We train probes3 to predict the future actions of DRC(3, 3) and
+other features of the environment. Of these, the probe predicting
+the future move-direction of boxes from every square in the grid has
+the strongest causal effect on the actions of the DRC: intervening
+on the activations to change the probe’s output also affects the
+future box directions [Li et al., 2023]. Qualitatively, the sequence
+of box movements contains most of the information needed to
+solve Sokoban levels, so we consider this a plan. Thus, we consider
+this strong evidence that the DRC(3, 3) represents and uses plans
+(Finding 1). The spatial structure of the probes and some of the
+targets are adapted from Bush et al. [2025].
+We find some evidence that the DRC(3, 3) considers multiple
+plans. For example, in the level in Figure 1 (middle), the box
+probe initially predicts moving box 4 down and right (shown in
+red) but later revises this plan and takes different actions. Despite
+this, we have not found evidence of multiple simultaneous plan
+representations or a mechanism to evaluate and decide between
+plans, such as a value comparison. Overall, this section provides
+strong evidence for a causally represented plan (Finding 1), but
+very limited evidence supporting search (Finding 5).
+
+Concepts (labels). We choose concepts that are likely to encode
+steps in the agent’s plan. Both the Agent-Directions and BoxDirections probes are grid-wise. These are central to our causality
+analysis and the same as Bush et al. [2025]. We train five additional
+probes: Next-Box, Next-Target, Next-Action, Pacing, and Value,
+described in Appendix F.
+
+3.1. Probe methodology: interpretation and
+intervention
+
+• Agent-Directions probe. Predicts the direction the agent
+takes from a square (x, y) at the nearest future timestep. It
+has 5 outputs: NV (No Visit), UP, DOWN, LEFT, RIGHT.
+The probe takes the 192-dim hidden state activations concatenated across the 3 layers at a square (x, y) as input. If
+the agent visits the square in the future, the probe predicts
+the corresponding direction; otherwise, it predicts NV. Thus,
+for each image observation, we get a 10 × 10 target.
+
+Training. We train linear regression probes with L1 decay to predict environment features from the agent’s activations. Similar
+to the concurrent work by Bush et al. [2025], we use two types
+3
+
+In the interpretability literature, probes are simple (usually linear) models that are
+trained to predict specific labels (referred to as ‘concepts’) from intermediate
+activations of a NN [Alain and Bengio, 2016, Belinkov, 2016]. They provide a
+way to decode information represented in the network. However, that a probe
+can predict some information from NN activations is not enough to show that
+the NN is using that information. To show that, Li et al. [2023] argue that
+one has to intervene on the NN activations to change the probe output, and
+observe the NN’s behavior changing accordingly.
+
+• Boxes-Directions probe. Same, but predicts the direction any
+
+3
+
+DRC(3, 3) architecture
+MLP
+0.8M params
+
+Action Probe
+135 params
+
+GridWise
+Probe
+
+Global
+Probe
+
+Figure 2: Left: The DRC(3, 3) architecture [Guez et al., 2019] with 3 convolutional layers repeated 3 times, embedded observation feeding
+into each layer, the last layer’s output h feeding back into the first layer, and recurrent connections between layers. Blue: Linear
+probes on hidden state grid cells to predict future actions (Section 3). Red: Replacing the fixed-dimension MLP with probes
+enables the ConvLSTM core to generalize to more challenging puzzles beyond the 10 × 10 training grids (Section 6). Right:
+13 × 17 level from XSokoban-31 is solved by DRC(3, 3) after replacing the MLP.
+of the four boxes will move in at a given square.
+
+Table 1: Causal and predictive probe results. Prediction column
+measures probe’s F1 score to predict future information
+at all steps. Causal effect measures the fraction of cases
+where an intervention in the network’s hidden state using
+probes affects the agent’s action accordingly. Confidence
+is one of the mean estimator percentiles [2.5%, 97.5%],
+whichever is furthest from the mean, estimated using 1000
+bootstrap resamples. The average causal probe uses 24k
+data points for evaluation, and the best-case probe uses
+8k.
+
+Causal intervention. To see if the NN uses these concepts in its
+algorithm, we edit the network’s activations to influence probe outputs [Li et al., 2023], and measure the causal effect: the fraction
+of cases where an intervention affects the agent’s action accordingly.4 . For a linear probe on activations h with parameter vector
+p, we intervene to increase the logit p·h to an adaptive value α, following work on steering vectors [Turner et al., 2023, Rimsky et al.,
+2023, Li et al., 2024]. More precisely, we find arg minh′ ∥h′ − h∥22 ,
+with the constraint that h′ · p > α. The solution to this is
+h′ = h + p̂ max(0, α − (h · p)), where p̂ = p/∥p∥22 . For multiclass
+direction probes, we also zero-out the logits of the other classes.
+For example, to influence the UP direction at a square, we set the
+UP logit to α and the DOWN, LEFT, RIGHT, and NV logits to 0.
+This intervention more precisely edits the network’s representation
+as compared to the intervention of h′ = h + p performed by Bush
+et al. [2025] on toy-levels. Our intervention method is required to
+observe causal effects on standard difficult levels in the hard set.
+
+Probe
+Box-Dir
+Agent-Dir
+Next box
+Next target
+
+Pred (a)
+
+Causal Effect (b)
+
+F1
+
+α
+
+Avg
+
+Best-case
+
+86.4 ± 0.1
+72.3 ± 0.1
+74.2 ± 0.4
+54.3 ± 0.5
+
+30
+10
+40
+30
+
+49.3 ± 2.0
+7.1 ± 0.3
+5.5 ± 1.0
+4.6 ± 0.8
+
+82.5 ± 2.5
+20.7 ± 0.7
+15.1 ± 2.5
+13.2 ± 2.0
+
+hidden state activations h, c at the layer the probe was trained on.
+The results are reported in Table 1(b), where we perform a gridsearch over the intervention strength α to find the optimal value.
+Despite our adaptive scaling, high values of α can still destabilize
+the agent’s behavior, causing random actions, while low values of
+α may fail to induce the intended behavior. Most probes show little
+causal effect, the Box-Directions probe (used in Figure 1) demonstrates strong causality, and the Agent-Directions probe shows mild
+causality.
+Even then, the Box-Directions probe seems to alter box movements only when they do not lead to naive deadlocks. For instance,
+the model avoids pushing a box into a wall if later steps indicate
+that it would need to get the box off the wall to get it to the
+target. To account for this behavior, we introduce the Best-case
+causal effect in Table 1(b). This tests all three alternate directions
+that a box could move, counting the probe as “causal” if it successfully influences any of these directions without causing a naive
+
+3.2. Probe evaluation and causality
+Probe predictive power. Tables 1 and 10 show that most probes
+demonstrate high predictive accuracy.
+Figure 1 (right) and 17 show visualizations of Agent-Directions
+and Box-Directions probes5 . In particular, the box-directions probe
+can predict future box movements up to 50 steps in advance with
+over 90% accuracy (Figure 4, left).
+Only the Box-Directions probe is strongly causal. For each time
+step, we measure the causal impact of probes by intervening on the
+4
+
+This measurement is known in the literature as the average causal effect or
+average treatment effect [Holland, 1986], the expected difference in a variable
+(whether the direction changes) when a causal intervention is present or absent.
+5
+The supplementary material provides visualization videos of all the probes across
+several levels.
+
+4
+
+Figure 4 (right) confirms this effect: the plan initially has low accuracy and rapidly improves as DRC is given more thinking steps.
+Additionally, Figure 4 (middle) shows that the plans increase in
+complexity over time, with the length of the plans, defined as sum
+of length of continuous chains starting from boxes, growing significantly during these additional computation steps.
+
+deadlock.
+By intervening on the probes, we can lock the DRC into a plan
+when there are two equally valued options. Figure 17 in Appendix D
+shows visualizations of how causal interventions with the directions
+probe alter the trajectory of the agent. However, in most cases, if
+we stop intervening with a suboptimal plan, the DRC formulates a
+better plan online and follows it. This and the naive deadlock problems may be caused by us intervening only on the current square
+of the box, target or agent: the NN activations still contain contradictory information about other squares, so the NN malfunctions.
+
+5. Purposeful “pacing” to get more computation
+On occasion, the DRC exhibits a curious behavior: the agent
+“paces” in a cycle, returning to the same location, without touching
+any box. This behavior does not advance the puzzle state, so it
+is sub-optimal due to the per-step penalty incurred. Why is it still
+present in the trained network?
+We hypothesize (3) that this behavior is incentivized by training,
+and its purpose is to give the DRC enough time to develop the plan.
+We show this with multiple lines of evidence, based on observing
+and intervening on NN behavior, and speed of change in the plan
+during cycles. We also re-train the DRC(3, 3) with smaller penalties
+for taking NOOP actions, and show that the total number of cycles
+stays constant while the number of NOOPs increases. Through all
+these experiments, we take care to highlight that most cycles are
+deliberate for plan computation, as opposed to a small fraction of
+cycles that could be occurring accidentally
+Unless otherwise noted, the following experiments are for cycles
+recorded on medium-validation levels. We merge overlapping cycles, resulting in a total of 13 702 cycles.
+
+4. The plan improves with computation
+Guez et al. [2019] showed that the DRC solves more levels if we give
+it thinking steps at the start of episodes (see Definition 1.4). But
+what happens in the network during these thinking steps? Using
+the Box-Directions probe from Section 3, we show that the represented plan increases in length and accuracy (Figure 4, middle and
+right), demonstrating Finding 2. Extra thinking is more helpful for
+levels that have longer optimal solutions (Figure 3, right), or which
+require less myopic thinking to place the first few boxes (Figure 3,
+left)(b). Thus, we are moderately confident that extra thinking improves the success rate by letting the network develop its plan long
+enough that it finds a non-myopic solution instead of accidentally
+locking the level.
+Effects of thinking time: non-myopic network We first examine
+how additional thinking time impacts the DRC performance by
+performing thinking steps at the start of an episode, allowing the
+network to process its hidden state. As shown by Guez et al. [2019],
+adding 6 thinking steps increases the success rate by 4.7%, with a
+slight drop beyond 16 steps (Figure 7).
+This improvement is more pronounced for harder levels, which
+require longer optimal solutions (Figure 3, right). Notably, thinking
+time does not correlate with the number of nodes expanded by an
+A* search, suggesting the DRC works differently (Figure 20).
+Thinking reduces early error in levels where placing the first box
+may block completion. Figure 3 (left) (b) shows that without extra
+thinking steps, the agent pushes the first box to a target about 4
+steps too early, and notably much earlier than average (Figure 3,
+left). Providing 6 thinking steps prevents this mistake. While some
+improvement stems from avoiding catastrophic moves, the fact that
+the average time to push the first box exceeds 6 steps even without
+forced thinking suggests that the network uses the additional time
+to form a more complete solution, which changes behavior.
+The impact of thinking time varies with training duration and
+level difficulty. Figure 1 (bottom-left) shows that most of the planning improvement occurs within the first 70M steps. Beyond this
+point, the planning effect grows a bit more until 200M steps and
+then stabilizes (hard levels) or slowly decays (medium validation).
+Based on this, we speculate that the network develops better heuristics for when to think on medium-difficulty puzzles, reducing its
+default myopia.
+
+Cycles happen early in levels. In some levels, a single sub-optimal
+step can render the puzzle unsolvable, so it is very important to
+develop enough of the plan to prevent that. Section 4 showed that
+extra thinking steps help in large part by preventing these mishaps,
+so it makes sense that training would incentivize doing similarly
+early in a level. Accordingly, Figure 6 (left) shows that most cycles
+start in the first 5 steps of the episode.
+Plans improve much faster in cycles. If the DRC uses cycles to
+refine its plan, we expect the plans to be worse at the start of cycles
+(because they need improvement), and to change faster during the
+cycle. We check this by looking at the F1 score of box-directions
+probe at the first step of cycles, and the rate of change in F1
+and plan length found with box-directions probe, as measured by
+number of positive predictions of the probe.
+Plan length and quality are highly influenced by whether the
+agent is close to the beginning or end of a level. To account for
+this, we pair each step in a cycle with a non-cycle step from a
+random episode, such that their timesteps t match.
+Using the hard-level set, we find that the F1 score at cycle
+start points is 51.13% ± 1.52%, compared to 68.13% ± 1.45%
+for non-cycles. Per step, the F1 score improves on average by
+0.96% ± 0.15% during cycles, versus 0.60% ± 0.15% during noncycles. Finally, the plan length (number of squares with a predicted
+action) grows by 2.03 squares per step during cycles, compared to
+1.37 squares per step during non-cycles.
+Figure 23 shows the distribution corresponding to some of these
+aggregate statistics. While cycle-step improvements definitely skew
+larger, the distributions has some overlap, which suggests that
+
+Plan improvement. If DRC refines its plan with extra computation (Finding 2), probe-extracted plans should become more predictive of the agent’s actions as more computation time is provided.
+
+5
+
+Box 4
+Box 3
+Box 2
+Box 1
+0 2 4 6 8
+12
+Thinking steps
+(a) on ALL levels
+
+Avg Optimal Length
+
+Timestep to place box
+
+50
+40
+30
+20
+10
+0
+
+60
+55
+50
+
+0 2 4 6 8
+12
+Thinking steps
+(b) on SOLVED levels
+
+0 2 4 6 8 12 NS
+Solved at thinking step
+
+10.0
+
+80
+
+7.5
+
+60
+40
+
+80
+
+5.0
+
+Positive squares
+Chain length
+
+2.5
+0
+
+25
+50
+75
+Episode timesteps
+
+1
+
+2
+
+3
+
+% score
+
+100
+Count
+
+Accuracy
+
+Figure 3: Left: Average time step to place each box Bi on target for different numbers of thinking steps. (a) Averages across all levels.
+(b) Averages over levels solved by 6 thinking steps but not solved by 0 thinking steps. More thinking steps make the DRC
+avoid greedy strategies in favor of long-term return. The 95% confidence intervals computed with the bootstrap method over
+the levels is very small and not visible in the plot. Right: Average optimal solution length of levels grouped by the number of
+thinking steps at which the level is first solved. Levels that take longer to solve tend to be harder. NS stands for “not solved”.
+
+60
+
+Precision
+Recall
+F1
+
+40
+
+20
+4 5 6
+1 2
+Thinking steps with internal ticks
+
+3
+
+4
+
+5
+
+6
+
+Figure 4: Left: The number of steps in advance that the Box-Directions probe is able to predict a box move. The probe predicts ≥ 90% of
+the actions 50 steps before they occur. Middle and Right: The plan quality, as measured by summing length of probe-predicted
+chain of box-directions starting from boxes and counting squares with positive non-empty predictions, and the F1-score increases
+over thinking steps (Section 3.1). This suggests that the DRC refines its plan during computation, including across the three
+ticks per environment step.
+with NOOPs suggest that most cycles are deliberate, but a small
+fraction could be accidental that occur anyways. We exclude cycles
+that happen after the last box is placed in a level because when
+the DRC sees a level is locked, it goes in cycles until the time limit,
+and that would make the results above largely depend on the time
+limit.
+
+some cycles could be accidental in which F1 improvement is not
+larger than non-cycles steps.
+Training with smaller NOOP penalty. The original version of the
+DRC(3, 3) could not take NOOPs, so it has to pace to get time to
+think. We train for 800M steps a version of the DRC(3, 3) which
+gets a smaller penalty for taking a NOOP than for moving. If the
+DRC is deliberately stalling when the plan is not good enough, we
+would expect it to use NOOPs when it is stalling deliberately. At
+the same time, the total number of cycles should stay constant:
+each step incurs a penalty, so it is still optimal to solve the level as
+quickly as possible.
+Figure 5 shows exactly this effect. The per-move penalty is fixed
+to 0.1, and the NOOP penalty varies in {0.05, 0.07, 0.09, 0.1}. We
+plot the total number per episode of steps in cycles (including
+NOOPs) and of NOOPs. As expected, the NOOPs per episode
+increase with smaller NOOP penalties, and the cycle-steps per
+episode stay roughly constant (slightly decrease). At the same
+time, the DRC(3,3) performance stays similar: it goes from solving
+70% to 60% of levels. The trend of more cycles getting replaced
+
+Cycles can be substituted by NOOPs. Figure 6 (middle) shows
+that forcing the model to think for six steps eliminates about 75% of
+the early cycles. Thus, we can again conclude that most cycles are
+deliberately performed by the network. We can also directly replace
+would-be cycles with NOOPs. Just when the DRC would start a
+cycle of length N , we intervene and make it take N thinking steps.
+Figure 6 (right) shows that these thinking steps largely replace the
+cycles: in at least 60% of the levels, the DRC followed the same
+trajectory for a minimum of 30 steps. For comparison, the median
+solution length for train-unfiltered is exactly 30 steps.
+
+6
+
+% solved
+
+steps
+
+Cycle steps (incl. NOOPs)
+
+in area and number of boxes compared to the 10 × 10 levels with
+4 boxes seen during training.
+Our findings show that by aggregating interpretable spatial features, the ConvLSTM generalizes to larger and more complex puzzles without retraining. This suggests that much of the DRC’s
+planning ability is encoded in the ConvLSTM core, and refining
+spatial predictions allows for scalable generalization in neural planning systems.
+
+NOOPs
+
+3
+2
+1
+0
+70
+60
+0.5
+
+0.7
+0.9
+NOOP to move-action penalty ratio
+
+Stress-testing on zig-zag. How well does this extension to larger
+levels work? We stress the network by placing it in straightforward
+(but long) n × n zig-zag levels (Figure 16). The DRC(3, 3) solves
+all levels for n ≤ 15, but fails at n ≥ 16 no matter how many
+thinking steps.
+
+1.0
+
+Figure 5: Top: Average number of NOOPs and cycle steps per
+episode, when training with a NOOP action that has
+less penalty than the movement actions. This makes the
+network substitute many of the cyclic steps with NOOP
+steps on average, indicating it is a deliberate behavior.
+The total number of cycle steps (blue) stays constant.
+Bottom: percentage of validation-medium levels solved
+for each network. Error bars show the minimum and the
+maximum over 3 training seeds.
+
+7. Related Work
+Our work contributes to the growing field of mechanistic interpretability focused on understanding reasoning and planning processes within neural networks. While the internal mechanisms of
+complex agents remain largely opaque, several lines of research
+provide context for our investigation.
+Interpreting planning and reasoning in neural networks. Prior
+studies have investigated planning mechanisms in simpler settings
+like mazes [Mini et al., 2023, Knutson et al., 2024, Brinkmann et al.,
+2024], gridworlds [Bloom and Colognese, 2023], and graph search
+problems [Ivanitskiy et al., 2023]. Others have explored reasoning
+in Large Language Models (LLMs) on tasks such as block-stacking
+[Men et al., 2024]. These works often focus on identifying representations of state or specific concepts, rather than studying the
+representation involved in planning. Researchers have also investigated sophisticated game-playing agents like Leela Chess Zero
+[Jenner et al., 2024] and AlphaZero [McGrath et al., 2021, Schut
+et al., 2023], uncovering evidence for lookahead mechanisms or
+high-level local concepts important for the game. Our work builds
+on these efforts but specifically targets the explicit representation
+and causal role of plans (complete sequences of future actions, Definition 1.1) within the DRC network trained on Sokoban, a game
+demanding complex, foresightful planning.
+
+6. Generalizing beyond 10 × 10 inputs and training
+examples
+We extend the DRC’s capabilities by modifying its internal structure
+to generalize beyond the original 10 × 10 input size and four-box
+training distribution. Analysis of the ConvLSTM core reveals that
+layer 3, at the final tick, encodes four key channels representing
+the next action provided in Table 10. Since the ConvLSTM is
+completely convolutional, it can process inputs of arbitrary sizes,
+unlike the full DRC architecture, which flattens the convolution
+output and passes through an MLP layer.
+Spatial aggregation. Using layer 3 next-action probes (Table 10),
+we predict at each spatial location the next action of the DRC. To
+turn the probe’s grid-wise outputs into a single action prediction,
+we need to aggregate them spatially. We linearly combine three
+spatial aggregation methods: mean-pooling, max-pooling, and the
+proportion of positive probe outputs. The optimal combination
+weights and a bias for each action are learned by minimizing crossentropy loss against the MLP block using the Adam optimizer on
+3000 levels (1000 from each Boxoban training set).
+
+Sokoban planning and the DRC agent. The DRC network trained
+on Sokoban provides a compelling case study of long-term deliberate planning owing to its ability to utilize extra thinking time
+[Guez et al., 2019]. Our work aims to understand and explain this
+behavior by interpreting the DRC’s internal states. Concurrently
+with our research, Bush et al. [2025] also interpreted a DRC agent
+trained on Sokoban, by introducing probes similar to ours that predict future box and agent movements and found evidence for plan
+representations (similar to our Finding 1). Our work complements
+and extends theirs in several key ways. Bush et al. [2025] performed causal interventions on 200 handcrafted toy levels, whereas
+we perform more rigorous causal tests on 24k datapoints sampled
+from difficult standard benchmark levels and devise an intervention
+methodology that edits the representations more precisely (Section 3). Additionally, our work yields novel findings: Finding 4
+offers further evidence from probe-guided OOD generalization that
+
+Results. The aggregated features achieve 83% accuracy on the
+training set and 77.9% on medium-difficulty validation levels. Although lower than individual probes F1 scores Table 10, these enable the adjusted ConvLSTM to solve many out-of-distribution levels, including larger grids and more than four boxes, e.g., Figure 2
+(right) and Figure 15. Specifically, from the test set by Þorsteinsson
+[2009], it solves 64/484 levels with both dimensions > 10, 38/203
+levels with only one dimension > 10, and 221/486 levels within
+the original constraints. A detailed breakdown by level collection
+of performance and largest level solved is provided in Appendix C.
+The largest level solved per level-collection is between 3-4x larger
+
+7
+
+0.1
+0.0
+
+0
+
+20
+Cycle start timestep
+
+40
+
+% same trajectory
+
+Number of cycles
+
+Median: 4
+Mean: 8.3
+
+0.2
+Density
+
+8k
+6k
+4k
+2k
+0
+
+0
+
+2
+
+4 6 8
+Steps to think
+
+12
+
+80
+75
+70
+65
+60
+0
+10
+20
+30
+Trajectory length after cycle
+
+Figure 6: Left: Histogram of cycle start times on the medium-difficulty validation levels. Middle: Total cycles the agent takes in the first
+5 steps across all episodes with N initial thinking steps. Right: Proportion of trajectories that match when replacing N -length
+cycles with N thinking steps, tracked for x steps post-cycle.
+DRC’s planning capability generalizes to larger levels not supported
+by the architecture, while Finding 3 on pacing behavior provides
+explanation for the emergence of the performance improvements
+through “thinking time”.
+
+designers [Di Langosco et al., 2022, Shah et al., 2022]. Mechanistic interpretability of AI agents is a crucial tool for understanding
+how neural networks internally represent goals and plans and for
+identifying and fixing potential misalignments.
+We discuss more related work in Appendix I.
+
+Probing and intervention methods. Our methodology relies on
+probing internal activations to decode information embedded linearly and intervening on these activations to test causality. Linear
+probing has been widely successful in finding representations of
+game states [Li et al., 2023, Nanda et al., 2023b, Karvonen, 2024]
+or spatial information [Wijmans et al., 2023] in various networks
+trained on game sequences.
+
+8. Conclusion
+Building on prior and concurrent work on search-like behaviors of
+DRC agents [Guez et al., 2019] and plan representations [Bush
+et al., 2025], we provide detailed evidence that DRC agents represent causal plans through spatial encodings of future box movements and refine them over time.
+We describe how extra thinking steps increase success rate, by
+preventing greedy actions before the plan stabilizes into a longerterm solution. We find the agent takes advantage of this by “pacing” on-distribution to get enough time to stabilize the plan. By
+substituting the network output module with much simpler probes,
+we demonstrate how a mechanistic understanding can enable generalization beyond the agent’s training distribution.
+These findings advance the understanding of planning dynamics
+in neural networks and lay the groundwork for more transparent,
+safer and interpretable AI systems.
+
+Adaptive computation for reasoning. The finding that the DRC’s
+plan improves with computation (Finding 2) and that the agent
+learns to "pace" (Finding 3) connects to research on improving
+neural network reasoning by altering training setup or architecture
+and leveraging adaptive computation time in RNNs [Schwarzschild
+et al., 2021b,a, Bansal et al., 2022]. [Graves, 2016] and models
+that explicitly vary computation [Chung et al., 2024]. However,
+Knutson et al. [2024] argue that they lack generalization and fail
+to implement correct algorithms. Other works explore models that
+adjust computation per step, either with an explicit world model
+[Chung et al., 2024] or without one [Graves, 2016]. Our work suggests such adaptive strategies for long-term planning and reasoning
+can be learned implicitly using model-free RL, mirroring the recent
+advancements of LLMs leveraging test-time compute for improved
+reasoning [DeepSeek-AI et al., 2025, OpenAI, 2024].
+
+Impact Statement
+This research into interpretability can make models more transparent, which helps in making models predictable, easier to debug and
+ensure they conform to specifications.
+Specifically, we train and open-source a model organism which
+is planning, and analyze it somewhat; we hope this will catalyze
+further research on identifying, evaluating and understanding what
+goal a model has. We hope that directly identifying a model’s goal
+lets us monitor for and correct goal misgeneralization [Di Langosco
+et al., 2022].
+Goal evaluation also has implications for AI welfare. Knowing
+the goals of a model would also make it possible to know whether
+these goals are being satisfied enough, and thus perhaps give a
+way to evaluate whether or not a model is happy (Appendix I),
+assuming it is a moral patient.
+
+Goal misgeneralization and mesa-optimization. Understanding
+how neural networks perform tasks requiring sequential reasoning
+is crucial for ensuring transparency and safety of AI systems. In AI
+alignment, goal misgeneralization occurs when a neural network optimizes for unintended proxy objectives instead of its intended goal
+(e.g. Yudkowsky, 2006, Omohundro, 2008; see Russell, 2019). This
+risk relates to mesa-optimization, where a network develops internal objectives that diverge from training targets [Hubinger et al.,
+2019]. Recent work has shown that networks may pursue goals
+misaligned—or even directly opposed—to those intended by their
+
+8
+
+Li, H. Zhang, Han Bao, Hanwei Xu, Haocheng Wang, Honghui
+Ding, Huajian Xin, Huazuo Gao, Hui Qu, Hui Li, Jianzhong Guo,
+Jiashi Li, Jiawei Wang, Jingchang Chen, Jingyang Yuan, Junjie
+Qiu, Junlong Li, J. L. Cai, Jiaqi Ni, Jian Liang, Jin Chen, Kai
+Dong, Kai Hu, Kaige Gao, Kang Guan, Kexin Huang, Kuai Yu,
+Lean Wang, Lecong Zhang, Liang Zhao, Litong Wang, Liyue
+Zhang, Lei Xu, Leyi Xia, Mingchuan Zhang, Minghua Zhang,
+Minghui Tang, Meng Li, Miaojun Wang, Mingming Li, Ning
+Tian, Panpan Huang, Peng Zhang, Qiancheng Wang, Qinyu
+Chen, Qiushi Du, Ruiqi Ge, Ruisong Zhang, Ruizhe Pan, Runji
+Wang, R. J. Chen, R. L. Jin, Ruyi Chen, Shanghao Lu, Shangyan
+Zhou, Shanhuang Chen, Shengfeng Ye, Shiyu Wang, Shuiping Yu, Shunfeng Zhou, Shuting Pan, S. S. Li, Shuang Zhou,
+Shaoqing Wu, Shengfeng Ye, Tao Yun, Tian Pei, Tianyu Sun,
+T. Wang, Wangding Zeng, Wanjia Zhao, Wen Liu, Wenfeng
+Liang, Wenjun Gao, Wenqin Yu, Wentao Zhang, W. L. Xiao,
+Wei An, Xiaodong Liu, Xiaohan Wang, Xiaokang Chen, Xiaotao
+Nie, Xin Cheng, Xin Liu, Xin Xie, Xingchao Liu, Xinyu Yang,
+Xinyuan Li, Xuecheng Su, Xuheng Lin, X. Q. Li, Xiangyue Jin,
+Xiaojin Shen, Xiaosha Chen, Xiaowen Sun, Xiaoxiang Wang, Xinnan Song, Xinyi Zhou, Xianzu Wang, Xinxia Shan, Y. K. Li,
+Y. Q. Wang, Y. X. Wei, Yang Zhang, Yanhong Xu, Yao Li,
+Yao Zhao, Yaofeng Sun, Yaohui Wang, Yi Yu, Yichao Zhang,
+Yifan Shi, Yiliang Xiong, Ying He, Yishi Piao, Yisong Wang,
+Yixuan Tan, Yiyang Ma, Yiyuan Liu, Yongqiang Guo, Yuan
+Ou, Yuduan Wang, Yue Gong, Yuheng Zou, Yujia He, Yunfan
+Xiong, Yuxiang Luo, Yuxiang You, Yuxuan Liu, Yuyang Zhou,
+Y. X. Zhu, Yanhong Xu, Yanping Huang, Yaohui Li, Yi Zheng,
+Yuchen Zhu, Yunxian Ma, Ying Tang, Yukun Zha, Yuting Yan,
+Z. Z. Ren, Zehui Ren, Zhangli Sha, Zhe Fu, Zhean Xu, Zhenda
+Xie, Zhengyan Zhang, Zhewen Hao, Zhicheng Ma, Zhigang Yan,
+Zhiyu Wu, Zihui Gu, Zijia Zhu, Zijun Liu, Zilin Li, Ziwei Xie,
+Ziyang Song, Zizheng Pan, Zhen Huang, Zhipeng Xu, Zhongyu
+Zhang, and Zhen Zhang. Deepseek-r1: Incentivizing reasoning capability in llms via reinforcement learning, 2025. URL
+https://arxiv.org/abs/2501.12948.
+
+References
+Guillaume Alain and Yoshua Bengio. Understanding intermediate
+layers using linear classifier probes. CoRR, 2016. URL http:
+//arxiv.org/abs/1610.01644v4.
+Arpit Bansal, Avi Schwarzschild, Eitan Borgnia, Zeyad Emam,
+Furong Huang, Micah Goldblum, and Tom Goldstein. Endto-end algorithm synthesis with recurrent networks: Extrapolation without overthinking. In Alice H. Oh, Alekh Agarwal,
+Danielle Belgrave, and Kyunghyun Cho, editors, Advances in
+Neural Information Processing Systems, 2022. URL https:
+//openreview.net/forum?id=PPjSKy40XUB.
+Yonatan Belinkov. Probing classifiers: Promises, shortcomings, and
+advances. Computational Linguistics, pages 1–12, 2016.
+Joseph Bloom and Paul Colognese.
+Decision transformer
+interpretability,
+2023.
+URL
+https://
+www.lesswrong.com/posts/bBuBDJBYHt39Q5zZy/
+decision-transformer-interpretability.
+Trenton Bricken, Adly Templeton, Joshua Batson, Brian Chen,
+Adam Jermyn, Tom Conerly, Nick Turner, Cem Anil, Carson
+Denison, Amanda Askell, et al. Towards monosemanticity: Decomposing language models with dictionary learning. Transformer Circuits Thread, 2, 2023.
+Jannik Brinkmann, Abhay Sheshadri, Victor Levoso, Paul Swoboda,
+and Christian Bartelt. A mechanistic analysis of a transformer
+trained on a symbolic multi-step reasoning task. arXiv, 2024.
+URL http://arxiv.org/abs/2402.11917v2.
+Thomas Bush, Stephen Chung, Usman Anwar, Adrià GarrigaAlonso, and David Krueger. Interpreting emergent planning
+in model-free reinforcement learning. International Conference
+on Learning Representations, 2025. URL https://openreview.
+net/forum?id=DzGe40glxs.
+Bilal Chughtai, Lawrence Chan, and Neel Nanda. A toy model
+of universality: Reverse engineering how networks learn group
+operations. arXiv, 2023. URL http://arxiv.org/abs/2302.
+03025v1.
+
+Lauro Langosco Di Langosco, Jack Koch, Lee D Sharkey, Jacob Pfau, and David Krueger. Goal misgeneralization in deep
+reinforcement learning. In International Conference on Machine Learning, pages 12004–12019. PMLR, 2022. URL https:
+//proceedings.mlr.press/v162/langosco22a.html.
+
+Stephen Chung, Ivan Anokhin, and David Krueger. Thinker: Learning to plan and act. Advances in Neural Information Processing
+Systems, 36, 2024. URL https://openreview.net/forum?id=
+mumEBl0arj.
+
+Lasse Espeholt, Hubert Soyer, Remi Munos, Karen Simonyan,
+Volodymir Mnih, Tom Ward, Yotam Doron, Vlad Firoiu, Tim
+Harley, Iain Dunning, Shane Legg, and Koray Kavukcuoglu. IMPALA: Scalable distributed deep-RL with importance weighted
+actor-learner architectures. arXiv, 2018. URL http://arxiv.
+org/abs/1802.01561v3.
+
+Mayank Daswani and Jan Leike. A definition of happiness for reinforcement learning agents. arXiv, 2015. URL http://arxiv.
+org/abs/1505.04497v1.
+DeepSeek-AI, Daya Guo, Dejian Yang, Haowei Zhang, Junxiao
+Song, Ruoyu Zhang, Runxin Xu, Qihao Zhu, Shirong Ma, Peiyi
+Wang, Xiao Bi, Xiaokang Zhang, Xingkai Yu, Yu Wu, Z. F. Wu,
+Zhibin Gou, Zhihong Shao, Zhuoshu Li, Ziyi Gao, Aixin Liu,
+Bing Xue, Bingxuan Wang, Bochao Wu, Bei Feng, Chengda Lu,
+Chenggang Zhao, Chengqi Deng, Chenyu Zhang, Chong Ruan,
+Damai Dai, Deli Chen, Dongjie Ji, Erhang Li, Fangyun Lin,
+Fucong Dai, Fuli Luo, Guangbo Hao, Guanting Chen, Guowei
+
+Leo Gao, Tom Dupré la Tour, Henk Tillman, Gabriel Goh, Rajan Troll, Alec Radford, Ilya Sutskever, Jan Leike, and Jeffrey
+Wu. Scaling and evaluating sparse autoencoders. arXiv preprint
+arXiv:2406.04093, 2024.
+Alex Graves. Adaptive computation time for recurrent neural
+networks. arXiv, 2016. URL http://arxiv.org/abs/1603.
+08983v6.
+
+9
+
+Arthur Guez, Mehdi Mirza, Karol Gregor, Rishabh Kabra, Sebastien Racaniere, Theophane Weber, David Raposo, Adam
+Santoro, Laurent Orseau, Tom Eccles, Greg Wayne, David Silver, Timothy Lillicrap, and Victor Valdes. An investigation
+of model-free planning: boxoban levels, 2018. URL https:
+//github.com/deepmind/boxoban-levels/.
+
+Rafal Jozefowicz, Wojciech Zaremba, and Ilya Sutskever. An
+empirical exploration of recurrent network architectures. In
+Francis Bach and David Blei, editors, International Conference
+on Machine Learning, volume 37 of Proceedings of Machine
+Learning Research, pages 2342–2350, Lille, France, 07–09 Jul
+2015. PMLR. URL https://proceedings.mlr.press/v37/
+jozefowicz15.html.
+
+Arthur Guez, Mehdi Mirza, Karol Gregor, Rishabh Kabra, Sébastien
+Racanière, Théophane Weber, David Raposo, Adam Santoro,
+Laurent Orseau, Tom Eccles, Greg Wayne, David Silver, and
+Timothy Lillicrap. An investigation of model-free planning. arXiv,
+2019. URL http://arxiv.org/abs/1901.03559v2.
+
+Adam Karvonen. Emergent world models and latent variable estimation in chess-playing language models. CoRR, 2024. URL
+http://arxiv.org/abs/2403.15498v2.
+Brandon Knutson, Amandin Chyba Rabeendran, Michael Ivanitskiy, Jordan Pettyjohn, Cecilia Diniz-Behn, Samy Wu Fung,
+and Daniel McKenzie. On logical extrapolation for mazes with
+recurrent and implicit networks. CoRR, 2024. URL http:
+//arxiv.org/abs/2410.03020v1.
+
+Jonathan Heek, Anselm Levskaya, Avital Oliver, Marvin Ritter,
+Bertrand Rondepierre, Andreas Steiner, and Marc van Zee. Flax:
+A neural network library and ecosystem for JAX, 2023. URL
+http://github.com/google/flax.
+
+Takeshi Kojima, Shixiang Shane Gu, Machel Reid, Yutaka Matsuo,
+and Yusuke Iwasawa. Large language models are zero-shot reasoners. Advances in Neural Information Processing Systems, 35:
+22199–22213, 2022. URL https://openreview.net/pdf?id=
+e2TBb5y0yFf.
+
+Felix Hill, Andrew Lampinen, Rosalia Schneider, Stephen Clark,
+Matthew Botvinick, James L. McClelland, and Adam Santoro.
+Environmental drivers of systematicity and generalization in a
+situated agent. In International Conference on Learning Representations, 2020. URL https://openreview.net/forum?id=
+SklGryBtwr.
+
+Brenden M. Lake and Marco Baroni. Human-like systematic generalization through a meta-learning neural network. Nature, 623
+(7985):115–121, 2023. doi: 10.1038/s41586-023-06668-3. URL
+https://doi.org/10.1038/s41586-023-06668-3.
+
+Paul W. Holland.
+Statistics and causal inference.
+Journal of the American Statistical Association, 81(396):
+945–960, 1986.
+doi:
+10.1080/01621459.1986.10478354.
+URL
+https://www.tandfonline.com/doi/abs/10.1080/
+01621459.1986.10478354.
+
+Tamera Lanham, Anna Chen, Ansh Radhakrishnan, Benoit Steiner,
+Carson Denison, Danny Hernandez, Dustin Li, Esin Durmus,
+Evan Hubinger, Jackson Kernion, et al. Measuring faithfulness in chain-of-thought reasoning. CoRR, 2023. URL https:
+//arxiv.org/abs/2307.13702.
+
+Shengyi Huang, Jiayi Weng, Rujikorn Charakorn, Min Lin, Zhongwen Xu, and Santiago Ontañón. Cleanba: A reproducible and
+efficient distributed reinforcement learning platform, 2023. URL
+https://arxiv.org/abs/2310.00036.
+Robert Huben, Hoagy Cunningham, Logan Riggs Smith, Aidan
+Ewart, and Lee Sharkey. Sparse autoencoders find highly interpretable features in language models. In The Twelfth International Conference on Learning Representations, 2023.
+
+Kenneth Li, Aspen K Hopkins, David Bau, Fernanda Viégas,
+Hanspeter Pfister, and Martin Wattenberg. Emergent world
+representations: Exploring a sequence model trained on a synthetic task. In International Conference on Learning Representations, 2023. URL https://openreview.net/forum?id=DeG07_
+TcZvT.
+
+Evan Hubinger, Chris van Merwijk, Vladimir Mikulik, Joar Skalse,
+and Scott Garrabrant. Risks from learned optimization in advanced machine learning systems. arXiv, 2019. URL https:
+//arxiv.org/abs/1906.01820.
+
+Kenneth Li, Oam Patel, Fernanda Viégas, Hanspeter Pfister, and
+Martin Wattenberg. Inference-time intervention: Eliciting truthful answers from a language model. Advances in Neural Information Processing Systems, 36, 2024.
+Thomas McGrath, Andrei Kapishnikov, Nenad Tomašev, Adam
+Pearce, Demis Hassabis, Been Kim, Ulrich Paquet, and Vladimir
+Kramnik. Acquisition of chess knowledge in AlphaZero. Proceedings of the National Academy of Sciences of the United States
+of America, 119, 2021.
+
+Michael Ivanitskiy, Alexander F Spies, Tilman Räuker, Guillaume Corlouer, Christopher Mathwin, Lucia Quirke, Can Rager,
+Rusheb Shah, Dan Valentine, Cecilia Diniz Behn, Katsumi Inoue, and Samy Wu Fung. Linearly structured world representations in maze-solving transformers. In UniReps: the First Workshop on Unifying Representations in Neural Models, 2023. URL
+https://openreview.net/forum?id=pZakRK1QHU.
+
+Tianyi Men, Pengfei Cao, Zhuoran Jin, Yubo Chen, Kang Liu, and
+Jun Zhao. Unlocking the future: Exploring look-ahead planning mechanistic interpretability in large language models. CoRR,
+2024. URL http://arxiv.org/abs/2406.16033v1.
+
+Erik Jenner, Shreyas Kapur, Vasil Georgiev, Cameron Allen, Scott
+Emmons, and Stuart Russell. Evidence of learned look-ahead
+in a chess-playing neural network. CoRR, 2024. URL http:
+//arxiv.org/abs/2406.00877v1.
+
+Ulisse Mini, Peli Grietzer, Mrinank Sharma, Austin Meek, Monte
+MacDiarmid, and Alexander Matt Turner. Understanding and
+
+10
+
+Lisa Schut, Nenad Tomasev, Tom McGrath, Demis Hassabis, Ulrich Paquet, and Been Kim. Bridging the human-ai knowledge
+gap: Concept discovery and transfer in alphazero. CoRR, 2023.
+URL http://arxiv.org/abs/2310.16410v1.
+
+controlling a maze-solving policy network. arXiv, 2023. URL
+http://arxiv.org/abs/2310.08043v1.
+Mirco Mutti, Riccardo De Santi, Emanuele Rossi, Juan Felipe
+Calderon, Michael M. Bronstein, and Marcello Restelli. Invariance discovery for systematic generalization in reinforcement
+learning. In ICML 2022: Workshop on Spurious Correlations, Invariance and Stability, 2022. URL https://openreview.net/
+forum?id=yqpz1yHz98A.
+
+Avi Schwarzschild, Eitan Borgnia, Arjun Gupta, Arpit Bansal,
+Zeyad Emam, Furong Huang, Micah Goldblum, and Tom Goldstein. Datasets for studying generalization from easy to hard
+examples. CoRR, 2021a. URL http://arxiv.org/abs/2108.
+06011v2.
+
+Neel Nanda, Lawrence Chan, Tom Lieberum, Jess Smith, and Jacob Steinhardt. Progress measures for grokking via mechanistic interpretability, 2023a. URL https://arxiv.org/abs/2301.
+05217.
+
+Avi Schwarzschild, Eitan Borgnia, Arjun Gupta, Furong Huang, Uzi
+Vishkin, Micah Goldblum, and Tom Goldstein. Can you learn
+an algorithm? generalizing from easy to hard problems with
+recurrent networks. In A. Beygelzimer, Y. Dauphin, P. Liang, and
+J. Wortman Vaughan, editors, Advances in Neural Information
+Processing Systems, 2021b. URL https://openreview.net/
+forum?id=Tsp2PL7-GQ.
+
+Neel Nanda, Andrew Lee, and Martin Wattenberg. Emergent linear representations in world models of self-supervised sequence
+models. CoRR, 2023b. URL http://arxiv.org/abs/2309.
+00941v2.
+
+Eric Schwitzgebel and Mara Garza. A defense of the rights of artificial intelligences. Midwest Studies In Philosophy, 39(1):98–119,
+2015. doi: 10.1111/misp.12032. URL http://www.faculty.
+ucr.edu/~eschwitz/SchwitzPapers/AIRights-150915.htm.
+
+Stephen M. Omohundro. The basic AI drives. In Proceedings
+of the 2008 Conference on Artificial General Intelligence 2008:
+Proceedings of the First AGI Conference, page 483–492, NLD,
+2008. IOS Press. ISBN 9781586038335.
+
+Rohin Shah, Vikrant Varma, Ramana Kumar, Mary Phuong, Victoria Krakovna, Jonathan Uesato, and Zac Kenton. Goal misgeneralization: why correct specifications aren’t enough for
+correct goals. arXiv preprint arXiv:2210.01790, 2022. URL
+https://arxiv.org/abs/2210.01790.
+
+OpenAI. Introducing OpenAI o1-preview, 2024. URL https://
+openai.com/index/introducing-openai-o1-preview/.
+Ethan Perez and Robert Long. Towards evaluating ai systems for
+moral status using self-reports. CoRR, 2023. URL http://
+arxiv.org/abs/2311.08576v1.
+
+Xingjian Shi, Zhourong Chen, Hao Wang, Dit-Yan Yeung, Wai-Kin Wong, and Wang-chun Woo.
+Convolutional LSTM network:
+A machine learning approach
+for precipitation nowcasting.
+Advances in Neural Information Processing Systems, 28, 2015.
+URL https:
+//proceedings.neurips.cc/paper_files/paper/2015/
+file/07563a3fe3bbe7e3ba84431ad9d055af-Paper.pdf.
+
+Niklas Sandhu Peters, Marc Alexa, and Special Field Neurotechnology. Solving sokoban efficiently: Search tree pruning techniques
+and other enhancements, 2023. URL https://doc.neuro.
+tu-berlin.de/bachelor/2023-BA-NiklasPeters.pdf.
+Jacob Pfau, William Merrill, and Samuel R. Bowman. Let’s think
+dot by dot: Hidden computation in transformer language models.
+arXiv, 2024. URL http://arxiv.org/abs/2404.15758v1.
+
+Peter Singer. Animal liberation. In Ethics: Contemporary Readings,
+pages 284–292. Routledge, 2004.
+Gerald J. Sussman. A computational model of skill acquisition.
+Technical report, USA, 1973.
+
+Philip Quirke and Fazl Barez. Understanding addition in transformers. arXiv preprint arXiv:2310.13121, 2023. URL http:
+//arxiv.org/abs/2310.13121v9.
+
+Alex Tamkin, Mohammad Taufeeque, and Noah Goodman. Codebook features: Sparse and discrete interpretability for neural networks. In Proceedings of the 41st International Conference on
+Machine Learning, volume 235 of Proceedings of Machine Learning Research, pages 47535–47563. PMLR, 21–27 Jul 2024. URL
+https://proceedings.mlr.press/v235/tamkin24a.html.
+
+Nina Rimsky, Nick Gabrieli, Julian Schulz, Meg Tong, Evan Hubinger, and Alexander Matt Turner. Steering Llama 2 via Contrastive Activation Addition. arXiv, 2023. URL https://arxiv.
+org/abs/2312.06681.
+
+Borgar Þorsteinsson. Sokoban: levels, 2009. URL http://borgar.
+net/programs/sokoban/.
+
+Stuart Russell. Human compatible: artificial intelligence and the
+problem of control. Penguin, 2019.
+
+Brian Tomasik.
+A dialogue on suffering subroutines,
+2015.
+URL
+https://longtermrisk.org/
+a-dialogue-on-suffering-subroutines/.
+
+Jérémy Scheurer, Mikita Balesni, and Marius Hobbhahn. Large
+language models can strategically deceive their users when put
+under pressure. arXiv, 2023. URL http://arxiv.org/abs/
+2311.07590v3.
+
+Alex Turner, Lisa Thiergart, David Udell, Gavin Leech, Ulisse Mini,
+and Monte MacDiarmid. Activation addition: Steering language
+models without optimization. arXiv e-prints, pages arXiv–2308,
+2023.
+
+Max-Philipp B. Schrader. gym-sokoban, 2018. URL https://
+github.com/mpSchrader/gym-sokoban.
+
+11
+
+think for extra steps) but is nevertheless good at the game. The
+ResNet consists of 9 blocks, each with 4 × 4 convolutional filters.
+The first two blocks have 32 channels, and the others have 64.
+Each block consists of a convolution, followed by two (relu, conv)
+sub-blocks, each of which splits off and is added back to the trunk.
+The ResNet has 3.07M parameters.
+
+Jiayi Weng, Min Lin, Shengyi Huang, Bo Liu, Denys Makoviichuk, Viktor Makoviychuk, Zichen Liu, Yufan Song, Ting Luo,
+Yukun Jiang, Zhongwen Xu, and Shuicheng Yan. EnvPool: A
+highly parallel reinforcement learning environment execution engine. In S. Koyejo, S. Mohamed, A. Agarwal, D. Belgrave,
+K. Cho, and A. Oh, editors, Advances in Neural Information
+Processing Systems, volume 35, pages 22409–22421. Curran Associates, Inc., 2022. URL https://openreview.net/forum?
+id=BubxnHpuMbG.
+
+Value and policy heads. After the convolutions, an affine layer
+projects the flattened spatial output into 256 hidden units. We
+then apply a ReLU and two different affine layers: one for the
+actor (policy) and one for the critic (value function).
+
+Erik Wijmans, Manolis Savva, Irfan Essa, Stefan Lee, Ari S. Morcos, and Dhruv Batra. Emergence of maps in the memories of
+blind navigation agents. In International Conference on Learning
+Representations, 2023. URL https://openreview.net/forum?
+id=lTt4KjHSsyl.
+
+RL training. We train each network for 2.003 billion environment
+steps6 using IMPALA [Espeholt et al., 2018, Huang et al., 2023].
+For each training iteration, we collect 20 transitions on 256 actors using the network parameters from the previous iteration, and
+simultaneously take a gradient step. We use a discount rate of
+γ = 0.97 and V-trace λ = 0.5. The value and entropy loss coefficients are 0.25 and 0.01. We use the Adam optimizer with a
+learning rate of 4 · 10−4 , which linearly anneals to 4 · 10−6 at the
+end of training. We clip the gradient norm to 2.5 · 10−4 . Our
+hyperparameters are mostly the same as Guez et al. [2019]; see
+Appendix A.1.
+
+Eliezer Yudkowsky. Artificial intelligence as a positive and negative
+factor in global risk. In Nick Bostrom and Milan M. ĆirkoviĆ,
+editors, Artificial Intelligence as a positive and negative factor in
+global risk, 2006. URL https://api.semanticscholar.org/
+CorpusID:2629818.
+Ziqian Zhong, Ziming Liu, Max Tegmark, and Jacob Andreas.
+The clock and the pizza: Two stories in mechanistic explanation of neural networks. In Thirty-seventh Conference on
+Neural Information Processing Systems, 2023. URL https:
+//openreview.net/forum?id=S5wmbQc1We.
+
+A* solver. We used the A* search algorithm to obtain optimal
+solutions to each Sokoban puzzle. The heuristic was the sum of
+the Manhattan distances of each box to its nearest target. Solving
+a single level on one CPU takes anywhere from a few seconds to
+15 minutes.7
+
+A. Training the test subject
+DRC(D, N ) architecture. Guez et al. [2019] introduced the Deep
+Repeating ConvLSTM (DRC), whose core consists of D convolutional LSTM layers with 32 channels and 3 × 3 filters, each applied
+N times per time step. Our DRC(3, 3) – or just DRC for brevity –
+has 1.29M parameters. Before the LSTM core, two convolutional
+layers (without nonlinearity) encode the observation with 4 × 4
+filters.
+The LSTM core uses 3 × 3 convolutional filters, and a nonstandard tanh on the output gate [Jozefowicz et al., 2015]. Unlike the
+original ConvLSTM [Shi et al., 2015], the input to each layer of a
+DRC consists of several concatenated components:
+
+A.1. Training hyperparameters
+All networks were trained with the same hyperparameters, tuned
+on both ResNet and the DRC(3, 3). These largely match Guez
+et al. [2019], except we take the mean per-step losses instead of
+summing.
+Time limits. During training, we want to prevent strong time
+correlations between the returns, so the gradient steps are not correlated over time. For this reason, the time limit for each episode
+is uniformly random between 91 and 120 time steps.
+
+• The encoded observation is fed into each layer.
+• To allow spatial information to travel fast in the ConvLSTM
+layers, we apply pool-and-inject by max- and mean-pooling
+the previous step’s hidden state. We linearly combine these
+values channel-wise before feeding them as input to the next
+step.
+
+Loss. The value and entropy coefficients are 0.25 and 0.01 respectively. It is very important to not normalize the advantages for the
+policy gradient step.
+
+• To avoid convolution edge effects from disrupting the LSTM
+dynamics, we feed in a 12 × 12 channel with zeros on the
+inside and ones on the boundary. Unlike the other inputs, this
+one is not zero-padded, maintaining the output size.
+
+Gradient clipping and epsilon The original IMPALA implementation, as well as Huang et al. [2023], sum the per-step losses. We
+instead average them for more predictability across batch sizes, so
+we had to scale down some parameters by a factor of 1/640: Adam
+ϵ, gradient norm for clipping, and L2 regularization).
+
+ResNet architecture. This is a convolutional residual neural network, also from Guez et al. [2019]. It serves as a non-recurrent
+baseline that can only think during the forward pass (no ability to
+
+6
+7
+
+12
+
+A rounding error caused this to exceed 2B (Appendix A.2).
+The A* solutions may be of independent interest, so we make
+them available at https://huggingface.co/datasets/AlignmentResearch/
+boxoban-astar-solutions/.
+
+Weight initialization. We initialize the network with the Flax
+[Heek et al., 2023] default: normal weights truncatedpat 2 standard deviations and scaled to have standard deviation 1/fan_in.
+Biases are initialized to 0. The forget gate of LSTMs has 1 added
+to it [Jozefowicz et al., 2015]. We initialize the value and policy head weights with orthogonal vectors of norm 1. Surprisingly,
+this makes the variance of these unnormalized residual networks
+decently close to 1.
+
+Table 2: Parameter counts for each architecture.
+Architecture
+DRC(3, 3)
+DRC(1, 1)
+ResNet:
+
+Parameter count
+1,285,125
+987,525
+3,068,421
+
+(1.29M)
+(0.99M)
+(3.07M)
+
+80
+% solved
+
+Adam optimizer. As our batch size is medium-sized, we pick β1 =
+0.9, β2 = 0.99. The denominator epsilon is ϵ = 1.5625 · 10−7 .
+Learning rate anneals from 4 · 10−4 at the beginning to 4 · 10−6 at
+2,002,944,000 steps.
+L2 regularization. In the training loss, we regularize the policy
+logits with L2 regularization with coefficient 1.5625 × 10−6 . We
+regularize the actor and critic heads’ weights with L2 at coefficient
+1.5625 × 10−8 . We believe this has essentially no effect, but we
+left it in to more closely match Guez et al. [2019].
+
+DRC
+ResNet
+
+70
+60
+0
+
+Software. We base our IMPALA implementation on Cleanba
+[Huang et al., 2023]. We implemented Sokoban in C++ using Envpool [Weng et al., 2022] for faster training, based on gym-sokoban
+[Schrader, 2018].
+
+2
+
+4
+
+6 8 10 12
+Thinking steps
+
+16
+
+Figure 7: Success rate of DRC(3, 3) on Validation-medium levels
+across forced thinking steps at the start of the episode.
+Increasing thinking steps increases performance.
+future work. Table 3 reports test and validation performance for
+the DRC and ResNet seeds which we picked for the paper body.
+The parameter counts (Table 2) are very different from what
+Guez et al. [2019] report. In private communication with the authors, we confirmed that our architecture has a comparable number
+of parameters, and some of the originally reported numbers are a
+typographical error.
+
+A.2. Number of training steps
+The paper states networks train for 2.003B steps, but the exact number is 2 002 944 000 steps. Our code and hyperparameters require that the number of environment steps be divisible by
+5 120 = 256 environments × 20 steps collected, because that is the
+number of steps in one iteration of data collection.
+However, 2B is divisible by 5 120, so there is no need to add a
+remainder. We noticed this mistake once the networks already have
+trained. Retraining the networks to correct this error was deemed
+unnecessary.
+At some point in development, we settled on 80 025 600 to approximate 80M while being divisible by 256 × 20 and 192 × 20.
+Perhaps due to error, this mutated into 1 001 472 000 as an approximation to 1B, which directly leads to the number we used.
+
+B. Results on DRC(1, 1) and ResNet
+B.1. DRC(1, 1)
+In this section, we show that the DRC(1, 1) network, which only
+has a single recurrent convolutional block that runs a single forward
+pass per environment step, also exhibits similar planning behavior
+to the DRC(3, 3) network, although achieving lower performance as
+expected due to lower parameter count and compute expenditure
+per environment step. The parameter count for the DRC(1, 1) and
+other networks used in the paper are reported in Table 2.
+Figure 9 shows the performance of the DRC(1, 1) network on the
+medium difficulty validation levels during training. The DRC(1, 1)
+network shows a similar planning effect as the DRC(3, 3) network
+(Figure 1), which matches the results of Guez et al. [2019] who also
+showed that extra thinking steps improved performance of both the
+DRC(1, 1) and the DRC(3, 3) network.
+We train the box-directions probe on the DRC(1, 1) network and
+evaluate it on the medium validation levels. The resulting probe
+achieves an F1 score of 72.3%. The F1 score is high enough to
+suggest that the DRC(1, 1) network also has a plan representation similar to the DRC(3, 3) network. Upon inspecting the probe
+visualizations, we find that the probe is indeed good at predict-
+
+A.3. Learning curve comparison
+Replicating the results of Guez et al. [2019] proved challenging.
+Chung et al. [2024] propose an improved method for RL in planningheavy domains. They employ the IMPALA DRC(3, 3) as a baseline
+and plot its performance in Chung et al. [2024, Figure 5]. They
+plot two separate curves for DRC(3, 3): that from Guez et al.
+[2019], and a decent replicated baseline. The baseline is considerably slower to learn and peaks at lower performance.
+We did not innovate in RL, so were able to spend more time on
+the replication. We compare our replication to Guez et al. [2019] in
+Appendix A.3, which shows that the learning curves for DRC(3, 3)
+and ResNet are compatible, but not the one for DRC(1,1). Our
+implementation exhibits reduced stablility, with large error bars and
+pronounced oscillations over time. We defer addressing this to
+
+13
+
+0.8
+
+1.00
+
+0.6
+
+0.95
+
+Val-medium solved
+
+Test-unfiltered solved
+
+0.7
+
+0.90
+drc_33
+resnet
+drc_11
+deepmind
+
+0.85
+0.80
+
+0.0
+
+0.5
+1.0
+1.5
+Environment steps, training
+
+0.5
+0.4
+0.3
+0.2
+0.1
+0.0
+
+2.0
+1e9
+
+0.0
+
+0.5
+1.0
+1.5
+Environment steps, training
+
+2.0
+1e9
+
+Figure 8: Success rate for Test-unfiltered and Validation-medium levels vs. environment steps of training. Each architecture has 5 random
+seeds, the solid line is the pointwise median and the shaded area spans from the minimum to the maximum. The dotted lines
+are data for the performance of architectures extracted from the [Guez et al., 2019] PDF file.
+Table 3: Success rate and return of DRC and ResNet on the unfiltered test set at various training environment steps.
+Training Env
+Steps
+100M
+500M
+1B
+2B
+
+Test Unfiltered
+ResNet
+DRC(3, 3)
+Success Return Success Return
+87.8
+93.1
+95.4
+97.9
+
+8.13
+9.24
+9.75
+10.29
+
+95.4
+97.9
+99.2
+99.3
+
+9.58
+10.21
+10.47
+10.52
+
+ing the box movements in the short-term but is worse than the
+probe on DRC(3, 3) at predicting the long-term box movements
+(Appendix B.1, left). This suggests that the DRC(1, 1) network
+has a plan-representation, but it is limited to short-term planning.
+This results matches the evidence from the network’s overall performance which is significantly worse on level requiring long-term
+planning.
+
+Valid Medium
+ResNet
+DRC(3, 3)
+Success Return Success Return
+18.6
+39.7
+50.0
+59.4
+
+-6.59
+-2.64
+-0.64
+1.16
+
+47.9
+66.6
+70.4
+76.6
+
+-0.98
+2.62
+3.40
+4.52
+
+by deliberately and not accidentally. The percentage is lower than
+75% for DRC(3, 3) suggesting that DRC(1, 1) performs comparatively more accidental cycles, which is again consistent with lower
+planning-capacity and performance of the network.
+Hence, the main Findings 1−3 analysed for DRC(3, 3) in the
+main text are also true for DRC(1, 1), with results suggesting worse
+long-term planning as compared to DRC(3, 3) as expected.
+
+We now ask whether the performance improvement during thinking steps can be explained by the network refining its plan as we
+showed for the DRC(3, 3) network in Section 4. We measure the
+plan quality as we did in the main text using the length of plan
+from boxes and number of positive predictions. We find that the
+plan quality (Appendix B.1, middle) as well as the F1 score (Appendix B.1, right) measured using the probe increases over the
+number of thinking steps. Figure 11 (left) shows that this network
+also avoids myopic strategies when given extra thinking steps. This
+shows that the DRC(1, 1) network also refines its plan during the
+thinking steps.
+
+B.2. ResNet
+We now check if our findings about the DRC networks also generalize to a ResNet model with no recurrence over hidden state. The
+training and architecture details of the ResNet model is provided
+in Appendix A.
+We first train the box-directions probe on the concatenation of
+the output of the ReLU activations from every residual block in
+every layer. This creates a single input vector of size 1024 for the
+linear probe. The activations are collected on 1000 uniformly sampled levels from the medium-difficulty train set on which the ResNet
+model has a solve rate of 59.9%. The resulting probe achieves an
+F1 score of 84.5% for predicting future box-movement directions
+on the validation set, similar to the probe on the DRC(3, 3) network. Figure 13 (left) also shows that the activations of the model
+in early steps are highly predictive of the actions it will take many
+
+Finally, we show that the DRC(1, 1) network also exhibits the
+pacing behavior as the DRC(3, 3) network. Figure 10 (left) shows
+that DRC(1, 1) also performs cycles at the start of levels, where
+extra computation steps are more useful to come up with better
+solutions. Figure 10 (right) shows that 60% of these cycles disappear with extra thinking steps, suggesting that they are performed
+
+14
+
+are sequentially through the layers. Since the ResNet is state-less,
+it cannot exhibit the pacing-behavior.
+Hence, we can conclude that only the Finding 1 of plan representation holds for the ResNet model, with plan-improvements
+happening sequentially through the layers.
+
+40
+20
+
+Planning Effect
+
+% solved
+
+60
+
+0
+2
+4
+
+0
+5
+0
+
+8
+12
+
+0.5
+1.0
+1.5
+Environment steps, training
+
+16
+resnet
+
+C. Generalizing the DRC(3, 3) to larger levels
+We license the levels by Þorsteinsson [2009] as GPLv3, and make
+them available in the supplementary material. Table 4 shows the
+performance of DRC acriss various level sets. Higher scores align
+with levels considered easier by humans; for example, “Dimitri &
+Yorick” was made for children by Jacques Duthen, features small
+levels (maximum size: 12 × 10) with at most 5 boxes. Level sets
+where the DRC fails to solve any puzzles were also challenging for
+the authors.
+We tested the DRC(3, 3) with 2 to 128 extra thinking steps,
+incrementing in powers of two. For most sets, we find some benefit to 2-4 thinking steps, but no more. The sole exception is
+XSokoban, which contains one level (Figure 15(c)) requiring 128
+steps of thinking to solve.
+We encourage the reader to go to the website by Þorsteinsson
+[2009] and try solving the levels.
+
+2.0
+1e9
+
+Figure 9: The DRC(1, 1) network shows similar planning effect as
+the DRC(3, 3). The plot is computed on the medium
+difficulty validation levels. The planning effect is measured as the difference in performance between the best
+thinking step and no thinking step. It achieves a lower
+performance than the 9 layer ResNet network due to lower
+parameter count.
+
+Density
+
+0.10
+0.05
+0.00
+
+0
+
+20
+40
+Cycle start timestep
+
+17500
+Number of cycles
+
+Median: 10
+Mean: 12.7
+
+0.15
+
+15000
+
+C.1. Generalization to zig-zag levels
+
+12500
+
+We create a template of levels as shown in Figure 16 where the
+agent has to take boxes from the left side to the targets on the
+right side by going through multiple zig-zag vertical lanes. This
+template can be created for arbitrary sized levels by adjusting the
+number of vertical lanes that the agent has to pass through. We
+find that the agent is able to solve levels only until the size of 15×15
+with 5 lanes but fails to solve larger levels. In larger levels, the agent
+does push the boxes through some of the lanes but is unable to
+find the complete path to the target through the remaining zig-zag
+lanes.
+
+10000
+7500
+0 2 4 6 8
+Steps to think
+
+12
+
+Figure 10: Left: DRC(1, 1) also performs cycles at the start of
+levels when it is more beneficial. Right: DRC(1, 1) performs many cycles when given no thinking steps. More
+than 60% of the cycles disappear with extra thinking
+steps.
+
+D. Bistable and unstable plans in toy
+environments
+
+steps in the future. This suggests that both the networks have similar representations that store their long-term plans. However, since
+the ResNet model achieves a lower performance on medium and
+hard difficulty sets, we can conclude that the ResNet model is not
+as good at constructing correct plans as the DRC(3, 3) network.
+We found that plan improves with more thinking steps for the
+DRC model. Since the ResNet is not a recurrent model, it cannot
+take in extra thinking steps like the DRC networks can. Since the
+ResNet does not have a recurrent hidden state, we would expect
+that the plan representation of the model should not improve with
+more environments steps, as the activations are recomputed from
+scratch on every step. Figure 13 (middle plots) show that the
+plan is computed in one-step, and more environment steps do not
+result in better plan representations. Figure 13 (right) shows the
+validation F1-score of the same probe trained on the activations of
+the individual layers separately. We can see that the plan improves
+in the early to middle layers, implying that the plan representations
+
+We examined the Box-Directions probe, which displayed significantly higher causal influence than the Agent-Directions probe Table 1. To better understand this behavior, we designed controlled
+scenarios. Figure 17 (left) shows a level where a single box is next
+to a target, and the agent faces two equally viable paths. Without intervention, the agent initially chooses the right, taking three
+steps before returning to the start and switching to the left. This
+behavior deviates from optimality, which requires committing to a
+single path.
+When we applied Agent-Directions probe to enforce a path
+choice, the agent consistently followed the chosen trajectory Figure 17 (middle). However, in levels where multiple viable paths
+exists, the Agent-Directions probe’s influence diminished, and the
+Box-Directions probe guided the agent more effectively. Figure 17
+(right) shows a near-empty level where the Box-Directions probe
+was used to guide the agent on the first four steps. After the inter-
+
+15
+
+40
+30
+20
+10
+0 2 4 6 8
+12
+Thinking steps
+(a) on ALL levels
+
+55.0
+Avg Optimal Length
+
+Timestep to place box
+
+Box 4
+Box 3
+Box 2
+Box 1
+
+50
+
+0 2 4 6 8
+12
+Thinking steps
+(b) on SOLVED levels
+
+52.5
+50.0
+47.5
+45.0
+0 2 4 6 8 12 NS
+Solved at thinking step
+
+Figure 11: Left: Thinking steps also help DRC(1, 1) to avoid myopic plans, thus increasing the time to place boxes first 3 boxes in solved
+levels while solving the level faster by placing the box 4 earlier. Right: The average optimal length of level solved by extra
+thinking steps doesn’t change with more thinking steps. This suggests that, unlike DRC(3, 3) which solves more difficult levels
+with more thinking steps, DRC(1, 1)’s planning capacity is limited.
+vention ceased. the agent computed a shorter, optimal path and
+deviated from the initial intervention.
+
+F. Probe Training
+Probe architecture We train multiple linear probes on the hidden
+states h and cell states c activations of the network. Probes are
+trained either on activations from individual layers or by concatenating activations across all three layers. Activations were collected
+as the model played through hard levels. The training set are
+constructed by randomly sampling cached levels and including all
+timesteps except the first five. These initial steps excluded due to
+potential noise while the network formulated its strategy for solving
+the levels.
+Probes are trained with logistic regression with L1 decay using
+the Scikit-Learn library. A grid search over learning rates and L1
+weight decay was conducted to identify the probe with the highest
+F1 score on the validation set.
+For multi-class probe targets, each potential output class l is
+treated as a separate data point. Specificially: A prediction was
+considered positive if the highest probe logit corresponded to class
+l, and negative otherwise. A data point was positive if its true
+label matched l. The confusion matrix and F1 score were then
+computed from the n · l data points.
+In addition to Agent-Directions and Box-Directions probes, we
+trained the following:
+
+This analysis the agent prioritizes box-directions when available
+and relies on the agent-direction cues as secondary guidance. These
+findings highlight the hierarchy of planning components encoded
+in the network.
+
+E. Case Studies
+Case Study: Thinking makes some levels solvable Figure 18(a).
+In this scenario, the DRC fails to solve the level in the no-thinking
+condition. It initially pushes box C one square to the right. While
+attempting to push A to a, it blocks B from reaching b, making
+the level unsolvable. In the thinking condition, the DRC correctly
+pushes A to a first, leaving room to push B to b and C to ts target,
+solving the level.
+
+Case Study: Thinking speeds up solving Figure 18(b). Without
+thinking, the DRC takes inefficient route, moving back and forth
+multiple times before starting to push boxes. For example, it moves
+to y, up to c, then down onto z, back up to y and to z before solving
+the puzzle. With thinking, the DRC immediately moves to box A,
+completing the solution with fewer extraneous steps. The resulting
+solution is faster, reducing the total step penalty.
+
+• Next-Box probe: Predicts 1 on the square of the box that the
+agent will move next and 0 for every other square.
+• Next-Target probe: Predicts 1 on the square of the target
+that the agent will put a box in next, and 0 for every other
+square.
+
+Case Study: Thinking slows down Figure 18(c). In this level,
+thinking causes the DRC to take a less efficient path. Without
+thinking, the DRC pushes box C to y, followed by boxes A, then
+B into place. On the way back down, the DRC pushes C onto c
+and finally D onto d. In the thinking condition, the DRC starts
+by pushing B onto b then backtracks to push A, C, then D. This
+unnecessary backtracking leads to a slower overall solution.
+
+• Next-Action probe: Grid-wise binary probe for each of the four
+move action that predict 1 for all squares in the grid if the next
+action matches the probe’s action. We train grid-wise probe
+instead of a global probe so that the probe can be applied to
+arbitrary-sized inputs. The results for the next-action probes
+are available in Table 10.
+
+16
+
+8
+
+50
+
+6
+
+Count
+
+Future Accuracy
+
+75
+
+25
+
+4
+
+Positive squares
+Cont. chain length
+
+2
+
+0
+25
+50
+Episode timesteps
+60
+% score
+
+0
+
+1
+
+75
+
+2
+
+3
+4
+5
+Thinking Steps
+
+6
+
+40
+Recall
+Precision
+F1
+
+20
+1
+
+2
+
+3
+4
+5
+Thinking Steps
+
+6
+
+Figure 12: Left: For DRC(1, 1), the number of steps in advance that the Box-Directions probe is able to predict a box move shows similar
+trend as DRC(3, 3), but is overall lower, indicating that the DRC(1, 1) is less capable of planning. Middle and Right: The
+plan quality, as measured by summing probe-predicted chain lengths starting from boxes and counting squares with positive
+non-empty predictions, and the F1-score increases over thinking steps (Section 3.1). This suggests that DRC(1, 1) also refines
+its plan during computation, although it has an overall lesser F1 score of 60% as compared to 84% for DRC(3, 3).
+• Pacing probe: The global label is 1 if the agent is currently
+in a cycle, and 0 otherwise.
+
+G. Looking for interpretable features with Sparse
+Autoencoders (SAEs)
+To search for monosemantic and interpretable features in the network, we train sparse-autoencoders (SAEs) [Huben et al., 2023,
+Bricken et al., 2023] on the individual squares in the h hidden state
+of the network consisting of 32 neurons. Thus, we get a 10 × 10 visualization for each SAE feature as shown in Figure 19. We use the
+top-k activation function [Gao et al., 2024, Tamkin et al., 2024],
+which is state-of-the-art for training SAEs and directly enforces
+an L0 sparcity constraint on activations. The SAE hyperparameter search space is detailed in Table 6. We train separate SAEs
+for each layer with the specified hyperparameters, selecting those
+achieving greater than 90% explained variance while retaining interpretable features based on manual visual inspection. We release
+these trained SAEs and probes in the huggingface repository with
+our trained DRC networks. 8
+Examples of interpretable features from an SAE trained on the
+last layer with k = 8 are provided in Table 7, with visualizations
+in Figure 19. For “Target”, “Unsolved”, and “Solved” concepts (Table 9), we occasionally observed an offset of 1 square (horizontal or
+vertical) from the ground truth. Due to a permanent one-square
+outer-edge wall, this offset never results in out-of-bounds errors.
+We evaluated these potential “Offset” variants for the Target, Unsolved, and Solved concepts.
+All interpretable SAE features identified are already embedded
+
+• Value probe: The global label is the numerical value that the
+critic head outputs.
+
+Probe results. The pacing probe gets F1 = 31.0%, which is not
+much better than the constant 1 probe, which has F1 = 12.8%.
+This suggests that the DRC(3, 3) does not represent whether it is
+in a cycle or not.
+For the value function probe, we compute the fraction of variance
+explained R2 . If we train a global probe, R2 is very high: 97.7%–
+99.7% depending on the layer. However, grid-wise probes obtain
+much worse but still passable results: 41.0%–79.2% depending on
+layer. We visually checked whether the grid-wise probe reads off
+the values of different plans, but could not find any such pattern.
+Almost all the performance of the global probe is recovered by
+training on the mean-pooled inputs: 95.2%–99.5%. It is likely that
+the global and mean-pooled value probes are indirectly counting
+the number of squares the agent will step on, which almost fully
+determines the value, and we know is possible due to the futuredirection probes.
+The possible box directions probe got approximately ≈ 30% accuracy, and it was
+
+8
+
+17
+
+https://huggingface.co/AlignmentResearch/learned-planner
+
+40
+
+75
+
+7
+
+80
+
+70
+
+60
+
+Positive squares
+Cont. chain length
+
+6
+5
+4
+
+0
+
+25
+50
+Episode timesteps
+
+75
+
+Recall
+Precision
+F1
+
+65
+60
+
+% F1 score
+
+60
+
+8
+% score
+
+80
+Count
+
+Future Accuracy
+
+100
+
+55
+1
+
+2
+
+3
+4
+Env Steps
+
+5
+
+6
+
+40
+20
+0
+
+1
+
+2
+
+3
+4
+Env Steps
+
+5
+
+6
+
+All layers
+
+0 1 2 3 4 5 6 7 8
+Layer
+
+Figure 13: Left: The box-directions probe trained on all layers for the ResNet model can predict moves with 80% accuracy 50 steps before
+they occur. This implies that the ResNet model also computes a long-term plan for every observation. Middle: The plan
+quality and accuracy measured with the all-layer box-directions probe doesn’t improve with more environment steps as expected,
+since the plan in the activations need to be recomputed entirely from scratch on every step. This is unlike the DRC models
+which improve their plans with more thinking and environment steps. Right: Training the box-directions probe on each layer
+separately reveals that the plan representation is computed and improved in the early middle layers 1-4 with F1-score reaching
+63.9%. The layer likely compute different parts of the plan since the probe trained on all the layers achieves a significantly
+higher F1-score of 84.5%.
+
+(a) Microban, level 105
+
+(b) Microban, level 144
+
+(c) Mas Sasquatch, level 15
+
+Figure 14: Thinking steps are not always useful: For level (a), the network succeeds with 0 to 16 thinking steps, but fails with 32 or more
+thinking steps. Levels (b) and (c) are too difficult for the DRC(3, 3), and it always fails on them independent of thinking steps,
+though it comes up with decent partial solutions. All levels from Þorsteinsson [2009].
+
+18
+
+(a) Sokoban Jr. 2, level 17
+
+(b) Microban, level 145
+
+(c) XSokoban, level 30
+
+Figure 15: Some levels require thinking steps for success: For level (a), the network always succeeds. For level (b), it succeeds at 32 or
+more thinking steps. For level (c), it needs 128 thinking steps to succeed. All levels from Þorsteinsson [2009].
+in individual channels, with comparable or higher monosemanticity
+then the SAE features based on F1 scores. Table 10 compares precision, recall, and F1 scores for action features across channels, SAE
+neurons, and linear probes trained against the ground truth predictions. Table 9 reports scores for other interpretable features. SAE
+action features consistently underperform channels by an average
+F1 margin of 5.9%. Linear probes trained across all hidden-state
+channels achieve similar F1 scores to individual channels indicating
+the inherent monosemanticity of channels without further improvement through linear probe.
+
+H. Additional quantitative behavior figures and
+tables
+Figure 20 through Figure 23 present quantitative behavior, analyzing various aspects of the network’s planning behavior and evaluation metrics.
+
+I. Additional related work
+Ethical treatment of AIs. The question whether AIs deserve
+moral consideration has been widely debated. Schwitzgebel and
+Garza [2015] argue that highly human-like AIs merit rights, while
+Tomasik [2015] suggest that most AIs deserve some degree of consideration, akin to biological organisms [Singer, 2004]. The concept
+of ethical treatement for reinforcement learners has been explored
+by Daswani and Leike [2015], who propose that pleasure and pain
+in these systems may correspond to temporal difference (TD) error rather than absolute returns. If neural networks have internal
+objectives distinct from their critic head [Hubinger et al., 2019,
+Di Langosco et al., 2022], identifying these objectives could provide higher-assurance methods for assessing AI goals compared to
+direct querying [Perez and Long, 2023].
+
+Figure 16: 16 × 16 zig-zag level that the DRC(3, 3) doesn’t solve.
+The network solves all levels of this pattern only up to
+15 × 15 size and fails on all zig-zag levels beyond that.
+
+Chain-of-thought faithfulness. The faithfulness of chain of
+thought reasoning in large language models (LLMs). Studies such
+as [Lanham et al., 2023, Pfau et al., 2024] investigate whether
+
+19
+
+Table 4: Performance of the DRC(3, 3) on each set of levels by [Þorsteinsson, 2009]. The “max solved” columns represent the proportion
+of levels solved at the number of steps in the “max at” column, which is the highest solved proportion for each number of thinking
+steps tried. The “largest level size” column represents the height and width of the solved level with the largest grid area.
+Level collection
+Dimitri & Yorick
+Sokoban Jr. 1
+Howard’s 3rd set
+Simple sokoban
+Sokoban Jr. 2
+Sokogen 990602
+Microban
+Yoshio Automatic
+Deluxe
+Howard’s 2nd set
+Sasquatch III
+Microcosmos
+Howard’s 1st set
+Still more levels
+Sasquatch IV
+Xsokoban
+Sasquatch
+David Holland 1
+David Holland 2
+Howard’s 4th set
+Mas Sasquatch
+Nabokosmos
+Sokoban
+
+#
+61
+60
+40
+61
+54
+78
+155
+52
+55
+40
+16
+40
+100
+35
+36
+40
+49
+10
+10
+32
+50
+40
+50
+
+All levels
+solved Max slv.
+
+max at
+
+#
+
+86.9%
+85.0%
+70.0%
+55.7%
+48.1%
+37.2%
+31.0%
+28.8%
+25.5%
+12.5%
+6.2%
+5.0%
+4.0%
+2.9%
+2.8%
+2.5%
+2.0%
+0.0%
+0.0%
+0.0%
+0.0%
+0.0%
+0.0%
+
+2
+0
+0
+16
+2
+4
+64
+2
+16
+2
+0
+16
+0
+0
+0
+128
+4
+0
+0
+0
+0
+0
+0
+
+0
+19
+1
+51
+40
+0
+17
+0
+1
+22
+8
+0
+54
+34
+20
+39
+39
+5
+9
+30
+43
+0
+48
+
+93.4%
+85.0%
+70.0%
+62.3%
+53.7%
+43.6%
+31.6%
+36.5%
+27.3%
+15.0%
+6.2%
+10.0%
+4.0%
+2.9%
+2.8%
+5.0%
+4.1%
+0.0%
+0.0%
+0.0%
+0.0%
+0.0%
+0.0%
+
+Levels larger than 10 × 10
+solved Max slv. max at
+—
+73.7%
+0.0%
+47.1%
+45.0%
+—
+5.9%
+—
+0.0%
+0.0%
+0.0%
+—
+0.0%
+2.9%
+0.0%
+2.6%
+0.0%
+0.0%
+0.0%
+0.0%
+0.0%
+—
+0.0%
+
+—
+73.7%
+0.0%
+54.9%
+47.5%
+—
+11.8%
+—
+0.0%
+0.0%
+0.0%
+—
+0.0%
+2.9%
+0.0%
+5.1%
+2.6%
+0.0%
+0.0%
+0.0%
+0.0%
+—
+0.0%
+
+—
+0
+0
+16
+2
+—
+2
+—
+0
+0
+0
+—
+0
+0
+0
+128
+4
+0
+0
+0
+0
+—
+0
+
+Largest
+level size
+(10,
+(18,
+(11,
+(16,
+(14,
+(10,
+(14,
+(10,
+(10,
+(11,
+(10,
+(10,
+(12,
+(13,
+(10,
+(13,
+(14,
+—
+—
+—
+—
+—
+—
+
+12)
+21)
+10)
+19)
+27)
+10)
+10)
+10)
+13)
+10)
+17)
+10)
+10)
+13)
+10)
+19)
+24)
+
+Figure 17: Left: A custom level where the agent has two equally good paths to follow. The arrows show the prediction of the AgentDirections probe with opacity proportional to the number of times an arrow was predicted across all the steps. The green
+and red arrows are correct and incorrect predictions, respectively. The agent behaves suboptimally by returning to the start
+and going left after first going right for three steps. Middle: The agent takes the path on the right after intervening with
+the corresponding arrows using the Agent-Directions probe on the first step. The same happens on the left if we intervene
+on that path without the suboptimal steps right of the undisturbed agent. Right: An empty level with Box-Directions probe
+intervening on the first four steps which are followed correctly by the agent on those four steps. When the intervention is
+removed on the fifth step, the agent computes the simpler path in green and doesn’t follow the path laid out earlier (in red).
+
+20
+
+b
+
+c y
+a
+AD
+C
+
+b
+
+B
+
+c
+
+d
+
+D
+
+CBy
+
+aAx
+b
+
+d
+
+(a) file 0, level 18
+
+c
+
+z
+
+(b) file 0, level 53
+think
+
+think
+
+→ solved faster
+
+unsolved → solved
+
+d
+
+a
+
+ACDB
+
+(c) file 0, level 153
+think
+
+→ solved slower
+
+Figure 18: Case studies of three medium-validation levels demonstrating different behaviors after 6 thinking steps. Colors are as in
+Figure 1 (right). Boxes and targets are paired in upper- and lower-case letters respectively, and the optimal solution places
+boxes alphabetically. Videos available at this https URL. Levels solved faster incur fewer per-step penalties, yielding higher
+returns. Letters are for reference only and not intrinsic to Sokoban.
+
+Figure 19: Visualization of some interpretable features from the SAE of last layer. These features also appear monosemantically in the
+channels. The precision, recall, and F1 score for the features are reported in Table 9.
+
+Table 5: Weight and bias for transforming action probes to predictions
+Weight
+
+Bias
+
+Mean
+
+Max
+
+Positive proportion
+
+1.2086
+
+-0.0582
+
+0.2070
+
+Up
+
+Down
+
+Left
+
+Right
+
+0.3337
+
+-0.0921
+
+-0.0632
+
+-0.0539
+
+Table 6: Hyperparameter search space for training SAE
+Hyperparameter
+
+Search Space
+
+k
+learning rate
+expansion factor
+
+{4, 8, 12, 16}
+{1e − 5, 5e − 5, 1e − 4, 5e − 4, 1e − 3}
+{16, 32, 64}
+
+Systematic Generalization. Previous work identified conditions
+under which neural networks generalize, such as diverse datapoints
+and egocentric environments [Lake and Baroni, 2023, Hill et al.,
+2020, Mutti et al., 2022]. Similar interpretability can be extended
+across these neural networks to uncover shared planning mechanisms and the conditions in which they emerge.
+
+LLMs rely on plain English for long-term reasoning, which could allow unintended consequences to be easily identified and mitigated
+Scheurer et al. [2023].
+
+J. Sussman’s anomaly
+Fully reverse engineering small networks. Recent efforts have successfully reverse-engineered small neural networks performing algorithmic tasks [Nanda et al., 2023a, Chughtai et al., 2023, Zhong
+et al., 2023, Quirke and Barez, 2023].
+
+Although the DRC(3, 3) shows exceptional long-term planning capabilities as demonstrated in the paper, it can have some trivial
+failure modes. Figure 24 shows a level in which the agent indefinitely tries to put the two boxes on the right onto the same target
+
+21
+
+Success (val. medium)
+
+Avg search steps A*
+
+0.8
+
+110k
+100k
+90k
+80k
+
+Density
+
+1
+
+10
+
+2
+
+10
+
+3
+
+10
+
+4
+
+0.4
+0.2
+0.0
+
+0
+
+2
+
+0.0
+0.5
+1.0 0.0
+Success (test unfiltered)
+
+4
+6
+8
+12 unsolved
+Solved at steps to think
+
+Figure 20: Number of thinking steps required to solve the level
+vs. number of nodes A* needs to expand to solve
+it. The weak correlation toward the end indicates
+different that the DRC and A* rely on different
+heuristics.
+
+10
+
+drc33
+resnet
+drc11
+
+0.6
+
+Median: 2
+Mean: 6.2
+
+0.5
+Success (hard)
+
+1.0
+
+Figure 21: Success rate on datasets of varying difficulty for different architecture checkpoints. Performance trends suggest ResNets and DRCs with comparable results on easier sets also perform similarly on harder sets. DRC(1,1) is
+a slight exception, performing consistently worse overall
+(see Appendix A.3).
+
+0.80
+
+Same state
+
+Same state
+
+0.75
+
+0.80
+
+0.70
+0.65
+
+0.75
+
+0.60
+0
+
+25
+
+50
+75
+Cycle length
+
+(a) Cycle length distribution
+
+100
+
+0
+
+10
+20
+Steps after cycle
+(b) with cycles from all levels
+
+30
+
+0
+
+10
+20
+Steps after cycle
+
+30
+
+(c) with cycles from levels solved by agent
+
+Figure 22: We replace N -length cycles with N thinking steps to examine state consistncy across subsequent timesteps. (a) Histogram of
+cycle lengths in the medium-validation set. (b, c) After replacing a cycle with the same length in thinking steps, are all the
+states the same for the next x steps?
+
+22
+
+Cycles
+Non-cycles
+
+Density
+
+0.06
+0.04
+0.02
+0.00
+
+(a) Pacing behavior on file 0, level 53. On the given starting
+observation, the agent paces around 4 spaces in the first
+9 steps and then goes on to solve the level. Video for
+the level is available at this https url .
+
+-1
+
+-0.5
+
+0
+0.5
+Delta F1 score
+
+1
+
+(b) Change in per-step F1 score of Box-Directions probe for moves in cycles and outside
+cycles on medium-difficulty validation levels. The non-cycle moves were recorded
+from the same distribution of timesteps where cycles occur but from levels without
+a cycle at those steps. Mean per-step change in F1 for cycle and non-cycle steps are
+1.40% ± 0.06% and 0.84% ± 0.04% respectively.
+
+Figure 23: Illustration of cycles and F1 scores
+
+Table 7: SAE Feature Concepts
+Concept
+
+Description
+
+Target
+Unsolved
+Solved
+Agent Up
+Agent Down
+Agent Left
+Agent Right
+
+The 4 target squares (static)
+Targets and boxes that aren’t solved
+Solved target squares with a box on them
+The agent will move Up next step
+The agent will move Down next step
+The agent will move Left next step
+The agent will move Right next step
+
+that is on the right side of the level. This failure mode is similar to the Sussman’s anomaly demonstrated by Sussman [1973]
+illustrating the weakness of non-interleaved planning algorithms.
+We observe that such cases happen rarely, with the network being
+able to resolve the interleaved dependencies between boxes in most
+cases.
+Figure 24: Level 466 from file 233 of train-medium in which the
+DRC(3, 3) network tries to put both the boxes on the
+right to the target on the right by repeatedly putting
+one box on target, only to remove it and put the other
+one on the same target.
+
+K. Planning vs. predicting box-directions
+Most of our analysis and experimentation in the paper relies on
+the box-directions probe, which predicts the sequence of all future
+box movement directions from squares in the grid given network’s
+activations. While predicting the box-directions is very close to
+planning, it misses a few details required for a complete plan. For
+example, for a complete plan of actions, the agent also has to also
+know the order in which it wants to move the boxes in and the
+plan a path from the agent’s current position to the next box to
+
+23
+
+Table 8: Breakdown of levels by category at 6 thinking steps.
+Level categorization
+Solved, previously unsolved
+Unsolved, previously solved
+
+Percentage
+6.87
+2.23
+
+Solved, with better returns
+Solved, with the same returns
+Solved, with worse returns
+
+18.98
+50.16
+5.26
+
+Unsolved, with same or better returns
+Unsolved, with worse returns
+
+15.14
+1.36
+
+push. However, we do train probes for agent-directions and nextbox to move and show they have high predictive accuracy. We
+focus primarily on boxes-directions because it is the most crucial
+component of a plan in the game, which is also reflected in the
+fact that the box-directions probe is the most causal probe.
+
+24
+
+Table 9: Scores for SAE and Channel features
+Offset (dy, dx)
+
+Concept
+
+Channel
+Number
+
+Target
+Unsolved targets and boxes
+Solved targets
+
+(1, 0)
+(0, 0)
+(0, 0)
+
+SAE Feature
+
+Prec
+
+Rec
+
+F1
+
+97.8
+94.9
+91.6
+
+97.7
+90.8
+94.6
+
+97.8
+92.8
+93.0
+
+L3C17
+L3C7
+-L3C7
+
+Number
+L3F278
+L3F212
+L3F179
+
+Prec
+
+Rec
+
+F1
+
+97.8
+95.3
+91.7
+
+98.1
+86.6
+91.5
+
+98.0
+90.7
+91.6
+
+Table 10: Action features scores across channels, probes, and SAE features
+Feature
+
+Channel
+Number
+
+Up
+Down
+Left
+Right
+
+L3C29
+L3C8
+L3C27
+L3C3
+
+SAE Feature
+
+Prec
+
+Rec
+
+F1
+
+95.7
+98.4
+85.5
+97.0
+
+88.1
+80.8
+84.6
+86.9
+
+91.7
+88.8
+85.1
+91.7
+
+Number
+L3F270
+L3F187
+L3F244
+L3F385
+
+25
+
+Probe
+
+Prec
+
+Rec
+
+F1
+
+Prec
+
+Rec
+
+F1
+
+93.9
+98.0
+96.1
+94.6
+
+76.2
+79.1
+63.2
+78.5
+
+84.1
+87.6
+76.2
+85.8
+
+97.5
+97.6
+83.5
+97.6
+
+86.5
+86.9
+86.6
+87.4
+
+91.7
+91.9
+85.0
+92.2
+
+

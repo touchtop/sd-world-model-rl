@@ -1,0 +1,2765 @@
+Sokoban: Enhan ing General Single-Agent Sear h
+Methods Using Domain Knowledge
+
+Andreas Junghanns and Jonathan S hae er
+Department of Computing S ien e
+University of Alberta
+Edmonton, Alberta
+CANADA T6G 2H1
+Email: fandreas, jonathang s.ualberta. a
+
+Abstra t
+
+AI resear h has developed an extensive olle tion of methods to solve
+state-spa e problems. Using the hallenging domain of Sokoban, this paper studies the e e t of general sear h enhan ements on program performan e. We show that the urrent state of the art in AI generally requires a large resear h and programming e ort to use domain-dependent
+knowledge to solve even moderately omplex problems in su h diÆ ult
+domains. The appli ation of domain-spe i knowledge to exploit properties of the sear h spa e an result in large redu tions in the size of
+the sear h tree, often several orders of magnitude per sear h enhan ement. This appli ation-spe i knowledge is dis overed and applied using
+appli ation-independent sear h enhan ements. Understanding the e e t
+of these enhan ements on the sear h leads to a new taxonomy of sear h
+enhan ements, and a new framework for developing single-agent sear h
+appli ations. This is used to illustrate the large gap between what is
+portrayed in the literature versus what is needed in pra ti e.
+Keywords: single-agent sear h, IDA*, Sokoban, transposition table, pattern sear h, pattern database, rapid random restart
+
+1
+
+Introdu tion
+
+The AI resear h ommunity has developed an impressive suite of te hniques
+for solving state-spa e problems. These te hniques range from general-purpose
+domain-independent methods su h as A*, to enhan ements using domain-spe i
+knowledge. There is a strong movement toward developing domain-independent
+methods to solve problems. While these approa hes require minimal e ort to
+spe ify a problem to be solved, the performan e of these solvers is often limited,
+ex eeding available resour es on even simple problem instan es. This requires
+1
+
+the development of domain-dependent methods that exploit additional knowledge about the sear h spa e. These methods an greatly improve the eÆ ien y
+of a sear h-based program, as measured in the size of the sear h tree needed to
+solve a problem instan e.
+This paper presents a study on solving hallenging single-agent sear h problems for the domain of Sokoban. Sokoban is a one-player puzzle and is of general
+interest as an instan e of robot motion planning problems [4℄. Sokoban is analogous to the problem of having a robot in a warehouse move spe i ed goods
+from their urrent lo ation to their nal destination, subje t to the topology of
+the warehouse and any obsta les in the way. Sokoban has been shown to be
+NP-hard and PSPACE- omplete [2, 4℄.
+Previously, we reported on our attempts to solve Sokoban problems using the
+standard single-agent sear h te hniques available in the literature [10℄. When
+these proved inadequate, solving only 10 problems of a 90-problem test suite,
+new algorithms had to be developed to improve sear h eÆ ien y [8, 9, 11, 12℄.
+This allowed 47 problems to be solved optimally or near-optimally. Additional
+e orts have sin e in reased this number to 57. The results reported here do ument the large gains a hieved by adding appli ation-dependent knowledge to
+our program, Rolling Stone. Many of the sear h enhan ements added to Rolling
+Stone result in the sear h-tree size being redu ed by several orders of magnitude.
+Analyzing all the additions made to the Sokoban solver reveals that the
+most valuable enhan ements are based on sear h (both on-line and o -line). We
+lassify the sear h enhan ements along several dimensions in luding generality,
+omputational model, ompleteness and admissibility. Not surprisingly, the
+more spe i an enhan ement is, the greater its impa t on sear h performan e.
+When presented in the literature, single-agent sear h (usually IDA*) onsists
+of a few lines of ode. Most textbooks do not dis uss sear h enhan ements, other
+than y le dete tion. In reality, non-trivial single-agent sear h problems require
+mu h more extensive programming (and often resear h) e ort. For example,
+a hieving high performan e for solving sliding tile puzzles requires enhan ements
+su h as y le dete tion, pattern databases, move ordering and enhan ed lowerbound al ulations [3℄. In this paper, we outline a new framework for developing
+high-performan e single-agent sear h programs.
+This paper ontains the following ontributions:
+1. A ase study showing the evolution of a Sokoban solver's performan e,
+beginning with a domain-independent solver and ending with a highlytuned, appli ation-dependent program.
+2. Pattern sear hes are a new proof pro edure for improving a lower bound.
+They attempt to show that the lower bound for part of a state on guration an be in reased.
+3. Relevan e uts are a new way to add lo ality to a global sear h.
+4. A taxonomy of single-agent sear h enhan ements.
+
+2
+
+He-Ge Hd-H -Hd Fe-Ff-Fg Fh-Gh-Hh-Ih-Jh-Kh-Lh-MhNh-Oh-Ph-Qh-Rh-Rg Fg-Fh-Gh-Hh-Ih-Jh-Kh-Lh-MhNh-Oh-Ph-Qh-Qi-Ri F -Fd-Fe-Ff-Fg-Fh-Gh-Hh-Ih-JhKh-Lh-Mh-Nh-Oh-Ph-Qh-Qg
+Ge-Fe-Ff-Fg-Fh-GhHh-Ih-Jh-Kh-Lh-Mh-Nh-Oh-Ph-Qh-Rh Hd-He-Ge-FeFf-Fg-Fh-Gh-Hh-Ih-Jh-Kh-Lh-Mh-Nh-Oh-Ph-Pi-Qi
+Ch-Dh-Eh-Fh-Gh-Hh-Ih-Jh-Kh-Lh-Mh-Nh-Oh-Ph-Qh
+Figure 1: Sokoban problem 1 with one solution
+5. A new framework for single-agent sear h, in luding sear h enhan ements
+and their ontrol fun tions.
+In this paper, the term domain-dependent refers to knowledge about the
+(Sokoban) sear h spa e that is used by a sear h enhan ement. The sear h enhan ements dis ussed are otherwise generally appli able to appli ation domains
+that have ne essary sear h-spa e prerequisites (e.g. dire ted versus undire ted
+graphs, or tree- versus graph-stru ture of the sear h spa e). Many of the te hniques des ribed in this paper have been su essfully applied to other singleagent sear h domains (as well as for other lasses of sear h problems). Some
+of the te hniques that were initially on eived for Sokoban (su h as pattern
+sear hes) have been used in other domains (the 15-puzzle and Bri ks).
+2
+
+Sokoban
+
+Figure 1 shows a sample Sokoban problem, the rst and easiest of a 90 problem
+test suite available at http://xsokoban.l s.mit.edu/xsokoban.html. The goal is
+simple: use the man to push (but not pull) all the stones in the maze to the
+shaded goal squares, abiding by the wall onstraints. Only one stone an be
+pushed at a time. These rather simple rules belie the diÆ ulty of Sokoban
+problems, espe ially with respe t to omputer solutions. The rules of Sokoban
+give rise to beautiful problems that an be extraordinarily omplex.
+To refer to squares in a Sokoban problem, we use a oordinate notation. The
+horizontal axis is labeled from \A" to \T", and the verti al axis from \a" to \t"
+(assuming the maximum sized 20x20 problem), starting in the upper left orner.
+3
+
+A move onsists of pushing a stone from one square to another. For example,
+in Figure 1 the move Fh-Eh moves the stone on Fh left one square. We use FhEh-Dh to indi ate a sequen e of pushes of the same stone. A move, of ourse, is
+only legal if there is a valid path by whi h the man an move behind the stone
+and push it. Thus, although we only indi ate stone moves (su h as Fh-Eh),
+impli it in this is the man's moves from its urrent position to the appropriate
+square to do the push (for Fh-Eh the man would have to move from Li to Gh
+via the squares Lh, Kh, Jh, Ih and Hh).
+Throughout this paper, only a limited number of the strategi prin iples
+intrinsi to Sokoban will be mentioned. The full depth of Sokoban an only
+be appre iated by a more dire t en ounter with the game. Nevertheless, we
+want to mention brie y the hallenge of deadlo k positions resulting from the
+restri tion of being able to push only one stone at a time. In the simplest ase
+the man ould push a stone into a orner, e e tively immobilizing it on a nongoal square. Sin e all stones need to be pushed to a goal, any su h xed stone
+renders the problem unsolvable. We will all these and similarly unsolvable
+positions deadlo ked.
+In this paper we attempt to optimally solve Sokoban problems. One definition of optimal is to minimize the number of stone pushes in the solution.
+Another de nition is to minimize the number of man movements. It is unommon for a single solution to a hieve both goals. In this work, optimality is
+de ned as the minimal number of stone pushes.1
+There are several properties that make Sokoban a hallenging domain [10℄:
+
+
+
+The ombination of long solution lengths (from 97 to 674 stone pushes
+in the test set) and potentially large bran hing fa tors (up to 136) make
+Sokoban diÆ ult for onventional sear h algorithms to solve. The size of
+the sear h spa e for 20  20 Sokoban mazes has been estimated at 1098
+[7℄.
+
+
+
+Sokoban solutions are inherently sequential; only limited parts of a solution are inter hangeable. Subgoals are often interrelated and thus annot
+be solved independently. Attempts to de ompose problems are also ineffe tive. For example, removing a single stone from a problem may make it
+trivial to solve, o ering no insights as to how to solve the original problem.
+
+
+
+A simple and e e tive lower bound on the solution length of a Sokoban
+problem remains elusive. The best lower-bound estimator is expensive to
+al ulate, and is often ine e tive.
+
+
+
+The underlying stru ture of Sokoban an be represented by a dire ted
+graph, meaning that some moves are not reversible. Consequently, there
+are deadlo k states from whi h no solution an be rea hed.
+
+1 Optimizing man movements may be harder in pra ti e be ause of the diÆ ulty in nding
+a good lower-bound fun tion.
+
+4
+
+Property
+Bran hing Fa tor
+Solution Length
+Sear h-Spa e Size
+Cal ulation of
+Lower Bound
+Underlying Graph
+
+Spe i s
+Average
+Range
+Average
+Range
+Upper Bound
+Full
+In remental
+
+24-Puzzle
+2.37
+1-3
+100+
+1-unknown
+1025
+O (n)
+O (1)
+Undire ted
+
+Rubik's Cube
+13.35
+12-15
+18
+1-20
+1019
+O (n)
+O (1)
+Undire ted
+
+Sokoban
+12
+0-136
+260
+97-674
+1098
+3
+O (n )
+2
+O (n )
+Dire ted
+
+Table 1: Sear h-Spa e Properties of Di erent Domains
+
+Figure 2: Two Trivial Sokoban Problems
+Sokoban exhibits a large number of diÆ ult sear h-spa e properties. Traditional domains for the s ienti investigation of sear h methods, su h as N N puzzles and Rubik's Cube, are usually \easier" with respe t to at least one
+sear h-spa e property. Table 1 ompares several sear h-spa e properties of
+the above mentioned domains. It is un lear whether the on lusions obtained
+from these simpler domains will be e e tive for diÆ ult sear h domains su h as
+Sokoban, mu h less \real-world" problems.
+3
+
+Appli ation-Independent Te hniques
+
+Ideally, we would like appli ations to be spe i ed with minimal e ort, and a
+\generi " solver ould be used to ompute the solutions. In small domains this
+is attainable (e.g., by exhaustive enumeration). For more hallenging domains,
+there have been a number of interesting attempts at domain-independent solvers
+(e.g., Bla kbox [13℄). Before investing a lot of e ort in developing a Sokobanspe i program, it is important to understand the apabilities of urrent AI
+tools. The omparison reveals a large disparity between what appli ationindependent and appli ation-dependent problem solvers an a hieve.
+5
+
+The Sokoban problems in Figure 2 were given to Bla kbox to solve. Bla kbox
+was a winner in the AIPS'98 fastest planner ompetition. The rst problem,
+ontaining a single stone, was solved by Bla kbox 3.3 in a few se onds. The
+se ond problem, ontaining two stones, requires 90 se onds to solve. Note that
+the sear h spa e ( onsidering only the stones, not the man) is (43 hoose 2) =
+903 positions. In ontrast, the non-trivial six-stone position shown in Figure 1
+an be solved in less than a se ond by Rolling Stone. The sear h spa e is
+(52 hoose 6) = 293; 162; 688; 000.
+Clearly, generalized planners, like Bla kbox, have a long way to go if they
+are to solve even the simplest problem in the test suite (Figure 1). Domainindependent solvers are urrently unable to automati ally identify the knowledge
+needed to traverse large sear h spa es eÆ iently. Hen e, for Sokoban we have
+no hoi e but to pursue using appli ation-dependent knowledge in our implementation.
+4
+
+Appli ation-Dependent Te hniques
+
+Iterative deepening A* (IDA*) was the basis for our Sokoban implementation
+[10℄. We gave the algorithm a xed node limit of 20 million nodes for all experiments (varying from 1 to 3 hours of CPU time on a single 195 MHz pro essor
+of an SGI Origin 2000). Over a period of 3 years, numerous enhan ements were
+made to the basi IDA* algorithm. After ea h enhan ement was added, the program's performan e was assessed by running Rolling Stone on the 90-problem
+test suite to nd out how many problems ould be solved, and how mu h sear h
+e ort was required to do so. Detailed results of the following experiments an
+be found in Tables 2 and 3 (pages 20 and 21). Starting with the basi IDA*
+and a simple lower-bound estimator, ea h version of the program (labeled from
+R0 to R10, ordered hronologi ally) adds one enhan ement.
+Although this se tion is alled \appli ation-dependent te hniques", in reality
+all the te hniques an be des ribed in an appli ation-independent way. However,
+their e e tiveness depends on domain-spe i knowledge.
+The following se tions des ribe ea h of the enhan ements in Rolling Stone.
+For well-known ideas, only a brief des ription is given here. Full details are
+provided in the Appendi es.
+4.1
+
+Simple Lower Bound (0 problems solved):
+
+IDA* with a simple lower bound has no hope of nding a solution to any of the
+problems in our test suite. An obvious lower bound is the distan e of ea h stone
+to its losest goal, a Manhattan distan e for Sokoban. However, the gap between
+the lower-bound value and the a tual solution length for any non-trivial problem
+is so large that the number of IDA* iterations, and thus their respe tive tree
+sizes, make solving these problems e e tively impossible. Improving the lower
+bound is the key to better performan e. Appli ation-dependent knowledge is
+needed to produ e the best possible bound.
+6
+
+4.2
+
+Minimum Mat hing Lower Bound (R0, 0 solved):
+
+To obtain a better admissible estimate for the distan e of a position to a goal,
+a minimum- ost, perfe t bipartite mat hing algorithm is used. The mat hing
+assigns ea h stone to a goal and returns the total (minimum) distan e of all
+stones to their goals. The minimum ost augmentation algorithm is O(N 3 ),
+where N is the number of stones [18℄. During the sear h the lower bound only
+needs to be updated, whi h requires nding negative- ost y les [14℄, and is
+less expensive to ompute. Other optimizations are possible and redu e the
+omputational ost. Nevertheless, maintaining the lower bound dominates the
+exe ution time of our program. More details an be found in Appendix A.1.
+For the test suite, minimum mat hing improves the simple lower bound by
+an average of 30 pushes. Given that minimum mat hing preserves the solution
+parity,2 this represents a de rease of 15 iterations for the IDA* sear h. The
+heuristi bran hing fa tor for Sokoban is more than 10, so this represents a
+de rease in the size of the sear h tree by a fa tor in ex ess of 1015 ! Nevertheless,
+IDA* with minimum mat hing alone annot solve any of the test problems
+within the 20 million node sear h limit. The sear h limit was in reased to one
+billion nodes, but still no problems ould be solved. In the experiments, this
+version of the program is referred to as \R0".
+4.3
+
+Transposition Table (R1, 5 solved):
+
+Even though sear h spa es are generally graphs, most sear h algorithms treat
+them as trees. If a state an have several prede essors, this an lead to dupli ate work. The sear h ould revisit nodes and even entire subtrees several
+times. These \transpositions" or y les are dete ted using a transposition table
+in whi h useful information about previously visited nodes is stored [22℄. Before
+expanding a node, the transposition table is onsulted, and if valid information
+is found, it is used to potentially urtail the sear h. Further details an be found
+in Appendix A.2.
+Adding transposition tables with 218 entries to IDA* allows the sear h to
+solve 5 problems in our test suite within the 20 million node limit. Figure 3
+shows the e ort needed to solve those problems, ordered by sear h-tree size
+on a linear and a logarithmi s ale. The verti al axis shows the number of
+nodes sear hed to solve the problems. The horizontal axis shows the number
+of problems solved. We will use this kind of graph throughout the paper and
+refer to them as e ort graphs. The keys of the e ort graphs refer to di erent
+versions of Rolling Stone. In Figure 3, \R1" is a version of Rolling Stone that
+adds transposition tables to version \R0".
+2 If the minimum-mat hing fun tion returns an odd (even) number, then the orre t solution
+length will also be odd (even). This an easily be veri ed by imposing a he ker-board oloring
+of the squares and realizing that pushing a stone between di erently olored squares requires
+an odd number of pushes, otherwise even. Furthermore, the di eren e in the number of
+bla k/white stones and goals determines the odd- or evenness of the solution length, regardless
+of stone-goal assignments and detours ne essary be ause of stone interdependen ies.
+
+7
+
+20,000,000
+
+R0 + transposition table = R1
+R1 + move ordering = R2
+R2 + deadlock tables = R3
+R3 + tunnel macros = R4
+
+nodes to solve
+
+16,000,000
+
+12,000,000
+
+8,000,000
+
+4,000,000
+
+0
+1
+
+2
+
+3
+
+4
+
+5
+
+6
+
+problems solved ordered by effort
+20,000,000
+
+1,000,000
+
+nodes to solve
+
+100,000
+10,000
+1,000
+
+R0 + transposition table = R1
+R1 + move ordering = R2
+R2 + deadlock tables = R3
+R3 + tunnel macros = R4
+
+100
+10
+1
+1
+
+2
+
+3
+
+4
+
+5
+
+problems solved ordered by effort
+
+Figure 3: E ort Graph for R0 to R4 (Linear and Log S ale)
+
+8
+
+6
+
+4.4
+
+Move Ordering (R2, 4 solved):
+
+Instead of visiting su essors of a position in an arbitrary order, one an try
+to look at \good" su essors rst. Move (or su essor) ordering is not used
+in best- rst sear hes; the algorithm itself provides for a global ordering of the
+alternatives. In depth- rst and breadth- rst sear hes, move ordering an lead
+to eÆ ien y gains be ause goals are found earlier (left in the tree) rather than
+later (right in the tree). For IDA*, ordering moves at interior nodes makes no
+di eren e to the sear h, ex ept for the nal iteration. Sin e the nal iteration
+is aborted on e a solution is found, nding a solution early in this iteration an
+signi antly improve the performan e [21℄.
+The s heme used in Rolling Stone, inertia, does an ex ellent job of pla ing
+the best moves near the beginning of the move list (see Appendix A.3). Figure 3 shows the e e t of adding move ordering to a program with the minimum
+mat hing lower bound and transposition tables (R2). Surprisingly, one problem an no longer be solved (in 20 million nodes) and two others require more
+nodes. This result is not favorable for move ordering. However, this appears to
+be bad lu k for this small set of problems. After other features are added, move
+ordering shows up as a valuable ontribution (as shown in Se tion 5 page 18).
+4.5
+
+Deadlo k Table (R3, 5 solved):
+
+The pattern database is a re ent idea that has been su essfully used in the
+sliding-tile puzzles [3℄ and Rubik's Cube [17℄. An o -line sear h is used to
+enumerate all possible stone/wall pla ements in a 45 region to determine if a
+deadlo k is present. These results are stored in deadlo k tables. During the IDA*
+sear h, the table is queried to see if the urrent move leads to a lo al deadlo k.
+Thus, deadlo k tables ontain sear h results of partial problem on gurations.
+In the IDA* sear h, before making a move, the program queries the deadlo k
+table to see if the move would result in a known deadlo k. If so, the move is
+not onsidered further. On average, deadlo k tables redu e the bran hing fa tor
+by 20% (see Appendix A.4). Given that the sear h is exponential in depth (bd
+where b is the bran hing fa tor and d is the average sear h depth) this represents
+an enormous redu tion in the sear h spa e onsidered ((:8  b)d ).
+Figure 3 shows the e e t of adding deadlo k tables (R3). On e again 5
+problems an be solved, regaining the one lost with move ordering. For some
+problems, the sear h-tree size has been redu ed by several orders of magnitude
+(see Tables 2 and 3, pages 20 and 21). It is illuminating to dis over that su h
+an impressive redu tion in the bran hing fa tor does not allow more problems
+to be solved.
+4.6
+
+Tunnel Ma ros (R4, 6 solved):
+
+The sear h algorithms dis ussed so far treat all moves equally. After making a
+move, all legal moves are onsidered as su essors. These algorithms are therefore treating all moves as if they were unrelated. The method of ma ro moves
+9
+
+[15℄ is an attempt to group related atomi a tions into higher level omposite
+a tions: ma ros. This an result in impressive sear h-spa e redu tions. However, spe ial attention must be paid to the side-e e ts that ma ros an have.
+They might in uen e the orre tness and/or the ompleteness of the sear h, as
+well as the ability of the algorithm to nd optimal solutions.
+A tunnel is the part of a maze where the maneuverability of the man is
+restri ted to a width of one. Sin e there an be at most one stone in a tunnel without reating an immediate deadlo k, we an omplete the remaining
+tunnel moves without loss of generality or optimality. If a tunnel is omposed
+of arti ulation squares3 , we all the tunnel a one-way tunnel. Whenever the
+move generator reates a move into a one-way tunnel, the move is substituted
+with the ma ro pushing the stone all the way through the tunnel. This eliminates all the interleavings with other legal moves. More details are provided in
+Appendix A.5.
+Tunnel ma ros result in one additional problem being solved, for a new total
+of 6 (Figure 3, page 8, version R4). However, the signi ant redu tion in the
+size of the sear h tree ontributes to the solvability of many future problems.
+4.7
+
+Goal Ma ros (R5, 17 solved):
+
+Many of the Sokoban problems have all the goal squares grouped together in
+rooms. These goal areas are usually a essible through only a few squares whi h
+we all entran es. One an de ompose the problem of solving a maze into:
+
+
+
+
+how to get ea h stone to one of the entran es, and
+how to pa k stones into the goal areas.
+
+Often these subgoals an be solved independently, thus redu ing the sear h
+spa e enormously. Problem #1 is a good example. As soon as a stone rea hes
+the entran e to the goal area at the right side of the maze (e.g. square Mh), the
+stone an be pushed dire tly to its nal destination.
+This is a hieved by de ning a goal area, marking its entran es, and pre omputing the order in whi h goal squares are lled without introdu ing deadlo k
+in the goal area. During the sear h, if a move is generated that pushes a stone
+onto the entran e square of a goal area, that move is repla ed with a goal ma ro
+that generates a sequen e of moves to push the stone dire tly to an appropriate
+goal square (in Figure 1, underlined sequen es of moves are goal ma ros and
+are treated as a single move). Depending on the pre omputation, there ould
+be one or more goal-ma ro moves. All other moves are deleted from the move
+list; only the goal-ma ro moves are onsidered. If a stone an be pushed to its
+nal destination, nothing else should matter at the moment, sin e ompletion of
+this task will redu e the omplexity of the remaining problem. This di ers from
+tunnel ma ros, where alternative moves are still sear hed. By removing other
+moves when a goal ma ro is present, the e e t on the sear h-tree size is more
+dramati than for tunnel ma ros. More details are provided in Appendix A.6.
+3 Squares
+
+dividing the maze into otherwise dis onne ted parts.
+
+10
+
+Figure 4 shows the dramati e e ts of goal ma ros. Instead of solving 6
+problems, Rolling Stone an now solve 17. The savings for individual problems
+are again several orders of magnitude. For example, the number of sear h nodes
+for problem #55 drops from over 20 million down to a mere 333 (see Table 2,
+page 20) { almost 5 orders of magnitude! On average, the sear hes are smaller
+by a fa tor of 20 with the goal ma ros. This is a onservative estimate, sin e
+unsu essful sear hes are stopped at 20 million nodes. However, it is important
+to mention that goal uts are unsafe and therefore in omplete.
+4.8
+
+Goal Cuts (R6, 24 solved):
+
+The goal-ma ro heuristi eliminates all alternative moves from onsideration
+when a goal ma ro is present. The reason for this is that if we an push a stone
+to its nal destination, it will not a e t other moves and they an be ignored.
+The same reasoning an be applied to the previous move: the move that pushed
+the stone to the square from whi h it will be \ma ro"-pushed to the goal square.
+Goal uts do exa tly that re ursively further up the tree: if a stone is pushed to
+a goal with a goal ma ro at the end without interleaving other stone pushes, all
+alternatives to pushing that stone are deleted from the move list. More details
+are in Appendix A.7.
+Figure 4 shows savings of approximately one to two orders of magnitude in
+sear h-tree size for the version using goal uts (R6). Now 24 problems an be
+solved. Problem #65 was not solved without goal uts; now it is solved with
+just over 600 nodes { the sear h tree is over 4 orders of magnitude smaller. For
+solved problems, the median sear h tree is a fa tor of 6 smaller.
+4.9
+
+Pattern Sear h (R7, 48 solved):
+
+Establishing the presen e of deadlo k an be quite involved. The deadlo k may
+require as few as one and as many as all the stones on the board. Ideally, having
+dis overed a subset of a state that auses a deadlo k (a pattern of stones), any
+state ontaining that pattern should be assigned the lower bound of 1.
+Pattern sear hes nd patterns of stones that prove that the lower bound
+is in error. The errors ould be small, improving the lower bound by as little
+as 2, or as mu h as 1 in the ase of a deadlo k. All dis overed patterns are
+saved and used throughout the sear h. If a pattern mat hes a subset of stones
+in a position, then the penalty asso iated with that pattern is added to the
+lower-bound estimate for the position. In e e t, the program learns lowerbound penalty patterns and uses them to dynami ally improve the lower-bound
+fun tion.
+In the following, we will refer to two di erent mazes: the original maze, the
+data stru ture used by the IDA* sear h, and the test maze whi h will be used
+for the pattern sear hes.
+A pattern sear h iterates on the number of stones in the test maze. By
+de nition, a deadlo k is a on guration of stones su h that not all of the stones
+an rea h a goal. If we make a move A-B, we might introdu e a deadlo k. If this
+11
+
+20,000,000
+
+R0 + transposition table = R1
+R1 + move ordering = R2
+R2 + deadlock tables = R3
+R3 + tunnel macros = R4
+R4 + goal macros = R5
+R5 + goal cuts = R6
+
+nodes to solve
+
+16,000,000
+
+12,000,000
+
+8,000,000
+
+4,000,000
+
+0
+0
+
+5
+
+10
+
+15
+
+20
+
+25
+
+problems solved ordered by effort
+20,000,000
+
+1,000,000
+
+nodes to solve
+
+100,000
+10,000
+1,000
+
+R0 + transposition table = R1
+R1 + move ordering = R2
+R2 + deadlock tables = R3
+R3 + tunnel macros = R4
+R4 + goal macros = R5
+R5 + goal cuts = R6
+
+100
+10
+1
+0
+
+5
+
+10
+
+15
+
+20
+
+problems solved ordered by effort
+
+Figure 4: E ort Graph for R0 to R6 (Linear and Log S ale)
+
+12
+
+25
+
+Figure 5: Deadlo k Example
+
+Figure 6: Sequen e of Test Mazes as Passed to PIDA* (a, b, and d)
+deadlo k was not present before the move, then the moved stone, now on square
+B, must be part of that pattern. This is the initial stone in luded into the test
+maze for the pattern sear h. PIDA*, a version of IDA* tailored to be eÆ ient
+at pattern sear hing, is alled to solve this test maze (see Appendix A.8). It
+either returns in failure (no solution, hen e deadlo k), or it nds a solution. In
+the latter ase, the number of pushes in the solution may disagree with that of
+our minimum mat hing lower bound. If so, then we know that the lower bound
+fun tion is in error and an be improved.
+Figure 5 shows a simple position, before and after the move Gd-Fd. The
+question is whether this move introdu es a deadlo k. Figure 6 shows how the
+test maze is built. Sin e the last move ended up on square Fd, the test maze
+is initialized with this single stone (Figure 6a). A PIDA* sear h nds a trivial
+solution. However, the sear h reveals that there is a on i t in the original maze
+that prevents this solution: the stone on E . This on i t is resolved by adding
+the stone to the test maze and trying to solve it (Figure 6b).
+PIDA* will sear h the two-stone maze and again nd a solution. This time
+there are no stone on i ts. However, the man had to move through square Ge
+to get behind the stone on Fd, again on i ting with the original maze. This
+13
+
+stone is added to the test maze (Figure 6 ) and another sear h is ommen ed.
+A solution will be found, requiring a fourth stone to be added (Figure 6d).
+The next all to PIDA* will return no solution and announ e a deadlo k
+with this pattern of four stones. Identifying the riti al stones to examine has
+been driven by whether they on i t with a potential solution. The irrelevant
+parts of the maze (su h as the stone on H ) have been ignored.
+The notion of bit (stone) patterns is similar to the Method of Analogies [1℄.
+Pattern sear hes are a on i t-driven top-down proof of orre tness, while the
+Method of Analogies is a bottom-up heuristi approximation.
+The fewer stones in a penalty pattern, the more likely it will mat h an arbitrary position and be used to eliminate futile bran hes of the sear h. A minimal
+penalty pattern is a pattern from whi h no stone an be removed without dereasing its penalty. The attentive reader will have noti ed that only three
+stones are needed to guarantee deadlo k in Figure 6; the stone on E is not
+ne essary. Before saving the pattern, our program will attempt to minimize the
+number of stones in it. The minimization routine takes an N-stone pattern and
+onsiders ea h of the possible N-1-stone sub-patterns. Ea h of the sub-patterns
+is sear hed to verify whether removing that stone preserves the deadlo k or
+penalty. If the penalty still exists, then the stone was not part of the minimal
+pattern and is removed.
+During an IDA* sear h, at ea h node the normal minimum mat hing lower
+bound is omputed. If this value is insuÆ ient to ause a uto , then the olle tion of penalty patterns is mat hed against the position. Of the patterns
+that mat h, the largest penalty is omputed and added to the lower bound. If
+two or more patterns overlap, only a maximal non-overlapping subset of them
+is ounted towards the position penalty. To prevent ex essive pattern mat hing during the sear h (utility problem [20℄), the number of patterns stored is
+restri ted. The least re ently used patterns are removed if ne essary.
+Figure 8 (page 19) shows the e ort graph, now in luding the version of
+Rolling Stone using pattern sear hes (R7). The program an now solve 48
+problems, 24 more than the previously best version!
+In Table 3 (page 21), the sear h-tree size for R7 is broken down into two
+ategories. The \total nodes" olumn re e ts all positions visited in the sear h.
+The \IDA*" olumn gives the number of positions that the IDA* sear h visits.
+The di eren e is the number of pattern sear h nodes (PIDA*).
+Ex ept for the small sear hes (<20,000 nodes), the ost of performing the
+additional PIDA* sear hes is o set by the redu tion in the IDA* sear h nodes.
+Problem #53 is an example. The savings for the IDA* tree are dramati . Previously, the sear h was unable to solve this problem given 20,000,000 nodes.
+Now the sear h su eeds with only 159 IDA* nodes and a total of 22,310 nodes.
+Clearly, the pattern sear hes dominate the sear h ost, but the knowledge unovered allows the program to solve the problem where it failed previously. In
+this example, Rolling Stone sear hes fewer IDA* nodes than the length of the
+solution! The sear h ba ktra ks a mere 13 times for a solution of 186 pushes.
+Pattern sear hes are a gamble: we invest sear h e ort (PIDA* nodes) expe ting to nd useful knowledge. Problem #78 is one example of where the
+14
+
+gamble does not pay o . Even though the tree size (IDA*) is redu ed about 50
+fold, in luding the PIDA* nodes triples the total number of nodes sear hed.
+The results reported here are not the best numbers that an be a hieved.
+The PIDA* nodes dominate the ost of the sear h for some problems. Some
+additional heuristi s for de iding when to exe ute pattern sear hes ould result
+in further improvements in the overall sear h eÆ ien y. There are numerous
+parameters in the sear h, ea h of whi h an be tuned for maximal performan e
+[7, 11℄.
+Pattern sear hes have also been applied to sliding-tile puzzles [7℄. The program dynami ally learns penalty patterns, su h as linear on i ts [6℄. The ost
+of the pattern sear hes is small ompared to the large redu tions in the IDA*
+sear h tree.
+Deadlo k tables (or pattern databases) are another way to store pattern
+information. However, the patterns in su h databases are ne essarily smaller,
+be ause pre omputing these patterns requires onsiderable omputing resour es
+and the resulting data needs to be stored, often exhaustively for fast hashing.
+Pattern sear hes avoid both these problems, be ause they are demand driven
+and only patterns that a tually appear in the sear h are explored.
+4.10
+
+Relevan e Cuts (R8, 50 solved):
+
+Analysis of the trees built by an IDA* sear h qui kly reveals that the sear h
+algorithm onsiders move sequen es that no human would ever onsider. Even
+ompletely unrelated moves are tested in every legal ombination|all in an
+e ort to prove that there is no solution for the urrent threshold. How an a
+program mimi an \understanding" of relevan e? We suggest that a reasonable
+approximation of relevan e is in uen e. If two moves do not in uen e ea h
+other, then it is unlikely that they are relevant to ea h other. If a program
+had a good \sense" of in uen e, it ould assume that in a given position all
+previous moves belong to a (unknown) plan of whi h a ontinuation an only
+be a move that is relevant|in our approximation, is in uen ing whatever was
+played previously. Relevan e uts eliminate moves from that sear h that appear
+to be irrelevant to the pre eding sequen e of moves.
+A move is onsidered relevant only if the previous m moves in uen e it. The
+sear h is only allowed to make relevant moves with respe t to previous moves,
+and only a few ex eptions are permitted. With these restri tions in pla e, the
+sear h is for ed to spend its e ort lo ally, sin e random jumps within the sear h
+area are dis ouraged. For ing the program to onsider lo al moves is making it
+adopt a pseudo-plan; an ex eption orresponds to a de ision to hange plans. Of
+ourse, restri ting the number onsidered for a node will result in the possibility
+of optimal solutions being found.
+An in uen e metri an be a hieved in di erent, domain-spe i ways. Appendix A.9 gives an overview of our implementation. Even though the spe i s
+aren't ne essarily appli able to other domains, the basi philosophy of the approa h is. We approximate the in uen e of two moves on ea h other by the
+in uen e between their from squares. In uen e is determined using the notion
+15
+
+Figure 7: Example Maze With Lo ality
+of a \most in uential path" between the squares. Small o -line sear hes are
+used to stati ally pre ompute an I nf luen eT able ontaining the in uen e values between any pair of f rom squares. For ea h pair of squares, a breadth- rst
+sear h is used to nd the path(s) with the largest in uen e. The algorithm is
+similar to a shortest-path nding algorithm, ex ept that we use in uen e here
+and not geographi distan e.
+Figure 7 shows an example where humans immediately identify that solving
+this problem involves onsidering two separate sub-problems. The solution to
+the left and right sides of the problem are ompletely independent of ea h other.
+An optimal solution needs 82 moves; Rolling Stone's lower-bound estimator
+returns a value of 70. Standard IDA* will need 7 iterations to nd a solution
+(our lower-bound estimator preserves the odd/even parity of the solution length,
+meaning that it iterates by 2 at a time). IDA* will try every possible (legal)
+move ombination, intermixing moves from both sides of the problem. Clearly,
+this is unne essary and ineÆ ient. Solving one of the sub-problems requires only
+4 iterations, sin e the lower bound is o by only 6. Considering this position
+as two separate problems will result in an enormous redu tion in the sear h
+omplexity.
+Our implementation of in uen e onsiders all moves on the left side as distant from those on the right, and vi e versa. This way only a limited number
+of swit hes is onsidered during the sear h. Our parameter settings allow for
+only one non-lo al move per 9-move sequen e. For this ontrived problem, relevan e uts de rease the number of nodes sear hed from 32,803 to 24,748 while
+still returning an optimal solution (the pattern sear hes were turned o for simpli ity). The savings (25%) appear relatively small be ause the transposition
+table at hes repeated positions (many of whi h may be the result of irrelevant
+moves) and eliminates them from the sear h. Although the relevan e uts provide a wel ome redu tion in the sear h e ort required, it is only a small step towards a hieving all the possible savings. For example, ea h of the sub-problems
+an be solved by itself in only 329 nodes! The di eren e between 329  2 and
+16
+
+32,803 illustrates why IDA* in its urrent form is inadequate for solving large,
+non-trivial real-world problems; the algorithm is in apable of taking advantage
+of exploitable stru tural properties of the domain. Clearly, more sophisti ated
+methods are needed. Further re nement of the relevan e ut parameters an
+likely make a big di eren e in performan e.
+The overhead of the relevan e uts is negligible; the in uen e of two moves
+an be established by a simple table lookup. This is in stark ontrast to our
+pattern sear hes, where the overhead dominates the ost of the sear h for most
+problems. The addition of relevan e uts in reases the number of solved problems to 50. Figure 8 shows that the bene ts of relevan e uts are only dis ernible
+on the largest sear hes. This is not a negative omment on the e e tiveness of
+relevan e uts; it only re e ts the observation that most of the solved problems
+already have very eÆ ient sear hes.
+4.11
+
+Overestimation (R9, 54 solved):
+
+To ensure optimality of solutions produ ed by A*-based algorithms, the heuristi
+has to be admissible. This limits the hoi e of knowledge that an be used. Even
+if some knowledge orrelates well with the distan e to the goal, but there is a
+han e that it overestimates, it annot be used be ause the solution optimality
+would not be guaranteed. This shows that optimality has its pri e. Instead
+of tting the heuristi distan e to a solution h as losely as possible to the
+a tual distan e h , we are restri ted to reating a lower bound. The error of
+su h a lower-bound fun tion is often larger than a fun tion that is allowed to
+o asionally overestimate. The larger the error of the lower-bound fun tion, the
+less eÆ ient the sear h.
+We have seen in previous se tions that an aggressive treatment of the sear h
+spa e is needed to make signi ant progress. The examples of the goal ma ros
+and relevan e uts have shown the bene ts that are a hievable when the small
+risk of losing optimality and ompleteness is taken. Therefore, it seems logi al
+to question the admissibility onstraint for the heuristi fun tion. The hope is
+to a hieve a loser t of h to h , albeit at the ost of non-optimal solutions.
+Our overestimation te hnique ombines the penalties for all pattern-sear h
+patterns that mat h in a position. Further details are in Appendix A.10.
+Figure 8 shows that 3 additional problems an now be solved. There is
+roughly one order of magnitude savings in sear h-tree size (see Table 3). With
+overestimation, almost all solved problems, ex ept #49, have smaller or insignifi antly larger number of nodes. Problem #26, for example, drops from over 20
+million nodes to just under 123,000. While some sear hes with overestimation
+use more iterations to nd a goal, the sear h for problem #26 uses less; the
+initial position is overestimated enough to allow the sear h to nd a solution in
+fewer iterations. On average, the IDA* and total nodes are redu ed by roughly
+half.
+
+17
+
+4.12
+
+Rapid Random Restart (R10, 57 solved):
+
+Some problem lasses exhibit the property of heavy tails. Heavy tails refer to
+the high likelihood of problem instan es being very hard to solve with a ertain algorithm, its heuristi s and (random) parameters used. Rapid Random
+Restart (RRR) assumes that by varying parameters to the solution algorithm
+(here sear h), it is possible to redu e the solution time dramati ally [5℄. Therefore, instead of using all the available time with one parameter setting, RRR
+repeatedly aborts the sear h after a given e ort limit and restarts it with different (random) parameters.
+In Rolling Stone, RRR is used to interrupt an iteration and restart it with
+a di erent move ordering tie-breaking s heme (see Appendix A.11). Now 57 of
+the 90 problems an be solved, as shown in Figure 8.
+5
+
+Single-Agent Sear h Enhan ements
+
+The performan e gap between the rst and last versions of Rolling Stone in
+Figure 8 is astounding. For example, onsider extrapolating the performan e
+of Rolling Stone with transposition tables so that it an solve the same number
+of problems as the omplete program (57). 1050 (not a typo!) seems to be a
+reasonable lower bound on the di eren e in sear h-tree sizes.
+For ea h of the unsolved problems, an additional sear h to 200 million nodes
+was performed. This resulted in two more problems being solved (numbers 25
+and 28), bringing the total number of solved problems to 90. It is dis ouraging
+to see an order of magnitude more omputing power translating into su h a
+small improvement, learly an indi ation of the diÆ ulty of solving Sokoban
+problems. For some problems (notably number 50), the IDA* sear h threshold
+is so far from the best known human solution, that there is no hope of ever
+solving this problem with our urrent te hniques.
+The ordering of the pre eding sub-se tions losely orresponds to the order
+in whi h enhan ements were initially added to Rolling Stone (although most
+enhan ements have been ontinually re ned). Figure 9 shows how these results
+were a hieved over the 3-year development time. The development e ort equates
+to a full-time PhD student, a part-time professor, one summer student, and
+valuable feedba k from many people. Additionally, a large number of ma hine
+y les were used for tuning and debugging. It is interesting to note the o asional
+de rease in the number of problems solved, the result of (favorable) bugs being
+xed. The long, slow, steady in rease is indi ative of the reality of building a
+large system. Progress is in remental and often painfully slow.
+The results in Figure 8 may misrepresent the importan e of ea h feature.
+Consider removing a single enhan ement from Rolling Stone. In the absen e
+of a parti ular method, other sear h enhan ements an ompensate to allow a
+solution to be found. Most notably, while the lower-bound fun tion alone annot
+solve a single problem, neither an the omplete system solve a single problem
+without the lower-bound fun tion. Turning o goal ma ros redu es the number
+18
+
+R0 + transposition table = R1
+R1 + move ordering = R2
+R2 + deadlock tables = R3
+R3 + tunnel macros = R4
+R4 + goal macros = R5
+R5 + goal cuts = R6
+R6 + area/deadlock/penalty search = R7
+R7 + relevance cuts = R8
+R8 + overestimation = R9
+R9 + RRR = R10
+
+effort to solve in nodes searched
+
+20,000,000
+
+15,000,000
+
+10,000,000
+
+5,000,000
+
+0
+0
+
+10
+
+20
+
+30
+
+40
+
+50
+
+60
+
+problems solved ordered by effort
+
+effort to solve in nodes searched
+
+10,000,000
+1,000,000
+100,000
+10,000
+R0 + transposition table = R1
+R1 + move ordering = R2
+R2 + deadlock tables = R3
+R3 + tunnel macros = R4
+R4 + goal macros = R5
+R5 + goal cuts = R6
+R6 + area/deadlock/penalty search = R7
+R7 + relevance cuts = R8
+R8 + overestimation = R9
+R9 + RRR = R10
+
+1,000
+100
+10
+1
+0
+
+10
+
+20
+
+30
+
+40
+
+50
+
+problems solved ordered by effort
+
+Figure 8: E ort Graph for R0 to R10 (Linear and Log S ale)
+
+19
+
+60
+
+#
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+17
+19
+21
+23
+25
+26
+30
+33
+34
+36
+38
+40
+43
+45
+49
+51
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+67
+68
+70
+71
+72
+73
+75
+76
+77
+78
+79
+80
+81
+82
+83
+84
+
+R1 = R0 +
+Transposition Table
+IDA* nodes
+41,640
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+10,214,381
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+2,311,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+66,309
+> 20,000,000
+6,500,890
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+>1,059,134,220
+
+R2 = R1 +
+R3 = R2 +
+Move ordering Deadlo k Tables
+IDA* nodes
+IDA* nodes
+319
+261
+> 20,000,000
+640,680
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+12,061,182
+10,294,734
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+2,500,678
+460,089
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+2,555
+1,408
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+>1,074,564,734
+>1,051,397,172
+
+R4 = R3 +
+Tunnel Ma ros
+IDA* nodes
+223
+620,030
+> 20,000,000
+> 20,000,000
+> 20,000,000
+10,107,621
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+10,672,805
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+415,485
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+871
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+>1,041,817,035
+
+Table 2: Adding Enhan ements (I)
+
+20
+
+R5 = R4 +
+Goal Ma ros
+IDA* nodes
+53
+2,176
+29,148
+597
+> 20,000,000
+4,546
+126,023
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+120,747
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+33,812
+> 20,000,000
+> 20,000,000
+> 20,000,000
+8,895,883
+390,690
+> 20,000,000
+> 20,000,000
+333
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+480
+156,203
+115,574
+853,607
+971,093
+31,096
+> 20,000,000
+>811,732,061
+
+R6 = R5 +
+Goal Cuts
+IDA* nodes
+53
+316
+2,493
+597
+1,275,146
+283
+48,209
+> 20,000,000
+659,972
+> 20,000,000
+> 20,000,000
+> 20,000,000
+11,910
+> 20,000,000
+10,643,971
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+19,083
+> 20,000,000
+6,084,369
+> 20,000,000
+5,189,494
+80,504
+> 20,000,000
+> 20,000,000
+144
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+6,337
+> 20,000,000
+> 20,000,000
+604
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+> 20,000,000
+465
+5,964
+114,930
+221,690
+99,236
+20,847
+354,295
+>684,840,912
+
+#
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+17
+19
+21
+23
+25
+26
+30
+33
+34
+36
+38
+40
+43
+45
+49
+51
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+67
+68
+70
+71
+72
+73
+75
+76
+77
+78
+79
+80
+81
+82
+83
+84
+
+R7 = R6 + Pattern Sear h R8 = R7 + Relevan e Cuts R9 = R8 + Overestimation R10 = R9 + Rapid Restart
+IDA* nodes
+total nodes IDA* nodes
+total nodes IDA* nodes
+total nodes IDA* nodes total nodes
+50
+1,042
+50
+1,042
+55
+1,267
+55
+1,267
+82
+7,532
+80
+7,530
+80
+7,530
+80
+7,530
+94
+13,445
+87
+12,902
+94
+14,095
+94
+14,095
+187
+50,369
+187
+50,369
+187
+50,369
+187
+50,369
+436
+59,249
+202
+43,298
+153
+33,755
+239
+35,974
+85
+5,119
+84
+5,118
+84
+5,503
+84
+5,503
+1,704
+28,561
+1,392
+28,460
+338
+14,832
+237
+15,790
+317
+339,255
+291
+311,609
+315
+409,714
+315
+409,714
+704
+168,412
+1,884
+435,388
+1,591
+385,084
+1,734
+407,103
+1,909
+1,480,115
+1,810
+1,713,429
+2,920
+2,539,524
+25,034
+19,967,875
+14,048
+4,691,929
+5,679
+2,994,297
+4,058
+2,527,286
+3,902
+2,331,950
+162,129
+4,373,802
+4,912
+559,184
+951
+372,264
+951
+372,264
+2,473
+30,111
+2,038
+29,116
+2,158
+30,242
+2,336
+33,901
+59,433 > 20,000,000
+16,606
+7,269,595
+14,178
+6,631,475
+12,801
+6,089,182
+1,853
+154,593
+1,177
+179,734
+573
+113,042
+1,774
+258,852
+87,744 > 20,000,000
+59,498 > 20,000,000
+23,337
+6,555,398
+23,679
+7,082,584
+1,239
+553,900
+21,536
+5,784,086
+683
+366,035
+1,231
+592,585
+2,606,167 > 20,000,000
+2,125,116 > 20,000,000
+380
+122,997
+496
+126,379
+14,297 > 20,000,000
+14,124 > 20,000,000
+27,731
+17,795,114
+3,595
+3,467,260
+5,035
+866,085
+2,765
+586,684
+604
+283,926
+1,865
+551,406
+542
+298,674
+11,431
+1,981,993
+9,746
+749,787
+731
+442,025
+78,325 > 20,000,000
+23,467 > 20,000,000
+18,338
+12,150,606
+10,196
+5,785,290
+2,539
+51,276
+7,011
+154,969
+10,473
+160,176
+2,340
+56,563
+41,131 > 20,000,000
+23,274
+17,004,253
+16,725
+10,086,547
+19,125
+11,505,836
+5,308
+690,426
+1,729
+421,483
+2,225
+535,148
+2,332
+523,907
+1,685
+508,124
+339
+181,566
+602
+404,217
+588
+410,134
+375,293
+1,670,236
+53,113
+327,643
+441,638
+3,486,905
+136,700
+1,168,194
+137
+8,825
+256
+21,491
+256
+21,491
+306
+29,569
+159
+22,310
+157
+22,308
+157
+22,308
+157
+22,308
+106,663
+910,532
+163,757
+2,031,577
+269
+45,332
+872
+66,306
+97
+2,993
+97
+2,993
+97
+2,993
+97
+2,993
+353
+57,785
+377
+61,189
+911
+55,865
+605
+50,924
+256
+121,384
+234
+114,416
+209
+128,282
+209
+128,282
+426
+268,713
+211
+130,474
+231
+138,838
+231
+138,838
+795
+348,214
+1,420
+775,753
+602
+337,905
+1,437
+409,470
+223
+41,310
+160
+27,386
+18,100
+114,642
+304
+31,413
+314
+106,206
+309
+105,411
+299
+77,555
+299
+77,555
+211
+70,478
+195
+101,934
+180
+69,728
+180
+69,728
+567
+259,537
+703
+312,546
+473
+237,196
+1,371
+578,066
+378
+300,684
+405
+332,402
+193
+186,508
+193
+186,508
+196
+21,442
+196
+21,442
+165
+23,004
+165
+23,004
+18,107
+601,178
+12,669
+512,488
+298
+104,356
+298
+104,356
+2,278
+541,080
+1,953
+538,509
+324
+236,157
+324
+236,157
+412
+125,454
+431
+140,765
+446
+178,657
+446
+178,657
+1,432,332 > 20,000,000
+8,234,574 > 20,000,000
+1,132,180 > 20,000,000
+183,170
+1,973,352
+134
+44,908
+134
+44,908
+123
+45,735
+123
+45,735
+201
+87,019
+214
+94,568
+225
+103,494
+225
+103,494
+61,973 > 20,000,000
+55,274 > 20,000,000
+259,971 > 20,000,000
+12,786
+5,095,054
+185,633
+6,236,656
+74,315
+3,775,394
+251
+183,656
+4,123
+1,980,094
+1,092,369 > 20,000,000
+1,019,702 > 20,000,000
+1,108,195 > 20,000,000
+251,768
+6,277,715
+64
+4,451
+64
+4,913
+64
+4,913
+64
+4,913
+125
+15,833
+122
+15,527
+127
+13,114
+127
+13,114
+100
+16,114
+165
+26,943
+176
+26,309
+176
+26,309
+21,501
+234,235
+2,662
+42,445
+875
+111,033
+2,651
+206,423
+86
+33,445
+86
+33,445
+117
+45,014
+117
+45,014
+91
+7,294
+80
+5,631
+108
+6,856
+108
+6,856
+94
+5,960
+106
+7,938
+108
+7,818
+108
+7,818
+6,391,084 >206,536,295 11,950,910 >189,388,544
+3,105,947 >128,361,597
+715,741
+79,833,557
+
+Table 3: Adding Enhan ements (II)
+
+21
+
+90
+80
+
+problems solved
+
+70
+60
+50
+40
+30
+20
+10
+0
+Sep ’96
+
+Mar ’97
+
+Sep ’97
+
+Mar ’98
+time
+
+Sep ’98
+
+Mar ’99
+
+Sep ’99
+
+Figure 9: Number of Problems Solved Over Time
+of problems solved by 33, almost 60%! Turning o pattern sear hes redu es the
+number of solved problems by 22, while disabling transposition tables loses 19
+problems. Other than the lower-bound fun tion, these three methods are the
+most important for Rolling Stone; losing any one of them dramati ally redu es
+the performan e. While other enhan ements don't have as dramati an e e t,
+turning any one of them o loses at least one problem.
+5.1
+
+Knowledge Taxonomy
+
+In looking at the domain-spe i knowledge used to solve Sokoban problems,
+we an identify several di erent ways of lassifying the knowledge:
+Classify based on how general the knowledge is: domain (e.g.,
+Sokoban), instan e (a parti ular Sokoban problem), and subtree (within a
+Sokoban sear h).
+
+Generality.
+
+Di erentiate how the knowledge was obtained: stati
+(su h as advi e from a human expert) and dynami (gleaned from a
+sear h).
+
+Knowledge Sour e.
+
+Knowledge an be: admissible (preserve optimality in a solution) or non-admissible. Non-admissible knowledge an
+either preserve ompleteness of the algorithm or render it in omplete. Admissible knowledge is ne essarily omplete.
+
+Admissibility/Completeness.
+
+Figure 10 summarizes the sear h enhan ements used in Rolling Stone. Other
+enhan ements from the literature ould easily be added into spa es that are still
+blank, e.g. perimeter databases [19℄ (dynami , admissible, instan e). Note that
+some of the enhan ement lassi ations are xed by the type of the enhan ement. For example, any type of forward pruning is in omplete by de nition, and
+move ordering always preserves admissibility. For some enhan ements, the properties depend on the implementation. For example, overestimation te hniques
+22
+
+Classi ation
+Domain Instan e
+Stati admissible lower
+tunnel
+bound ma ros
+omplete
+in omplete
+relevan e
+uts
+Dynami admissible deadlo k
+tables
+omplete
+in omplete
+
+goal
+ma ros
+
+Subtree
+move
+ordering
+goal
+uts
+pattern
+sear hes
+transposition table
+overestimation
+
+Figure 10: Taxonomy of Sear h Enhan ements in Sokoban
+an be stati or dynami ; goal ma ros an be admissible or non-admissible;
+pattern databases an be domain-based or instan e-based.
+It is interesting to note that, apart from the lower-bound fun tion itself, the
+three most important program enhan ements in terms of program performan e
+are all dynami (sear h-based) and instan e/subtree spe i . The stati enhan ements, while of value, turn out to be of less importan e. Stati knowledge
+is usually rigid and does not in lude the myriad of ex eptions that sear h-based
+methods an un over and rea t to.
+5.2
+
+Control Fun tions
+
+There is another type of appli ation-dependent knowledge that is riti al to
+performan e, but re eives s ant attention in the literature. Control fun tions
+are intrinsi parts of eÆ ient sear h programs, ontrolling when to use or not
+use a sear h enhan ement. In Rolling Stone numerous ontrol fun tions are used
+to improve the sear h eÆ ien y. Some examples in lude:
+Control knowledge is needed to de ide when new information is worth repla ing older information in the table. Also, when
+reading from the table, ontrol information an de ide whether the benets of the lookup justify the ost.
+
+Transposition Table:
+
+If a goal area has too few goal squares, then goal ma ros are
+disabled. With a small number of goals or too many entran es, the sear h
+will likely not need ma ro moves, and the potential savings are not worth
+the risk of eliminating possible solutions.
+
+Goal Ma ros:
+
+Pattern sear hes are exe uted only when a non-trivial heuristi fun tion indi ates the likelihood of a penalty being present. Exe uting
+
+Pattern Sear hes:
+
+23
+
+a pattern sear h is expensive, so this overhead should be introdu ed only
+when it is likely to be ost e e tive. Control fun tions are also used to
+stop a pattern sear h when su ess appears unlikely.
+Implementing a sear h enhan ement is often only one part of the programming e ort. Implementing and tuning its ontrol fun tion(s) an be signi antly more time onsuming and more riti al to performan e. We estimate
+that whereas the sear h enhan ements take about 90% of the oding e ort and
+the ontrol fun tions only 10%, the reverse distribution applies to the amount
+of tuning e ort needed and ma hine y les onsumed.
+A lear separation between the sear h enhan ements and their respe tive
+ontrol fun tions an help the tuning e ort. For example, while the goal ma ro
+reation only onsiders whi h order the stones should be pla ed into the goal
+area, the ontrol fun tion an determine if goal ma ros should be reated at all.
+Both tuning e orts have very di erent obje tives: one is sear h eÆ ien y, the
+other risk minimization. Separating the two seems natural and onvenient.
+5.3
+
+Single-Agent Sear h Framework
+
+As presented in the literature, single-agent sear h onsists of a few lines of ode
+(usually IDA*). Most textbooks do not dis uss sear h enhan ements, other
+than y le dete tion. In reality, non-trivial single-agent sear h problems require
+a more extensive programming (and possibly resear h) e ort.
+Figure 11 illustrates the basi IDA* routine, with our enhan ements in luded
+(in itali s). This routine is spe i to Rolling Stone, but ould be written in more
+general terms. It does not in lude a number of well-known single-agent sear h
+enhan ements available in the literature. Control fun tions are indi ated by
+parameters to sear h enhan ement routines. In pra ti e, some of these fun tions
+are implemented as simple if statements ontrolling a ess to the enhan ement
+ode.
+Examining the ode in Figure 11, one realizes that there are really only three
+types of sear h enhan ements:
+1. Modifying the lower bound (as indi ated by the updates to lb). This an
+take two forms: optimally in reasing the bound (e.g. using patterns) whi h
+redu es the distan e to sear h, or non-optimally (using overestimation)
+whi h redistributes where the sear h e ort is on entrated.
+2. Removing bran hes unlikely to add additional information to the sear h
+(the next and break statements in the for loop). This forward pruning an
+result in large redu tions in the sear h tree, at the expense of possibly
+a e ting the ompleteness.
+3. Collapsing the tree height by repla ing a sequen e of moves with one move
+(for example, ma ros).
+Some of the sear h enhan ements involve omputations outside of the sear h.
+Figure 12 shows where the pre-sear h pro essing o urs at the domain and
+24
+
+IDA*() f
+/** Compute the best possible lower bound **/
+lb = ComputeLowerBound();
+lb += UsePatterns(); /** Mat h Patterns **/
+
+lb += UseDeadlo kTable();
+lb += UseOverestimate( CntrlOverestimate() );
+
+if(
+
+utoff ) return;
+
+/** Prepro ess **/
+
+lb += ReadTransTable();
+if( uto ) return;
+PatternSear h( CntrlPatternSear h() );
+lb += UsePatterns();
+if( uto ) return;
+/** Generate moves to onsider **/
+movelist = GenerateMoves();
+
+RemoveDeadMoves( movelist );
+IdentifyMa ros( movelist );
+OrderMoves( movelist );
+for( ea h move ) f
+
+if( Irrelevant( move, CntrlIrrelevent() )) next;
+solution = IDA*();
+if( solution) return;
+
+g
+
+if( GoalCut() ) break;
+UpdateLowerBound(); /** Use New Patterns **/
+if( uto ) return;
+
+/** Post-pro ess **/
+
+SaveTransTable( CntrlTransTable() );
+
+g
+
+return;
+
+Figure 11: Enhan ed IDA*
+
+25
+
+for( ea h domain ) f
+/** Prepro ess **/
+
+BuildDeadlo kTable( CntrlDeadlo kTable() );
+
+for( ea h instan e ) f
+/** Prepro ess **/
+
+FindTunnelMa ros();
+FindGoalMa ros( CntrlGoalMa ros() );
+
+while( not solved ) f
+SetSear hParamaters();
+IDA*();
+g
+/** Postpro ess **/
+g
+
+g
+
+SavePatterns( CntrlSavingPatterns() );
+
+Figure 12: Prepro essing Hierar hy
+instan e levels. O -line omputation of pattern databases or pre-pro essing
+of problem instan es are powerful te hniques that re eive s ant attention in
+the literature ( hess endgame databases are a notable ex eption). Yet these
+te hniques are an important step towards the automation of knowledge dis overy
+and ma hine learning. Prepro essing is involved in many of the most valuable
+enhan ements that are used in Rolling Stone.
+Similar issues o ur with other sear h algorithms. For example, although
+it takes only a few lines to spe ify the alpha-beta algorithm, the Deep Blue
+hess program's sear h pro edure in ludes numerous enhan ements (many similar in spirit to those used in Rolling Stone) that umulatively redu e the sear htree size by several orders of magnitude. If nothing else, the Deep Blue result demonstrated the degree of engineering required to build high-performan e
+sear h-based systems.
+Figure 13 shows a di erent perspe tive on the problem of knowledge levels. The diagram shows a hierar hy of problems, solvers, and the orresponding knowledge used. The appli ation domain is lo ated at the ore; the basi
+solver is stri tly on erned with this ore appli ation and ex lusively uses oreappli ation-spe i knowledge. The next higher level in the hierar hy treats this
+entire pro ess as the appli ation. It supplies the ore-appli ation knowledge to
+the ore-solver. The knowledge required at this level is ontrol knowledge|
+ontrolling the ore-knowledge gathering. When viewed in this ontext, it is
+lear why pattern sear hes and goal ma ros are su h important enhan ements.
+This diagram also shows an important dire tion of future resear h: automation
+of the next higher levels of the knowledge hierar hy.
+
+26
+
+Learning
+Knowledge
+Control Knowledge
+Discovery/Tuning
+
+Control
+Knowledge
+Domain Knowledge
+Discovery/Tuning
+
+Legend:
+
+Domain
+Knowledge
+
+Knowledge
+
+Domain
+Solver
+
+Human or Process
+
+Problem
+
+Application
+Domain
+
+Figure 13: Framework
+6
+
+Con lusions
+
+This paper des ribed our experien es working with a hallenging single-agent
+sear h domain. In ontrast to the simpli ity of the basi IDA* formulation,
+building a high-performan e single-agent sear her an be a omplex task that
+ombines both resear h and engineering. Appli ation-dependent knowledge,
+spe i ally that obtained using sear h, an result in an orders-of-magnitude
+improvement in sear h eÆ ien y. This an be a hieved through a judi ious
+ombination of several sear h enhan ements. Control fun tions are overlooked
+in the literature, yet are riti al to performan e. They represent a signi ant
+portion of the program development time and most of the program experimentation resour es.
+Domain-independent tools o er a qui k programming solution when ompared to the e ort required to develop domain-dependent appli ations. However, with urrent AI tools, performan e is ommensurate with e ort. Domaindependent solutions an be vastly superior in performan e. The trade-o between programming e ort and performan e is the riti al design de ision that
+needs to be made.
+7
+
+A knowledgements
+
+This resear h was supported by a grant from the Natural S ien es and Engineering Resear h Coun il of Canada. Computational resour es were provided by
+MACI. This resear h bene ted from intera tions with Don Beal, Darse Billings,
+27
+
+Yngvi Bjornsson, John Bu hanan, Neil Bur h, Joe Culberson, Matt Ginsberg,
+Carla Gomes, Rob Holte, Henry Kautz and Ri hard Korf.
+Referen es
+
+[1℄ G. Adelson-Velskiy, V. Arlazarov, and M. Donskoy. Some methods of ontrolling the tree sear h in hess programs. Arti ial Intelligen e, 6(4):361{
+371, 1975.
+[2℄ J. Culberson. Sokoban is PSPACE- omplete. In Informati s 4, Fun With
+Algorithms, pages 65{76. Carleton S ienti , 1999.
+[3℄ J. Culberson and J. S hae er. Pattern databases. Computational Intelligen e, 14(4):318{334, 1998.
+[4℄ D. Dor and U. Zwi k. SOKOBAN and other motion planning problems,
+1995. http://www.math.tau.a .il/~ddorit.
+[5℄ C. Gomes, B. Selman, and H. Kautz. Boosting ombinatorial sear h
+through randomization. In AAAI, pages 431{437, 1998.
+[6℄ O. Hansson, A. Mayer, and M. Yung. Criti izing solutions to relaxed models
+yields powerful admissible heuristi s. Information S ien es, 63(3):207{227,
+1992.
+[7℄ A. Junghanns. Pushing the Limits: New Developments in Single-Agent
+Sear h. PhD thesis, University of Alberta, 1999.
+[8℄ A. Junghanns and J. S hae er. Relevan e uts: Lo alizing the sear h. In
+The First International Conferen e on Computers and Games, pages 1{
+13, 1998. Also in: Computers and Games, J. van den Herik and H. Iida
+(editors), pages 1-14, 1999, Springer Verlag.
+[9℄ A. Junghanns and J. S hae er. Single-agent sear h in the presen e of deadlo k. In AAAI, pages 419{424, 1998.
+[10℄ A. Junghanns and J. S hae er. Sokoban: Evaluating standard single-agent
+sear h te hniques in the presen e of deadlo k. In R. Mer er and E. Neufeld,
+editors, Advan es in Arti ial Intelligen e, pages 1{15. Springer Verlag,
+1998.
+[11℄ A. Junghanns and J. S hae er. Domain-dependent single-agent sear h enhan ements. In IJCAI, pages 570{575, 1999.
+[12℄ A. Junghanns and J. S hae er. Sokoban: Improving the sear h with relevan e uts. Journal of Theoreti al Computing S ien e, 1999. To appear.
+[13℄ H. Kautz and B. Selman. Pushing the envelope: Planning, propositional
+logi and sto hasti sear h. In AAAI, pages 1194{1201, 1996.
+28
+
+[14℄ M. Klein. A primal method for minimal ost ows. Management S ien e,
+14:205{220, 1967.
+[15℄ R. Korf. Ma ro-operators: A weak method for learning. Arti ial Intelligen e, 26(1):35{77, 1985.
+[16℄ R. Korf. Linear-spa e best- rst sear h. Arti ial Intelligen e, 62(1):41{78,
+1993.
+[17℄ R. Korf. Finding optimal solutions to Rubik's Cube using pattern
+databases. In AAAI, pages 700{705, 1997.
+[18℄ H. Kuhn. The Hungarian method for the assignment problem. Naval Res.
+Logist. Quart., pages 83{98, 1955.
+[19℄ G. Manzini. BIDA*: An improved perimeter sear h algorithm. Arti ial
+Intelligen e, 75:347{360, 1995.
+[20℄ S. Minton. Quantitative results on erning the utility of explanation-based
+learning. In AAAI, pages 564{569, 1988.
+[21℄ A. Reinefeld and T. Marsland. Enhan ed iterative-deepening sear h. IEEE
+Transa tions on Pattern Analysis and Ma hine Intelligen e, 16(7):701{710,
+1994.
+[22℄ D. Slate and L. Atkin. Chess 4.5 | The Northwestern University hess
+program. In P. Frey, editor, Chess Skill in Man and Ma hine, pages 82{
+118. Springer-Verlag, 1977.
+A
+A.1
+
+Appendi es
+Minimum Mat hing
+
+Figure 14 shows an example of the lower-bound al ulation. The table lists the
+distan es from the three stones to ea h of the three goals in the maze. The bold
+entries represent a minimum ost mat hing. It is important to note here that
+the minimum mat hing algorithm solves one important problem. Even though
+the stone on C and the stone on Id both have goals lose by, they have to
+be pushed to a goal further away. While ounting how many stones are o a
+goal square would return a lower bound of 3, and summing the distan es of
+all stones to their losest goal squares would return 5, the minimum mat hing
+lower bound returns 14. This higher heuristi bound allows the sear h algorithm
+to eliminate a large fra tion of the total sear h spa e that is irrelevant to an
+optimal solution.
+The distan e of a stone to a goal an depend on the lo ation of the man.
+Consider Figure 15. While the stone is only 3 squares away from the goal, 7
+pushes are required to move the stone to the goal (two pushes away from the
+goal are needed for the man to rea h the opposite side of the stone). Therefore,
+29
+
+8
+
+stones
+2
+Cc
+6
+9
+6
+Hb
+
+goals
+Bb
+
+stones
+on
+Ic
+
+8 8
+1
+
+Id
+
+2
+
+C
+Hb
+Id
+
+goals on
+
+Bb
+2
+
+6
+
+1
+
+If
+
+Figure 14: Minimum Mat hing Example
+
+Figure 15: Distan e Depends on the Position of the Man
+the stone distan es used for minimum mat hing take the urrent position of the
+man into a ount.
+A.2
+
+Transposition Tables
+
+Transposition tables are usually implemented as (large) hash tables. The hash
+keys we use in orporate only the exa t stone positions. To mat h an entry, the
+keys must be identi al. Sin e the position of the man is important, a se ond test
+is performed. The lo ations of the man in both positions must be onne ted by
+a legal man path. Thus multiple positions that di er only in the man's lo ation may map to identi al transposition entries. This simpli ation is possible
+be ause we only optimize stone pushes.
+Transposition tables an handle y le dete tion. The table entry for a position an be agged before doing a sear h from that position, and the ag
+removed after the sear h ompletes. If a sear h ever rea hes a agged state then
+a y le has o urred.
+A.3
+
+Move Ordering
+
+The information used to order moves an ome from di erent sour es, but is
+usually domain-dependent knowledge. Sometimes knowledge gathered during
+the sear h (e.g., tree sizes or tree depths) an be useful. In the ase of iterative
+30
+
+I
+
+If
+
+6
+
+9
+
+1
+
+2
+
+1 1
+
+20
+moves considered by search
+rank of solution move before move ordering
+rank of solution move after move ordering
+
+number of moves
+
+15
+
+10
+
+5
+2
+1
+0
+0
+
+20
+
+40
+60
+depth in percent
+
+80
+
+100
+
+Figure 16: The E e t of Move Ordering
+deepening, move ordering information is passed from one iteration to the next
+by means of the transposition table.
+Rolling Stone uses a move-ordering s heme that we all inertia. Analysis of
+solution sequen es shows long runs where the same stone is repeatedly pushed.
+Hen e, moves are ordered to preserve the inertia of the previous move in the
+following way:
+1. Inertia moves are onsidered rst.
+2. Then all the moves that de rease the lower bound (optimal moves) are
+tried, sorted by the distan e from the stone pushed to the goal it is targeted
+to, with lose stones rst.
+3. Then all the \non-optimal" moves are tried, sorted similarly.
+Figure 16 shows the e e t of move ordering.4 The verti al axis shows the
+number of moves onsidered. The horizontal axis shows the depth of the node
+in the tree in per ent. The upper urve indi ates the average number of moves
+onsidered by the program.5 The middle urve shows where the a tual solution
+move is lo ated in the list returned by the move generator. Not surprisingly,
+the solution move is in the middle of the move list on average. The lower urve
+shows that inertia ordering results in solution moves being pla ed loser to the
+front of the move list. Move ordering be omes more a urate with de reasing
+distan e to the goal. In fa t, after rea hing a depth of about 20% of the solution
+length, the move ordering be omes lose to perfe t. At the start of a Sokoban
+problem, with many ompli ations in the maze, seemingly good moves might
+a tually lead to deadlo ks. Many of the problems in the test suite are designed
+in su h a way that an initial \knot" has to be freed up. This an usually be
+4 The data was ompiled from all the positions on the solution paths for the 57 problems
+that Rolling Stone an solve.
+5 Some of the legal moves are dis arded immediately be ause they lead to trivially provable
+deadlo ks. These moves are not in luded in the graph. See Appendix A.4 for more detail.
+
+31
+
+20
+all legal moves
+legal moves less dead squares
+legal moves less deadlock table
+
+number of moves
+
+15
+
+10
+
+5
+2
+1
+0
+0
+
+20
+
+40
+60
+depth in percent
+
+80
+
+100
+
+Figure 17: E e t of Deadlo k Tables
+a hieved only with moves that the lower-bound estimator views as being nonoptimal. After the knot is untangled, a \mop-up phase" ommen es during
+whi h stones are simply pushed to the goals. This is where our heuristi ex els.
+A.4
+
+Deadlo k Table
+
+Figure 17 shows the number of moves in the move list versus the depth of the
+tree. Only positions on paths to solutions were used to generate the data for
+the gure to avoid pathologi al ases. The top urve shows how many legal
+moves those positions have, averaged over all test positions. The se ond urve
+shows how many legal moves exist that do not dire tly push stones onto dead
+squares (squares from whi h no goal is rea hable, su h as moving a stone into
+a orner). Note that this simple test redu es the e e tive bran hing fa tor by
+about 20%. The third urve shows how many moves are a tually onsidered
+after s reening moves with the deadlo k tables. The savings are similar to the
+simple dead-square he king, almost an additional 20%.
+A.5
+
+Tunnel Ma ros
+
+Figure 18 illustrates the impa t of the move sequen e a-b- being treated as a
+tunnel ma ro. Instead of exploring every possible inter hanging ombination of
+moves a, b, of one stone, and d, e, f of another stone, most of the sear h tree
+an be eliminated by treating the sequen e a-b- as a single move. The ma ro
+also has the e e t of redu ing the depth of the tree.
+
+32
+
+a
+b
+
+No Macros
+
+d
+
+a-b-c As
+Tunnel Macro
+
+d
+e
+
+a
+
+a-b-c
+c
+
+d
+
+b
+
+e
+
+d
+
+c e
+
+c e
+
+e
+
+e
+
+c f
+
+e
+
+ce
+
+c f
+
+b e
+
+f
+
+f
+
+f c
+
+f f c
+
+f c
+
+c f f c
+
+b
+
+f
+
+b
+
+e
+
+a
+
+f
+
+c e
+
+b f
+
+b f
+
+a
+
+b
+
+c f b
+
+b
+
+f c c
+
+f c c
+
+c
+
+c f
+
+a-b-c As
+Goal Macro
+
+ce
+
+d
+
+d
+
+a-b-c
+
+e
+
+e
+
+f
+
+f
+
+a-b-c
+e
+a-b-c
+
+d
+f
+
+f
+
+e
+a-b-c
+
+f
+
+Figure 18: Impa t of Ma ro Moves
+A.6
+
+Goal Ma ros
+
+Figure 18 illustrates the impa t of goal ma ros on the sear h.
+The goal ma ros in the urrent implementation have limitations. One underlying assumption is that no stone will leave the goal area on e inside. Problem
+#50, for example, annot be solved without pushing stones through the goal
+area. A se ond, even stri ter assumption is that on e a stone is inside the goal
+area, it will never move again. This does not allow for parking inside goal areas.
+Sometimes it is ne essary to leave a stone in a key position inside the goal area
+until later in the solution, when it an nally be pushed to its goal square. Another limitation is that a goal area ontaining several entran es is often a travel
+area for the man; ertain parts of the maze need to remain unblo ked to allow
+the man to push stones in a ertain way outside the goal area. Problem #38 is
+an example where the areless pa king of stones in the goal area an obstru t
+the man from other areas of the maze.
+These problems show that goal ma ro reation is still far from being solved
+satisfa torily. Intera tions between the goal area and the outside parts of the
+maze make it diÆ ult to reate good goal ma ros. However, their positive
+impa t in the problems where they work is so large that any high-performan e
+Sokoban program needs to use this type of knowledge in one form or another.
+A.7
+
+Goal Cuts
+
+We implemented a s heme that will ut moves only after a stone push towards
+its ma ro move is explored. The sear h ba ks up the ut information, instead
+of stati ally trying to dedu e that su h a move exists in a ertain position. This
+ould potentially lead to missed opportunities for additional uts if other moves
+are explored before the one that leads to the goal ut. Sin e ordering puts moves
+that are lose to goals towards the front of the move list, lead-o moves to goal
+ma ros are likely to be onsidered early in the list.
+
+33
+
+A.8
+
+Pattern Sear hes
+
+Figure 19 shows the pseudo ode for pattern sear hes. We are interested in the
+set of squares that are used by the stones and the man to e e t the solution:
+the squares o upied by the stones(s) on their path to the goal(s) (StonePath),
+and the squares tou hed by the man while pushing the stone(s) to a goal(s)
+(ManPath). In e e t, these sets of squares are pre onditions for the solution to
+work. The ManPath and StonePath are used to determine whi h stone from the
+original maze to in lude next in the test maze (i.e. add a stone that violates one
+of the pre onditions). The stone in StonePath losest to square B (the square
+the stone was moved to in the original maze) is in luded next. If su h a stone
+does not exist, the stone on ManPath losest to square A is used.6 If none of
+those exists, the pattern sear h returns without nding a deadlo k.
+After in luding the next stone, PIDA* is alled again, returning with a
+solution determination and the two on i t sets. If deadlo k has not been found,
+then the on i t sets are used to add another stone to the test maze. If any of
+the returning sear hes indi ates a longer solution than the lower-bound estimate
+of the position, the urrent pattern is stored with a orresponding lower-bound
+in rease.
+Figure 5 (page 13) shows a simple position, before and after the move Gd-Fd.
+The question is whether this move introdu es a deadlo k. Figure 6 (page 13)
+shows how the test maze is built. Sin e the last move ended up on square Fd,
+the test maze is initialized with this single stone (Figure 6a). A PIDA* sear h
+reveals a 5-move solution (Fd-F -E -D -C -B ) whi h is also the StonePath,
+and sets ManPath to the squares needed by the man (Gd-Ge-Fe-Fd-Gd-G -F E -D -C ). Sin e there is a solution, we ontinue the pattern sear h.
+The original maze has a stone on one of the squares that the stone moved over
+(square E ) whi h now gets in luded in the test maze (Figure 6b). PIDA* will
+solve the two-stone maze and again nd a solution. The ManPath is (Gd-G F -E -D -Dd-Cd-C -D -E -F -G -Gd-Ge-Fe-Fd-Gd-G -F -E -D -C ) and the
+StonePath is (E -D -C -Cb Fd-F -E -D -C -B ). This time there are no stones
+in on i t with StonePath. However, there is a on i t with the ManPath,
+square Ge. This stone is added to the test maze (Figure 6 ) and another sear h
+is ommen ed. A solution will be found, requiring a fourth stone to be added
+(Figure 6d).
+The fourth all to PIDA* will return no solution and announ e a deadlo k
+with this pattern of four stones.
+A.9
+
+Relevan e Cuts
+
+When judging how two squares in a Sokoban maze in uen e ea h other, Eulidean distan e is not adequate. Taking the stru ture of the maze into a ount
+would lead to a simple geographi distan e whi h is not proportional to in uen e
+6 Closest is always with respe t to the distan e of either the stone or the man to the
+on i ting stone. These distan e measures are possibly di erent due to the more restri ted
+movement of the stones.
+
+34
+
+PatternSear h( From, To ) f
+lear TestMaze;
+StonePath = To;
+for( i=1; i <= MAX PATTERN SIZE AND NOT EffortLimit(); i++ ) f
+if( stone s on a square in StonePath )
+add losest s to TestMaze
+else if( stone s on a square in ManPath )
+add losest s to TestMaze
+else break;
+/* Call to PIDA* modifies SolLength, ManPath and StonePath */
+solution = PIDA*( TestMaze, SolLength, ManPath, StonePath );
+/* Test for a deadlo k */
+if( solution == NO AND NOT EffortLimit() ) f
+GeneralizeAndAddPattern( TestMaze, infinity );
+break;
+g
+/* Test for a lower-bound in rease */
+if( solution == YES ) f
+lb = LowerBound( TestMaze );
+if( SolLength > lb )
+GeneralizeAndAddPattern( TestMaze, SolLength - lb );
+g
+g
+g
+
+Figure 19: Pseudo Code for Pattern Sear hes
+either. For example, onsider two squares onne ted by a tunnel; the squares
+are equally in uen ing ea h other, no matter how long the tunnel is. Elongating
+the tunnel without hanging the general topology of the problem would hange
+the geographi distan e, but not the in uen e.
+The in uen e measure should re e t the following properties:
+The more alternatives that exist on a path between two squares,
+the less the squares in uen e ea h other. That is, squares in the middle of
+a room, where stones an go in all 4 dire tions, should de rease in uen e
+more than squares in a tunnel, where no alternatives exist.
+
+Alternatives:
+
+For a given square sq , any squares on the optimal path from sq to
+a goal should have stronger in uen e than squares o the optimal path.
+
+Goal-Skew:
+
+Two neighboring squares onne ted su h that a stone an move
+between them should in uen e ea h other more than two squares onne ted su h that only the man an move between them.
+
+Conne tion:
+
+Tunnel:
+
+In a tunnel, in uen e remains equal, regardless of length.
+
+Our implementation of relevan e uts uses small o -line sear hes to statially pre ompute an I nf luen eT able ontaining the in uen e values for ea h
+35
+
+square of a 20  20 maze to every other square in the maze [7, 12℄. Between
+every pair of squares, a breadth- rst sear h is used to nd the path(s) with the
+largest in uen e. The algorithm is similar to a shortest-path nding algorithm,
+ex ept that we use in uen e here and not geographi distan e. The smaller the
+in uen e number, the more two squares in uen e ea h other. Our approa h is
+quite simple and an undoubtedly be improved. For example, in uen e is stati ally omputed. A dynami measure, one that takes into a ount the urrent
+positions of the stones, would undoubtedly be more e e tive.
+A.10
+
+Overestimation
+
+Sin e the pattern sear hes are limited in ertain ways to keep them tra table,
+the orre t size of the penalties and shape of the patterns might not be known.
+Therefore, the patterns represent in omplete knowledge. Furthermore, when
+patterns are mat hed, only some of the penalties an be used to preserve admissibility. However, the presen e of mat hing patterns that are not in luded in the
+lower-bound al ulations suggests that there may be additional ompli ations
+in the urrent position. Not using the penalty of su h a pattern is equivalent
+to ignoring available knowledge. The following des ribes the best of our attempts to use the knowledge ontained in the patterns that mat h a position.
+It was a hieved after a signi ant e ort spent on experimentation and tuning.
+We all this method maximum partial penalties. More straightforward ways of
+overestimation suggested in the literature were not e e tive [16℄.
+One simple overestimation idea is to sum the penalties for all the patterns
+that mat h in a position (a worst- ase s enario). Predi tably, this does not
+perform well. Instead of attributing penalties to patterns, they an be assigned
+to stones in the maze. The penalty of a mat hed pattern is split equally among
+all the stones ontained in that pattern. For ea h stone the maximum of these
+partial penalties is stored. The total penalty of a position is the sum of all
+the maximum partial penalties for ea h stone. Thus, every stone involved in
+a penalty pattern ontributes to the total penalty assigned to a stone on guration. To tune the overestimation further, the penalty is s aled by a fa tor s
+( urrently set to 1.8, as determined by experimentation). A nal rounding step
+assures that the total penalty is an even number to preserve the parity property
+of the heuristi .
+Adding a limited penalty to the heuristi estimation of the distan e to the
+goal will only delay the examination of a node to a later iteration. If no solution an be found, the threshold will in rease until the position's lower-bound
+estimate is not enough to ause a uto anymore. The exploration of the node
+is only postponed. This is in stark ontrast to forward pruning with xed rules,
+su h as deterministi relevan e uts, that will prune the same node in every
+iteration. Be ause new patterns are added and useless patterns are dropped,
+the de ision to postpone a node hange dynami ally over the ourse of a sear h
+as new knowledge is found or other knowledge is dis arded.
+
+36
+
+A.11
+
+Rapid Random Restart
+
+Ea h iteration of IDA* is in prin iple a restart with a di erent parameter setting: the threshold. However, in the lassi IDA* the threshold is only in reased
+after an iteration is exhaustively sear hed. When RRR aborts an iteration early,
+it is un lear whether to restart with the same iteration or to in rease the threshold. Rolling Stone uses a \double impatien e" approa h. If a ertain number
+of restarts in a spe i threshold iteration have not produ ed a solution, the
+threshold is in reased. Furthermore, with ea h new restart within an iteration
+the randomization of the move ordering is in reased. This an be justi ed by
+simply stating that if the move ordering was good the solution would have been
+found by now. With ea h restart our on den e in the move ordering shrinks
+and more randomization is used. When the threshold is in reased, the randomization is redu ed to 0 again, be ause it is assumed that no solution existed for
+the lower threshold.
+
+37
+
+

@@ -1,0 +1,42 @@
+{
+  "cycles": [
+    {
+      "bad_actual_top3_rate": 0.24793388429752067,
+      "bad_cf_adv": 9.381849333397613,
+      "bad_tva_mean": -16.65340802415152,
+      "cycle": "041",
+      "good_actual_top3_rate": 0.4117647058823529,
+      "good_cf_adv": 13.628394337261424,
+      "good_tva_mean": 58.4183259245319,
+      "value_pearson": 0.8595013345648309,
+      "value_spearman": 0.7185778386622625
+    },
+    {
+      "bad_actual_top3_rate": 0.17,
+      "bad_cf_adv": 14.891037704050541,
+      "bad_tva_mean": -21.558012419800008,
+      "cycle": "050",
+      "good_actual_top3_rate": 0.36,
+      "good_cf_adv": 10.664890944957733,
+      "good_tva_mean": 66.39875291670072,
+      "value_pearson": 0.9724074699607788,
+      "value_spearman": 0.7173829972632743
+    },
+    {
+      "bad_actual_top3_rate": 0.21,
+      "bad_cf_adv": 10.06180246502161,
+      "bad_tva_mean": -25.0304107234993,
+      "cycle": "060",
+      "good_actual_top3_rate": 0.4,
+      "good_cf_adv": 14.163765686750413,
+      "good_tva_mean": 78.20372339697444,
+      "value_pearson": 0.9486235902811297,
+      "value_spearman": 0.6540742662426281
+    }
+  ],
+  "interpretation": {
+    "counterfactual_signal": "informative_but_not_ready_for_direct_online_update",
+    "recommended_next_step": "shadow_update",
+    "value_signal": "strong_episode_level_signal"
+  }
+}

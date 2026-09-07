@@ -1,0 +1,65 @@
+# XSokoban first 第 2 关 Room-GFT A36 agenda certificate 诊断
+
+## 核心结论
+
+A36 继承 A35，并复用 A35 multi-head checkpoint。新增部分不是新 teacher 或新动作规则，而是最小 agenda progress-certificate gate：release-progress 只有在完成义务、减少 blocker、推进 frontier slot 或消费 opened release 时才保留为有效进展。
+A31 为 `max_steps`、pushes=80、decisions=42、goals=2；A36 为 `max_steps`、pushes=80、decisions=42、goals=2。
+A31/A36 首个决策差异为 `None`；A36 certificate 加载步数为 `42`。
+
+## 摘要对照
+
+| planner | status | decisions | pushes | goals | slot cost | release actions | certified | pseudo | stale release | consumed release |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| A31 | max_steps | 42 | 80 | 2 | 29 | 2 | NA | NA | NA | NA |
+| A36 | max_steps | 42 | 80 | 2 | 29 | 2 | 39 | 1 | 0 | 0 |
+
+## A36 轨迹前缀
+
+| step | action | pushes | goals | stage | slot cost | release actions | score | rel raw | rel eff | cert | pseudo | stale | tier | macro reason |
+|---:|---|---:|---:|---|---:|---:|---:|---:|---:|---|---|---|---:|---|
+| 0 | b6:right | 1 | 0 | fill | 50 | 0 | 1.021 | 0.701 | 0.701 | True | False | False | 5 | selected_box_uncommitted |
+| 1 | b2:up | 1 | 0 | fill | 51 | 0 | 0.837 | 1.015 | 1.015 | True | False | False | 6 | below_min_total_pushes |
+| 2 | b6:right | 2 | 0 | fill | 49 | 0 | 0.919 | 1.378 | 0.35 | True | False | False | 5 | pre_release_bottleneck_truncated_corridor |
+| 3 | b4:up | 2 | 0 | fill | 47 | 0 | 1.381 | 0.553 | 0.553 | True | False | False | 5 | no_monotone_committed_push |
+| 4 | b3:up | 1 | 0 | fill | 48 | 0 | 0.58 | 0.457 | 0 | False | True | False | 3 | below_min_total_pushes |
+| 5 | b4:right | 1 | 0 | fill | 48 | 0 | 1.624 | 0.977 | 0.977 | True | False | False | 6 | selected_box_uncommitted |
+| 6 | b8:right | 1 | 0 | fill | 48 | 0 | 0.815 | 0.264 | 0.264 | True | False | False | 5 | selected_box_uncommitted |
+| 7 | b7:left | 3 | 0 | fill | 47 | 0 | -0.014 | 0.124 | 0.124 | True | False | False | 5 | pre_release_compatible_dependency_macro |
+| 8 | b7:up | 6 | 0 | fill | 44 | 0 | 0.918 | 0.302 | 0.302 | True | False | False | 5 | pre_release_compatible_dependency_macro |
+| 9 | b5:left | 5 | 0 | fill | 41 | 0 | 1.175 | 0.503 | 0.503 | True | False | False | 5 | pre_release_compatible_dependency_macro |
+| 10 | b3:left | 2 | 1 | fill | 49 | 0 | 1.199 | 0.881 | 0.881 | True | False | False | 7 | committed_slot_reached |
+| 11 | b6:down | 1 | 1 | fill | 48 | 0 | 0.403 | 0.417 | 0.417 | True | False | False | 5 | selected_box_uncommitted |
+| 12 | b3:down | 2 | 1 | fill | 48 | 0 | 1.428 | 1.801 | 1.801 | True | False | False | 6 | committed_slot_reached |
+| 13 | b3:up | 2 | 1 | fill | 48 | 0 | 0.908 | 1.226 | 1.226 | True | False | False | 6 | committed_slot_reached |
+| 14 | b6:right | 1 | 1 | fill | 48 | 0 | -0.383 | 0.043 | 0.043 | False | False | False | 4 | selected_box_uncommitted |
+| 15 | b8:up | 1 | 1 | fill | 48 | 0 | -0.187 | 0.129 | 0.129 | False | False | False | 4 | selected_box_uncommitted |
+| 16 | b8:left | 1 | 1 | fill | 47 | 0 | 1.161 | 0.617 | 0.617 | True | False | False | 5 | selected_box_uncommitted |
+| 17 | b8:left | 1 | 1 | fill | 46 | 0 | 1.26 | 0.632 | 0.632 | True | False | False | 5 | selected_box_uncommitted |
+| 18 | b8:left | 1 | 1 | fill | 45 | 0 | 2.118 | 1.078 | 1.078 | True | False | False | 6 | below_min_total_pushes |
+| 19 | b2:left | 1 | 1 | fill | 44 | 0 | 1.733 | 0.573 | 0.573 | True | False | False | 5 | selected_box_uncommitted |
+| 20 | b8:left | 2 | 1 | fill | 44 | 0 | 1.375 | 0.898 | 0.898 | True | False | False | 6 | pre_release_bottleneck_truncated_corridor |
+| 21 | b8:up | 6 | 1 | fill | 40 | 0 | 1.819 | 0.808 | 0.808 | True | False | False | 5 | ambiguous_monotone_committed_push |
+| 22 | b3:down | 2 | 1 | fill | 40 | 0 | 2.707 | 2.543 | 2.543 | True | False | False | 6 | committed_slot_reached |
+| 23 | b3:up | 2 | 1 | fill | 40 | 0 | 1.747 | 1.764 | 1.764 | True | False | False | 6 | committed_slot_reached |
+| 24 | b6:left | 1 | 2 | fill | 49 | 0 | 0.472 | 0 | 0 | True | False | False | 7 | below_min_total_pushes |
+| 25 | b6:up | 1 | 2 | release | 29 | 2 | 0.784 | 2.998 | 0.35 | True | False | False | 5 | goal_lock_predecessor_root_replacement |
+| 26 | b3:down | 2 | 2 | release | 29 | 2 | 1.366 | 2.649 | 2.649 | True | False | False | 6 | committed_slot_reached |
+| 27 | b3:up | 2 | 2 | release | 29 | 2 | 1.28 | 2.627 | 2.627 | True | False | False | 6 | committed_slot_reached |
+| 28 | b4:up | 1 | 2 | release | 51 | 0 | 0.888 | 1.418 | 1.418 | True | False | False | 6 | below_min_total_pushes |
+| 29 | b0:down | 2 | 2 | release | 49 | 0 | 0.558 | 2.706 | 0.35 | True | False | False | 5 | ambiguous_monotone_committed_push |
+| 30 | b6:up | 1 | 2 | release | 29 | 2 | 0.345 | 2.491 | 0.35 | True | False | False | 5 | goal_lock_predecessor_root_replacement |
+| 31 | b3:down | 2 | 2 | release | 29 | 2 | 0.286 | 2.337 | 2.337 | True | False | False | 6 | committed_slot_reached |
+| 32 | b3:down | 2 | 2 | release | 29 | 2 | 0.286 | 2.337 | 2.337 | True | False | False | 6 | committed_slot_reached |
+| 33 | b3:down | 2 | 2 | release | 29 | 2 | 0.286 | 2.337 | 2.337 | True | False | False | 6 | committed_slot_reached |
+| 34 | b3:down | 2 | 2 | release | 29 | 2 | 0.286 | 2.337 | 2.337 | True | False | False | 6 | committed_slot_reached |
+| 35 | b3:down | 2 | 2 | release | 29 | 2 | 0.286 | 2.337 | 2.337 | True | False | False | 6 | committed_slot_reached |
+| 36 | b3:down | 2 | 2 | release | 29 | 2 | 0.286 | 2.337 | 2.337 | True | False | False | 6 | committed_slot_reached |
+| 37 | b3:down | 2 | 2 | release | 29 | 2 | 0.286 | 2.337 | 2.337 | True | False | False | 6 | committed_slot_reached |
+| 38 | b3:down | 2 | 2 | release | 29 | 2 | 0.286 | 2.337 | 2.337 | True | False | False | 6 | committed_slot_reached |
+| 39 | b3:down | 2 | 2 | release | 29 | 2 | 0.286 | 2.337 | 2.337 | True | False | False | 6 | committed_slot_reached |
+| 40 | b3:down | 2 | 2 | release | 29 | 2 | 0.286 | 2.337 | 2.337 | True | False | False | 6 | committed_slot_reached |
+| 41 | b3:down | 2 | 2 | release | 29 | 2 | 0.286 | 2.337 | 2.337 | True | False | False | 6 | committed_slot_reached |
+
+## 方法含义
+
+A36 检验专家建议中的最小命题：release opened 不等于 release consumed，没有 progress certificate 的 release-progress 不应继续作为正向进展消费。该版本仍只使用离线 checkpoint，在线求解不调用 teacher/reference。

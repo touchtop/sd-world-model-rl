@@ -1,0 +1,600 @@
+{
+  "cycles": [
+    {
+      "cycle": 41,
+      "key_rules": [
+        {
+          "confidence": 0.75,
+          "confidence_status": "confidence_active",
+          "effect_direction_consistent_rate": 0.7040269428550735,
+          "effect_direction_harmful_rate": 0.2959730571449265,
+          "effect_good_state_hit_rate": 0.4055370464257261,
+          "effect_high_episode_hit_rate": 0.44110777142029406,
+          "effect_selected_gate_hits": 110456,
+          "id": "toe_recovery_low_support->soft_prefer:waist_pos",
+          "present": true,
+          "shadow_confidence": 0.75,
+          "shadow_confidence_delta": 0.0,
+          "shadow_confidence_status": "confidence_active",
+          "shadow_update_reason": "insufficient_tva_effect_coverage",
+          "tva_shadow_opposite_rate": 0.11009174311926606,
+          "tva_shadow_same_rate": 0.01834862385321101,
+          "tva_shadow_selected_gate_hits": 109
+        },
+        {
+          "confidence": 1.0,
+          "confidence_status": "confidence_active",
+          "effect_direction_consistent_rate": 0.8089338608894943,
+          "effect_direction_harmful_rate": 0.1910661391105057,
+          "effect_good_state_hit_rate": 0.38298592741508836,
+          "effect_high_episode_hit_rate": 0.8635911543751984,
+          "effect_selected_gate_hits": 46251,
+          "id": "unsupported_high_torque|omega_pos|vx_high|support_none|falling->prefer:ankle_pos",
+          "present": true,
+          "shadow_confidence": 0.872264,
+          "shadow_confidence_delta": -0.127736,
+          "shadow_confidence_status": "confidence_active",
+          "shadow_update_reason": "tva_shadow_harmful_weakened",
+          "tva_shadow_opposite_rate": 0.21768707482993196,
+          "tva_shadow_same_rate": 0.034013605442176874,
+          "tva_shadow_selected_gate_hits": 147
+        },
+        {
+          "id": "rotation_risk|omega_pos|vx_high|support_none|falling->prefer:ankle_pos",
+          "present": false
+        },
+        {
+          "confidence": 0.541319,
+          "confidence_status": "confidence_observing",
+          "effect_direction_consistent_rate": 0.5362237762237763,
+          "effect_direction_harmful_rate": 0.4637762237762238,
+          "effect_good_state_hit_rate": 0.015384615384615385,
+          "effect_high_episode_hit_rate": 0.49184149184149184,
+          "effect_selected_gate_hits": 10725,
+          "id": "rotation_risk|omega_pos|vx_mid|support_none|falling->prefer:hip_pos",
+          "present": true,
+          "shadow_confidence": 0.541319,
+          "shadow_confidence_delta": 0.0,
+          "shadow_confidence_status": "confidence_observing",
+          "shadow_update_reason": "tva_shadow_positive_but_diffuse_best_family",
+          "tva_shadow_opposite_rate": 0.14035087719298245,
+          "tva_shadow_same_rate": 0.4502923976608187,
+          "tva_shadow_selected_gate_hits": 171
+        },
+        {
+          "confidence": 0.56,
+          "confidence_status": "confidence_active",
+          "effect_direction_consistent_rate": 0.6840284534388446,
+          "effect_direction_harmful_rate": 0.31597154656115545,
+          "effect_good_state_hit_rate": 0.38298592741508836,
+          "effect_high_episode_hit_rate": 0.8635911543751984,
+          "effect_selected_gate_hits": 46251,
+          "id": "unsupported_high_torque|omega_pos|vx_high|support_none|falling->prefer:hip_neg",
+          "present": true,
+          "shadow_confidence": 0.56,
+          "shadow_confidence_delta": 0.0,
+          "shadow_confidence_status": "confidence_active",
+          "shadow_update_reason": "tva_shadow_rejected_by_consequence_gate",
+          "tva_shadow_opposite_rate": 0.6054421768707483,
+          "tva_shadow_same_rate": 0.10204081632653061,
+          "tva_shadow_selected_gate_hits": 147
+        }
+      ],
+      "matched_state_rule_pairs": 7956,
+      "rule_effect_audit": "results/sd_retrospective_rule_induction/closed_loop/hopper_v8formal_300k_confidence_toerecovery_auditfix_seed123_20260514_r1/cycle_041/reports/rule_effect_audit.json",
+      "shadow_summary": {
+        "max_shadow_delta": 0.0,
+        "mean_shadow_delta": -0.0008932587412587412,
+        "median_shadow_delta": 0.0,
+        "min_shadow_delta": -0.127736,
+        "num_active": 56,
+        "num_consequence_kept_changed": 1,
+        "num_consequence_rejected_changed": 3,
+        "num_observing": 42,
+        "num_original_changed": 4,
+        "num_retired": 45,
+        "num_rules": 143,
+        "num_strengthened": 0,
+        "num_unchanged": 142,
+        "num_weakened": 1
+      },
+      "shadow_update": "results/sd_retrospective_rule_induction/reports/tva_validation_300k_oldscheme_20260515/hopper_tva_shadow_update_cycle_041_label_event1200_consequence_h5_gated.json",
+      "strengthened_effect_summary": {
+        "count": 0,
+        "mean_delta": 0.0,
+        "mean_effect_consistent_rate": 0.0,
+        "mean_effect_good_state_hit_rate": 0.0,
+        "mean_effect_harmful_rate": 0.0,
+        "mean_effect_high_episode_hit_rate": 0.0,
+        "mean_tva_opposite_rate": 0.0,
+        "mean_tva_same_rate": 0.0
+      },
+      "top_strengthened": [],
+      "top_weakened": [
+        {
+          "confidence": 1.0,
+          "effect_direction_consistent_rate": 0.8089338608894943,
+          "effect_direction_harmful_rate": 0.1910661391105057,
+          "effect_good_state_hit_rate": 0.38298592741508836,
+          "effect_high_episode_hit_rate": 0.8635911543751984,
+          "effect_selected_gate_hits": 46251,
+          "id": "unsupported_high_torque|omega_pos|vx_high|support_none|falling->prefer:ankle_pos",
+          "shadow_confidence": 0.872264,
+          "shadow_confidence_delta": -0.127736,
+          "shadow_update_reason": "tva_shadow_harmful_weakened",
+          "source": "v4_substate",
+          "tva_shadow_opposite_rate": 0.21768707482993196,
+          "tva_shadow_same_rate": 0.034013605442176874,
+          "tva_shadow_selected_gate_hits": 147
+        }
+      ],
+      "unchanged_effect_summary": {
+        "count": 142,
+        "mean_delta": 0.0,
+        "mean_effect_consistent_rate": 0.43804231763709855,
+        "mean_effect_good_state_hit_rate": 0.06785104704435449,
+        "mean_effect_harmful_rate": 0.24505627391219725,
+        "mean_effect_high_episode_hit_rate": 0.25075736755932404,
+        "mean_tva_opposite_rate": 0.1429655934035366,
+        "mean_tva_same_rate": 0.14697104799716032
+      },
+      "weakened_effect_summary": {
+        "count": 1,
+        "mean_delta": -0.127736,
+        "mean_effect_consistent_rate": 0.8089338608894943,
+        "mean_effect_good_state_hit_rate": 0.38298592741508836,
+        "mean_effect_harmful_rate": 0.1910661391105057,
+        "mean_effect_high_episode_hit_rate": 0.8635911543751984,
+        "mean_tva_opposite_rate": 0.21768707482993196,
+        "mean_tva_same_rate": 0.034013605442176874
+      }
+    },
+    {
+      "cycle": 50,
+      "key_rules": [
+        {
+          "confidence": 0.75,
+          "confidence_status": "confidence_active",
+          "effect_direction_consistent_rate": 0.6942683147758469,
+          "effect_direction_harmful_rate": 0.30573168522415306,
+          "effect_good_state_hit_rate": 0.4823576136791204,
+          "effect_high_episode_hit_rate": 0.5437436419125127,
+          "effect_selected_gate_hits": 143518,
+          "id": "toe_recovery_low_support->soft_prefer:waist_pos",
+          "present": true,
+          "shadow_confidence": 0.75,
+          "shadow_confidence_delta": 0.0,
+          "shadow_confidence_status": "confidence_active",
+          "shadow_update_reason": "insufficient_tva_effect_coverage",
+          "tva_shadow_opposite_rate": 0.026785714285714284,
+          "tva_shadow_same_rate": 0.0625,
+          "tva_shadow_selected_gate_hits": 112
+        },
+        {
+          "confidence": 1.0,
+          "confidence_status": "confidence_active",
+          "effect_direction_consistent_rate": 0.8127394901982562,
+          "effect_direction_harmful_rate": 0.18726050980174377,
+          "effect_good_state_hit_rate": 0.39960968419903375,
+          "effect_high_episode_hit_rate": 0.9031716570679914,
+          "effect_selected_gate_hits": 72028,
+          "id": "unsupported_high_torque|omega_pos|vx_high|support_none|falling->prefer:ankle_pos",
+          "present": true,
+          "shadow_confidence": 1.0,
+          "shadow_confidence_delta": 0.0,
+          "shadow_confidence_status": "confidence_active",
+          "shadow_update_reason": "insufficient_tva_effect_coverage",
+          "tva_shadow_opposite_rate": 0.5508474576271186,
+          "tva_shadow_same_rate": 0.00847457627118644,
+          "tva_shadow_selected_gate_hits": 118
+        },
+        {
+          "id": "rotation_risk|omega_pos|vx_high|support_none|falling->prefer:ankle_pos",
+          "present": false
+        },
+        {
+          "confidence": 0.209773,
+          "confidence_status": "confidence_observing",
+          "effect_direction_consistent_rate": 0.482166642000888,
+          "effect_direction_harmful_rate": 0.517833357999112,
+          "effect_good_state_hit_rate": 0.015835429924522717,
+          "effect_high_episode_hit_rate": 0.5697794879384342,
+          "effect_selected_gate_hits": 13514,
+          "id": "rotation_risk|omega_pos|vx_mid|support_none|falling->prefer:hip_pos",
+          "present": true,
+          "shadow_confidence": 0.209773,
+          "shadow_confidence_delta": 0.0,
+          "shadow_confidence_status": "confidence_observing",
+          "shadow_update_reason": "tva_shadow_rejected_by_consequence_gate",
+          "tva_shadow_opposite_rate": 0.07874015748031496,
+          "tva_shadow_same_rate": 0.7007874015748031,
+          "tva_shadow_selected_gate_hits": 127
+        },
+        {
+          "confidence": 0.56,
+          "confidence_status": "confidence_active",
+          "effect_direction_consistent_rate": 0.682567890264897,
+          "effect_direction_harmful_rate": 0.317432109735103,
+          "effect_good_state_hit_rate": 0.39960968419903375,
+          "effect_high_episode_hit_rate": 0.9031716570679914,
+          "effect_selected_gate_hits": 72028,
+          "id": "unsupported_high_torque|omega_pos|vx_high|support_none|falling->prefer:hip_neg",
+          "present": true,
+          "shadow_confidence": 0.56,
+          "shadow_confidence_delta": 0.0,
+          "shadow_confidence_status": "confidence_active",
+          "shadow_update_reason": "insufficient_tva_effect_coverage",
+          "tva_shadow_opposite_rate": 0.652542372881356,
+          "tva_shadow_same_rate": 0.1440677966101695,
+          "tva_shadow_selected_gate_hits": 118
+        }
+      ],
+      "matched_state_rule_pairs": 7957,
+      "rule_effect_audit": "results/sd_retrospective_rule_induction/closed_loop/hopper_v8formal_300k_confidence_toerecovery_auditfix_seed123_20260514_r1/cycle_050/reports/rule_effect_audit.json",
+      "shadow_summary": {
+        "max_shadow_delta": 0.038745,
+        "mean_shadow_delta": 2.754140127388534e-05,
+        "median_shadow_delta": 0.0,
+        "min_shadow_delta": -0.041894,
+        "num_active": 62,
+        "num_consequence_kept_changed": 4,
+        "num_consequence_rejected_changed": 5,
+        "num_observing": 35,
+        "num_original_changed": 9,
+        "num_retired": 60,
+        "num_rules": 157,
+        "num_strengthened": 2,
+        "num_unchanged": 153,
+        "num_weakened": 2
+      },
+      "shadow_update": "results/sd_retrospective_rule_induction/reports/tva_validation_300k_oldscheme_20260515/hopper_tva_shadow_update_cycle_050_label_event1200_consequence_h5_gated.json",
+      "strengthened_effect_summary": {
+        "count": 2,
+        "mean_delta": 0.0385625,
+        "mean_effect_consistent_rate": 0.6614560607000943,
+        "mean_effect_good_state_hit_rate": 0.01725719009221107,
+        "mean_effect_harmful_rate": 0.3385439392999056,
+        "mean_effect_high_episode_hit_rate": 0.4626355919174908,
+        "mean_tva_opposite_rate": 0.055784861569723135,
+        "mean_tva_same_rate": 0.302736855473711
+      },
+      "top_strengthened": [
+        {
+          "confidence": 0.56,
+          "effect_direction_consistent_rate": 0.6734497558087909,
+          "effect_direction_harmful_rate": 0.3265502441912091,
+          "effect_good_state_hit_rate": 0.015835429924522717,
+          "effect_high_episode_hit_rate": 0.5697794879384342,
+          "effect_selected_gate_hits": 13514,
+          "id": "rotation_risk|omega_pos|vx_mid|support_none|falling->prefer:knee_pos",
+          "shadow_confidence": 0.598745,
+          "shadow_confidence_delta": 0.038745,
+          "shadow_update_reason": "tva_shadow_consistent_strengthened",
+          "source": "v4_substate",
+          "tva_shadow_opposite_rate": 0.05511811023622047,
+          "tva_shadow_same_rate": 0.30708661417322836,
+          "tva_shadow_selected_gate_hits": 127
+        },
+        {
+          "confidence": 0.56,
+          "effect_direction_consistent_rate": 0.6494623655913978,
+          "effect_direction_harmful_rate": 0.35053763440860214,
+          "effect_good_state_hit_rate": 0.01867895025989942,
+          "effect_high_episode_hit_rate": 0.35549169589654733,
+          "effect_selected_gate_hits": 20925,
+          "id": "unsupported_high_torque|omega_pos|vx_mid|support_none|falling->prefer:knee_pos",
+          "shadow_confidence": 0.59838,
+          "shadow_confidence_delta": 0.03838,
+          "shadow_update_reason": "tva_shadow_consistent_strengthened",
+          "source": "v4_substate",
+          "tva_shadow_opposite_rate": 0.056451612903225805,
+          "tva_shadow_same_rate": 0.29838709677419356,
+          "tva_shadow_selected_gate_hits": 124
+        }
+      ],
+      "top_weakened": [
+        {
+          "confidence": 0.041894,
+          "effect_direction_consistent_rate": 0.0,
+          "effect_direction_harmful_rate": 0.0,
+          "effect_good_state_hit_rate": 0.0,
+          "effect_high_episode_hit_rate": 0.0,
+          "effect_selected_gate_hits": 0,
+          "id": "rotation_risk|omega_pos|vx_high|support_none|falling->prefer:waist_neg",
+          "shadow_confidence": 0.0,
+          "shadow_confidence_delta": -0.041894,
+          "shadow_update_reason": "tva_shadow_soft_weakened",
+          "source": "v4_substate",
+          "tva_shadow_opposite_rate": 0.1044776119402985,
+          "tva_shadow_same_rate": 0.022388059701492536,
+          "tva_shadow_selected_gate_hits": 134
+        },
+        {
+          "confidence": 0.030907,
+          "effect_direction_consistent_rate": 0.0,
+          "effect_direction_harmful_rate": 0.0,
+          "effect_good_state_hit_rate": 0.0,
+          "effect_high_episode_hit_rate": 0.0,
+          "effect_selected_gate_hits": 0,
+          "id": "rotation_risk|omega_pos|vx_mid|support_none|falling->prefer:knee_neg",
+          "shadow_confidence": 0.0,
+          "shadow_confidence_delta": -0.030907,
+          "shadow_update_reason": "tva_shadow_harmful_weakened",
+          "source": "v4_substate",
+          "tva_shadow_opposite_rate": 0.30708661417322836,
+          "tva_shadow_same_rate": 0.05511811023622047,
+          "tva_shadow_selected_gate_hits": 127
+        }
+      ],
+      "unchanged_effect_summary": {
+        "count": 153,
+        "mean_delta": 0.0,
+        "mean_effect_consistent_rate": 0.4157834132538799,
+        "mean_effect_good_state_hit_rate": 0.07125090901283157,
+        "mean_effect_harmful_rate": 0.21166756713827695,
+        "mean_effect_high_episode_hit_rate": 0.27052715075091743,
+        "mean_tva_opposite_rate": 0.15184976721574445,
+        "mean_tva_same_rate": 0.16202064831976185
+      },
+      "weakened_effect_summary": {
+        "count": 2,
+        "mean_delta": -0.0364005,
+        "mean_effect_consistent_rate": 0.0,
+        "mean_effect_good_state_hit_rate": 0.0,
+        "mean_effect_harmful_rate": 0.0,
+        "mean_effect_high_episode_hit_rate": 0.0,
+        "mean_tva_opposite_rate": 0.20578211305676342,
+        "mean_tva_same_rate": 0.0387530849688565
+      }
+    },
+    {
+      "cycle": 60,
+      "key_rules": [
+        {
+          "confidence": 0.75,
+          "confidence_status": "confidence_active",
+          "effect_direction_consistent_rate": 0.6879546897124164,
+          "effect_direction_harmful_rate": 0.3120453102875836,
+          "effect_good_state_hit_rate": 0.5567816241611466,
+          "effect_high_episode_hit_rate": 0.6433116872548541,
+          "effect_selected_gate_hits": 184329,
+          "id": "toe_recovery_low_support->soft_prefer:waist_pos",
+          "present": true,
+          "shadow_confidence": 0.75,
+          "shadow_confidence_delta": 0.0,
+          "shadow_confidence_status": "confidence_active",
+          "shadow_update_reason": "insufficient_tva_effect_coverage",
+          "tva_shadow_opposite_rate": 0.17829457364341086,
+          "tva_shadow_same_rate": 0.06201550387596899,
+          "tva_shadow_selected_gate_hits": 129
+        },
+        {
+          "confidence": 1.0,
+          "confidence_status": "confidence_active",
+          "effect_direction_consistent_rate": 0.8211270882777235,
+          "effect_direction_harmful_rate": 0.1788729117222765,
+          "effect_good_state_hit_rate": 0.41163836622303807,
+          "effect_high_episode_hit_rate": 0.9337494263423589,
+          "effect_selected_gate_hits": 107445,
+          "id": "unsupported_high_torque|omega_pos|vx_high|support_none|falling->prefer:ankle_pos",
+          "present": true,
+          "shadow_confidence": 1.0,
+          "shadow_confidence_delta": 0.0,
+          "shadow_confidence_status": "confidence_active",
+          "shadow_update_reason": "insufficient_tva_effect_coverage",
+          "tva_shadow_opposite_rate": 0.35,
+          "tva_shadow_same_rate": 0.008333333333333333,
+          "tva_shadow_selected_gate_hits": 120
+        },
+        {
+          "confidence": 1.0,
+          "confidence_status": "confidence_active",
+          "effect_direction_consistent_rate": 0.8101886497414303,
+          "effect_direction_harmful_rate": 0.18981135025856966,
+          "effect_good_state_hit_rate": 0.3159129240151456,
+          "effect_high_episode_hit_rate": 0.9358769588187332,
+          "effect_selected_gate_hits": 89531,
+          "id": "rotation_risk|omega_pos|vx_high|support_none|falling->prefer:ankle_pos",
+          "present": true,
+          "shadow_confidence": 1.0,
+          "shadow_confidence_delta": 0.0,
+          "shadow_confidence_status": "confidence_active",
+          "shadow_update_reason": "insufficient_tva_effect_coverage",
+          "tva_shadow_opposite_rate": 0.3617021276595745,
+          "tva_shadow_same_rate": 0.0070921985815602835,
+          "tva_shadow_selected_gate_hits": 141
+        },
+        {
+          "confidence": 0.0,
+          "confidence_status": "confidence_retired",
+          "effect_direction_consistent_rate": 0.0,
+          "effect_direction_harmful_rate": 0.0,
+          "effect_good_state_hit_rate": 0.0,
+          "effect_high_episode_hit_rate": 0.0,
+          "effect_selected_gate_hits": 0,
+          "id": "rotation_risk|omega_pos|vx_mid|support_none|falling->prefer:hip_pos",
+          "present": true,
+          "shadow_confidence": 0.0,
+          "shadow_confidence_delta": 0.0,
+          "shadow_confidence_status": "confidence_retired",
+          "shadow_update_reason": "tva_shadow_rejected_by_consequence_gate",
+          "tva_shadow_opposite_rate": 0.0410958904109589,
+          "tva_shadow_same_rate": 0.7397260273972602,
+          "tva_shadow_selected_gate_hits": 146
+        },
+        {
+          "confidence": 0.56,
+          "confidence_status": "confidence_active",
+          "effect_direction_consistent_rate": 0.6755921634324538,
+          "effect_direction_harmful_rate": 0.3244078365675462,
+          "effect_good_state_hit_rate": 0.41163836622303807,
+          "effect_high_episode_hit_rate": 0.9337494263423589,
+          "effect_selected_gate_hits": 107445,
+          "id": "unsupported_high_torque|omega_pos|vx_high|support_none|falling->prefer:hip_neg",
+          "present": true,
+          "shadow_confidence": 0.56,
+          "shadow_confidence_delta": 0.0,
+          "shadow_confidence_status": "confidence_active",
+          "shadow_update_reason": "insufficient_tva_effect_coverage",
+          "tva_shadow_opposite_rate": 0.6833333333333333,
+          "tva_shadow_same_rate": 0.125,
+          "tva_shadow_selected_gate_hits": 120
+        }
+      ],
+      "matched_state_rule_pairs": 8525,
+      "rule_effect_audit": "results/sd_retrospective_rule_induction/closed_loop/hopper_v8formal_300k_confidence_toerecovery_auditfix_seed123_20260514_r1/cycle_060/reports/rule_effect_audit.json",
+      "shadow_summary": {
+        "max_shadow_delta": 0.137643,
+        "mean_shadow_delta": 0.0005806833333333333,
+        "median_shadow_delta": 0.0,
+        "min_shadow_delta": -0.03423,
+        "num_active": 76,
+        "num_consequence_kept_changed": 4,
+        "num_consequence_rejected_changed": 7,
+        "num_observing": 29,
+        "num_original_changed": 11,
+        "num_retired": 75,
+        "num_rules": 180,
+        "num_strengthened": 2,
+        "num_unchanged": 176,
+        "num_weakened": 2
+      },
+      "shadow_update": "results/sd_retrospective_rule_induction/reports/tva_validation_300k_oldscheme_20260515/hopper_tva_shadow_update_cycle_060_label_event1200_consequence_h5_gated.json",
+      "strengthened_effect_summary": {
+        "count": 2,
+        "mean_delta": 0.08200249999999999,
+        "mean_effect_consistent_rate": 0.34236043375982556,
+        "mean_effect_good_state_hit_rate": 0.008548970107292444,
+        "mean_effect_harmful_rate": 0.15763956624017442,
+        "mean_effect_high_episode_hit_rate": 0.3326065752481496,
+        "mean_tva_opposite_rate": 0.11690620555430796,
+        "mean_tva_same_rate": 0.43676547645781866
+      },
+      "top_strengthened": [
+        {
+          "confidence": 0.0,
+          "effect_direction_consistent_rate": 0.0,
+          "effect_direction_harmful_rate": 0.0,
+          "effect_good_state_hit_rate": 0.0,
+          "effect_high_episode_hit_rate": 0.0,
+          "effect_selected_gate_hits": 0,
+          "id": "transition|transition_gap|omega_pos|vx_high|support_none|phase_any|rotation_risk->soft_prefer:hip_pos",
+          "shadow_confidence": 0.137643,
+          "shadow_confidence_delta": 0.137643,
+          "shadow_update_reason": "tva_shadow_consistent_strengthened",
+          "source": "v8_transition_replay_safety",
+          "tva_shadow_opposite_rate": 0.15846994535519127,
+          "tva_shadow_same_rate": 0.6612021857923497,
+          "tva_shadow_selected_gate_hits": 183
+        },
+        {
+          "confidence": 0.56,
+          "effect_direction_consistent_rate": 0.6847208675196511,
+          "effect_direction_harmful_rate": 0.31527913248034883,
+          "effect_good_state_hit_rate": 0.017097940214584887,
+          "effect_high_episode_hit_rate": 0.6652131504962993,
+          "effect_selected_gate_hits": 17429,
+          "id": "rotation_risk|omega_pos|vx_mid|support_none|falling->prefer:knee_pos",
+          "shadow_confidence": 0.586362,
+          "shadow_confidence_delta": 0.026362,
+          "shadow_update_reason": "tva_shadow_consistent_strengthened",
+          "source": "v4_substate",
+          "tva_shadow_opposite_rate": 0.07534246575342465,
+          "tva_shadow_same_rate": 0.21232876712328766,
+          "tva_shadow_selected_gate_hits": 146
+        }
+      ],
+      "top_weakened": [
+        {
+          "confidence": 0.03423,
+          "effect_direction_consistent_rate": 0.0,
+          "effect_direction_harmful_rate": 0.0,
+          "effect_good_state_hit_rate": 0.0,
+          "effect_high_episode_hit_rate": 0.0,
+          "effect_selected_gate_hits": 0,
+          "id": "rotation_risk|omega_pos|vx_high|support_none|falling->prefer:waist_neg",
+          "shadow_confidence": 0.0,
+          "shadow_confidence_delta": -0.03423,
+          "shadow_update_reason": "tva_shadow_harmful_weakened",
+          "source": "v4_substate",
+          "tva_shadow_opposite_rate": 0.2127659574468085,
+          "tva_shadow_same_rate": 0.0425531914893617,
+          "tva_shadow_selected_gate_hits": 141
+        },
+        {
+          "confidence": 0.025252,
+          "effect_direction_consistent_rate": 0.0,
+          "effect_direction_harmful_rate": 0.0,
+          "effect_good_state_hit_rate": 0.0,
+          "effect_high_episode_hit_rate": 0.0,
+          "effect_selected_gate_hits": 0,
+          "id": "rotation_risk|omega_pos|vx_mid|support_none|falling->prefer:knee_neg",
+          "shadow_confidence": 0.0,
+          "shadow_confidence_delta": -0.025252,
+          "shadow_update_reason": "tva_shadow_harmful_weakened",
+          "source": "v4_substate",
+          "tva_shadow_opposite_rate": 0.21232876712328766,
+          "tva_shadow_same_rate": 0.07534246575342465,
+          "tva_shadow_selected_gate_hits": 146
+        }
+      ],
+      "unchanged_effect_summary": {
+        "count": 176,
+        "mean_delta": 0.0,
+        "mean_effect_consistent_rate": 0.4120801937340395,
+        "mean_effect_good_state_hit_rate": 0.07964931731174436,
+        "mean_effect_harmful_rate": 0.18451071535686964,
+        "mean_effect_high_episode_hit_rate": 0.2952220862740918,
+        "mean_tva_opposite_rate": 0.1598304641759587,
+        "mean_tva_same_rate": 0.17692604675172605
+      },
+      "weakened_effect_summary": {
+        "count": 2,
+        "mean_delta": -0.029740999999999997,
+        "mean_effect_consistent_rate": 0.0,
+        "mean_effect_good_state_hit_rate": 0.0,
+        "mean_effect_harmful_rate": 0.0,
+        "mean_effect_high_episode_hit_rate": 0.0,
+        "mean_tva_opposite_rate": 0.21254736228504809,
+        "mean_tva_same_rate": 0.05894782862139318
+      }
+    }
+  ],
+  "cycles_requested": [
+    41,
+    50,
+    60
+  ],
+  "persistent_changes": {
+    "strengthened": [
+      {
+        "cycles": [
+          50,
+          60
+        ],
+        "id": "rotation_risk|omega_pos|vx_mid|support_none|falling->prefer:knee_pos",
+        "mean_delta": 0.0325535
+      }
+    ],
+    "weakened": [
+      {
+        "cycles": [
+          50,
+          60
+        ],
+        "id": "rotation_risk|omega_pos|vx_high|support_none|falling->prefer:waist_neg",
+        "mean_delta": -0.038062
+      },
+      {
+        "cycles": [
+          50,
+          60
+        ],
+        "id": "rotation_risk|omega_pos|vx_mid|support_none|falling->prefer:knee_neg",
+        "mean_delta": -0.0280795
+      }
+    ]
+  },
+  "run_root": "results/sd_retrospective_rule_induction/closed_loop/hopper_v8formal_300k_confidence_toerecovery_auditfix_seed123_20260514_r1",
+  "shadow_dir": "results/sd_retrospective_rule_induction/reports/tva_validation_300k_oldscheme_20260515"
+}

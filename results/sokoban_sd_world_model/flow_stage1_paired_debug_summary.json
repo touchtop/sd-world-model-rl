@@ -1,0 +1,293 @@
+{
+  "material_passport": {
+    "origin_skill": "experiment-agent",
+    "origin_mode": "validate",
+    "verification_status": "ANALYZED",
+    "version_label": "sokoban_flow_baseline_rerun_summary_v1"
+  },
+  "group_name": "stage1_paired_debug",
+  "scope": {
+    "experiment_type": "frozen_minimal_baseline_retest",
+    "sd_mcts_enabled": false,
+    "transition_labels_from": "exact_single_push_diagnostic_provider",
+    "learned_component": "nonnegative_flow_model"
+  },
+  "groups": {
+    "stage1_paired_debug": {
+      "files": [
+        "results/sokoban_sd_world_model/flow_stage1_paired_debug_3_levelsplit_seed0.json"
+      ],
+      "seeds": [
+        0
+      ],
+      "config_digest": {
+        "model_kind": "base",
+        "flow_parameterization": "paired_net",
+        "feature_mode": "stock_action",
+        "stock_loss_preset": "uniform",
+        "rollout_loss_weight": 1.0,
+        "rollout_depth": 2,
+        "split_mode": "level",
+        "baseline_id": "sokoban_six_stock_nonnegative_flow_rollout_sup_base_v1",
+        "is_frozen_minimal_baseline": false
+      },
+      "metrics": {
+        "valid_stock_mae": {
+          "values": [
+            0.1676522046327591
+          ],
+          "mean": 0.1676522046327591,
+          "std": 0.0
+        },
+        "valid_flow_mae": {
+          "values": [
+            0.08938027173280716
+          ],
+          "mean": 0.08938027173280716,
+          "std": 0.0
+        },
+        "valid_zero_flow_stock_mae": {
+          "values": [
+            0.1304963231086731
+          ],
+          "mean": 0.1304963231086731,
+          "std": 0.0
+        },
+        "valid_rollout_stock_mae_mean": {
+          "values": [
+            0.18152820318937302
+          ],
+          "mean": 0.18152820318937302,
+          "std": 0.0
+        },
+        "valid_rollout_zero_flow_stock_mae_mean": {
+          "values": [
+            0.13554410636425018
+          ],
+          "mean": 0.13554410636425018,
+          "std": 0.0
+        },
+        "valid_rollout_improvement_over_zero_flow_mean": {
+          "values": [
+            -0.3392555977428404
+          ],
+          "mean": -0.3392555977428404,
+          "std": 0.0
+        },
+        "valid_rollout_step1_stock_mae": {
+          "values": [
+            0.15144287049770355
+          ],
+          "mean": 0.15144287049770355,
+          "std": 0.0
+        },
+        "valid_rollout_step2_stock_mae": {
+          "values": [
+            0.21161353588104248
+          ],
+          "mean": 0.21161353588104248,
+          "std": 0.0
+        },
+        "valid_rollout_step1_flow_mae": {
+          "values": [
+            0.08592399954795837
+          ],
+          "mean": 0.08592399954795837,
+          "std": 0.0
+        },
+        "valid_rollout_step2_flow_mae": {
+          "values": [
+            0.08421683311462402
+          ],
+          "mean": 0.08421683311462402,
+          "std": 0.0
+        },
+        "valid_clip_any_stock_fraction": {
+          "values": [
+            0.8235294222831726
+          ],
+          "mean": 0.8235294222831726,
+          "std": 0.0
+        },
+        "valid_clip_mean_abs_correction": {
+          "values": [
+            0.03291073814034462
+          ],
+          "mean": 0.03291073814034462,
+          "std": 0.0
+        },
+        "valid_alias_stock_max_next_delta_variance": {
+          "values": [
+            0.404402494430542
+          ],
+          "mean": 0.404402494430542,
+          "std": 0.0
+        },
+        "valid_alias_stock_action_max_next_delta_variance": {
+          "values": [
+            0.0
+          ],
+          "mean": 0.0,
+          "std": 0.0
+        },
+        "valid_flow_pair_pred_coactivation_mean": {
+          "values": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "mean": 0.0,
+          "std": 0.0
+        },
+        "valid_flow_pair_pred_coactivation_max": {
+          "values": [
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "mean": 0.0,
+          "std": 0.0
+        }
+      },
+      "per_stock_step2": {
+        "valid_rollout_step2_goal_completion_mae": {
+          "values": [
+            0.13116851449012756
+          ],
+          "mean": 0.13116851449012756,
+          "std": 0.0
+        },
+        "valid_rollout_step2_unresolved_box_pressure_mae": {
+          "values": [
+            0.21822848916053772
+          ],
+          "mean": 0.21822848916053772,
+          "std": 0.0
+        },
+        "valid_rollout_step2_mobility_mae": {
+          "values": [
+            0.07500000298023224
+          ],
+          "mean": 0.07500000298023224,
+          "std": 0.0
+        },
+        "valid_rollout_step2_reachable_capacity_mae": {
+          "values": [
+            0.2546283006668091
+          ],
+          "mean": 0.2546283006668091,
+          "std": 0.0
+        },
+        "valid_rollout_step2_congestion_mae": {
+          "values": [
+            0.25123268365859985
+          ],
+          "mean": 0.25123268365859985,
+          "std": 0.0
+        },
+        "valid_rollout_step2_irreversibility_risk_mae": {
+          "values": [
+            0.339423269033432
+          ],
+          "mean": 0.339423269033432,
+          "std": 0.0
+        }
+      },
+      "per_stock_one_step": {
+        "valid_goal_completion_mae": {
+          "values": [
+            0.08711318671703339
+          ],
+          "mean": 0.08711318671703339,
+          "std": 0.0
+        },
+        "valid_unresolved_box_pressure_mae": {
+          "values": [
+            0.20035257935523987
+          ],
+          "mean": 0.20035257935523987,
+          "std": 0.0
+        },
+        "valid_mobility_mae": {
+          "values": [
+            0.09401920437812805
+          ],
+          "mean": 0.09401920437812805,
+          "std": 0.0
+        },
+        "valid_reachable_capacity_mae": {
+          "values": [
+            0.17510290443897247
+          ],
+          "mean": 0.17510290443897247,
+          "std": 0.0
+        },
+        "valid_congestion_mae": {
+          "values": [
+            0.19471195340156555
+          ],
+          "mean": 0.19471195340156555,
+          "std": 0.0
+        },
+        "valid_irreversibility_risk_mae": {
+          "values": [
+            0.25461336970329285
+          ],
+          "mean": 0.25461336970329285,
+          "std": 0.0
+        }
+      },
+      "flow_pair_pred_coactivation": {
+        "goal_fill_flow__goal_unfill_flow": {
+          "values": [
+            0.0
+          ],
+          "mean": 0.0,
+          "std": 0.0
+        },
+        "assignment_relief_flow__assignment_worsening_flow": {
+          "values": [
+            0.0
+          ],
+          "mean": 0.0,
+          "std": 0.0
+        },
+        "mobility_loss_flow__mobility_recovery_flow": {
+          "values": [
+            0.0
+          ],
+          "mean": 0.0,
+          "std": 0.0
+        },
+        "reachability_loss_flow__reachability_recovery_flow": {
+          "values": [
+            0.0
+          ],
+          "mean": 0.0,
+          "std": 0.0
+        },
+        "congestion_generation_flow__congestion_release_flow": {
+          "values": [
+            0.0
+          ],
+          "mean": 0.0,
+          "std": 0.0
+        },
+        "risk_accumulation_flow__risk_relief_flow": {
+          "values": [
+            0.0
+          ],
+          "mean": 0.0,
+          "std": 0.0
+        }
+      }
+    }
+  },
+  "reproducibility_comparison": null
+}

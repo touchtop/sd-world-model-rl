@@ -1,0 +1,51 @@
+{
+  "checkpoint": "results/sd_retrospective_rule_induction/closed_loop/hopper_v8formal_500k_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume300k_20260603_r1/cycle_081/sd_explainers/sd_explainer_cycle_081.pt",
+  "epochs": 3,
+  "history_tail": [
+    {
+      "best_val_loss": 1.1599010229110718,
+      "epoch": 1.0,
+      "train_loss": 1.1138773741347066,
+      "val_loss": 1.1599010229110718
+    },
+    {
+      "best_val_loss": 1.159420132637024,
+      "epoch": 2.0,
+      "train_loss": 1.1158516206098406,
+      "val_loss": 1.159420132637024
+    },
+    {
+      "best_val_loss": 1.1590328216552734,
+      "epoch": 3.0,
+      "train_loss": 1.1153680394204815,
+      "val_loss": 1.1590328216552734
+    }
+  ],
+  "init_checkpoint": "results/sd_retrospective_rule_induction/closed_loop/hopper_v8formal_500k_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume300k_20260603_r1/cycle_080/sd_explainers/sd_explainer_cycle_080.pt",
+  "init_loaded_tensors": 30,
+  "metrics": {
+    "body_contact_z_mae": 0.025399019941687584,
+    "full_foot_support_mae": 0.3079186677932739,
+    "height_mae": 0.010886963456869125,
+    "one_step_struct_rmse": 2.400930166244507,
+    "pitch_mae": 0.08562883734703064,
+    "pitch_rate_mae": 3.3647050857543945,
+    "rollout_10_rmse": 2.985288209281862,
+    "rollout_1_rmse": 1.6566760251298547,
+    "rollout_20_rmse": 2.9216508539393544,
+    "rollout_3_rmse": 2.755130384815857,
+    "rollout_5_rmse": 3.1381508307531476,
+    "support_contact_mae": 0.36915579438209534,
+    "vx_mae": 0.22071602940559387,
+    "vz_mae": 0.4449010491371155
+  },
+  "model_config": {
+    "transition_residual_scale": 1.0,
+    "use_transition_residual": true
+  },
+  "num_transitions": 50000,
+  "seed": 20260588,
+  "selection": "results/sd_retrospective_rule_induction/closed_loop/hopper_v8formal_500k_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_resume300k_20260603_r1/cycle_081/manifests/selected_trajectories.json",
+  "train_size": 45409,
+  "val_size": 4591
+}

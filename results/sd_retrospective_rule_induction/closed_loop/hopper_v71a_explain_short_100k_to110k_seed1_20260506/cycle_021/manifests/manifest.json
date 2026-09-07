@@ -1,0 +1,33 @@
+{
+  "created_at_utc": "2026-05-06T09:47:06.358795+00:00",
+  "repo_root": "/home/data/round/code/sd_world_model_rl",
+  "log_root": "logs/hopper-hop",
+  "run_globs": [
+    "tdmpc2_v71a_explain_short_5k_seed1_20260506_cycle019_target95018",
+    "tdmpc2_v71a_explain_short_5k_seed1_20260506_cycle020_target100019",
+    "tdmpc2_v71a_explain_short_5k_seed1_20260506_cycle021_target105020"
+  ],
+  "write_policy": "results_only",
+  "runs": [
+    {
+      "seed": 1,
+      "run_name": "tdmpc2_v71a_explain_short_5k_seed1_20260506_cycle021_target105020",
+      "run_dir": "logs/hopper-hop/1/tdmpc2_v71a_explain_short_5k_seed1_20260506_cycle021_target105020",
+      "eval_csv": "logs/hopper-hop/1/tdmpc2_v71a_explain_short_5k_seed1_20260506_cycle021_target105020/eval.csv",
+      "eval_full_csv": "logs/hopper-hop/1/tdmpc2_v71a_explain_short_5k_seed1_20260506_cycle021_target105020/eval_full.csv",
+      "train_csv": "logs/hopper-hop/1/tdmpc2_v71a_explain_short_5k_seed1_20260506_cycle021_target105020/train.csv",
+      "eval_rows": [
+        {
+          "step": 105020,
+          "episode_reward": 0.0
+        }
+      ],
+      "official_eval_summaries": [
+        {
+          "step_dir": "step_0105020",
+          "summary_csv": "logs/hopper-hop/1/tdmpc2_v71a_explain_short_5k_seed1_20260506_cycle021_target105020/official_eval/step_0105020/eval_episode_summary.csv"
+        }
+      ]
+    }
+  ]
+}

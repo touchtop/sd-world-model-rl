@@ -1,0 +1,605 @@
+Proceedings of the Twenty-Sixth International Conference on
+Automated Planning and Scheduling (ICAPS 2016)
+
+Traps, Invariants, and Dead-Ends
+Nir Lipovetzky
+
+Christian Muise
+
+Hector Geffner
+
+University of Melbourne
+Melbourne, Australia
+@unimelb.edu.au∗
+
+MIT CSAIL
+Massachusetts, USA
+cjmuise@mit.edu
+
+ICREA & Universitat Pompeu Fabra
+Barcelona, SPAIN
+hector.geffner@upf.edu
+
+The situation is different for invariants (Rintanen 2000;
+Gerevini and Schubert 2001). Invariants are formulas that
+are true in all reachable states, and they are usually computed at preprocessing. Two types of invariants that are commonly used are mutex constraints (Blum and Furst 1997),
+i.e., invariants of the form ¬(p1 ∧ p2 ) for atoms p1 and p2 ,
+and disjunctive constraints (Helmert 2006), i.e., invariants of
+the form p1 ∨p2 ∨· · ·∨pn . Together such invariants yield the
+multivalued variables that are extracted from boolean problem representations (Helmert 2006).
+In this paper, we establish a relation between invariants
+and dead-ends, and develop a preprocessing algorithm for
+computing them both. The key concept in our analysis will
+be the notion of traps. Syntactically, traps are formulas that
+stand for conditional invariants; namely, once a state is
+reached that satisﬁes a trap formula, all the states that can
+be reached from that state will satisfy the formula as well.
+A standard invariant is thus a trap that is true in the initial
+state, while a trap that is mutually exclusive with the goal
+denotes a dead-end formula; a formula that is true in deadend states only. As a result, the proposed algorithm for computing traps is also an algorithm for computing invariants
+and dead-ends. We propose an algorithm that computes traps
+in k-DNF form: trap formulas in disjunctive normal form
+whose terms have at most k atoms. The algorithm is simple
+and clean, operates as a preprocessing step, and runs in time
+that is exponential in the k parameter. We report also preliminary experimental tests that illustrate its effectiveness for
+identifying dead-end states, and compare it with the identiﬁcation that follows from the use of the h1 and h2 heuristics
+that cannot be preprocessed, and must be computed at run
+time.
+
+Abstract
+We consider the problem of deriving formulas that capture
+traps, invariants, and dead-ends in classical planning through
+polynomial forms of preprocessing. An invariant is a formula
+that is true in the initial state and in all reachable states. A trap
+is a conditional invariant: once a state is reached that makes
+the trap true, all the states that are reachable from it will satisfy the trap formula as well. Finally, dead-ends are formulas
+that are satisﬁed in states that make the goal unreachable. We
+introduce a preprocessing algorithm that computes traps in kDNF form that is exponential in the k parameter, and show
+how the algorithm can be used to precompute invariants and
+dead-ends. We report also preliminary tests that illustrate the
+effectiveness of the preprocessing algorithm for identifying
+dead-end states, and compare it with the identiﬁcation that
+follows from the use of the h1 and h2 heuristics that cannot
+be preprocessed, and must be computed at run time.
+
+1
+
+Introduction
+
+The detection of dead-ends, states from which the goal
+is not reachable, is a crucial ability in many forms of
+planning, including classical, non-deterministic, and probabilistic planning (Hoffmann 2011; Junghanns and Schaeffer 1998; Kolobov et al. 2011; Muise, McIlraith, and Beck
+2012). Indeed, a plan or policy that must reach the goal with
+certainty must deﬁnitely avoid reaching dead-end states. In
+spite of the importance of dead-ends in planning, however,
+there has not been much work in the area. State-of-the-art
+classical planners do not feature speciﬁc mechanisms for
+detecting dead-ends, and recognize dead-ends implicitly, in
+the delete relaxation only, when heuristic estimators based
+on the delete relaxation yield inﬁnite values. Heuristics that
+are not based on the delete relaxation, like the hm heuristics (Haslum and Geffner 2000) and variations for m > 1,
+can detect a larger class of dead-ends, but these heuristics
+are expensive and cannot be computed at run time for every
+new node in the (forward) search, and thus such heuristics
+have been used mainly for detecting unsolvability, that is,
+when the initial problem state is a dead-end (Helmert 2006;
+Lipovetzky and Geffner 2011; Bäckström, Jonsson, and
+Ståhlberg 2013; Hoffmann, Kissmann, and Torralba 2014).
+
+2
+
+Logic
+
+The above notions are all simple, but it is worth making them
+explicit before presenting the algorithm. We assume a classical planning problem P where states provide an interpretation to the formulas in that language. A state s is reachable
+from another state s (in the problem P ) if there is an action sequence (possibly empty) that maps s into s . A state
+is reachable if it is reachable from the initial state s0 of P .
+
+∗
+
+ﬁrstname.lastname
+c 2016, Association for the Advancement of Artiﬁcial
+Copyright 
+Intelligence (www.aaai.org). All rights reserved.
+
+Deﬁnition 1 (Invariant) An invariant is a formula that is
+true in all reachable states.
+
+211
+
+Deﬁnition 2 (Dead-end) A dead-end formula is a formula
+that is true only in states from which no goal states are
+reachable.
+Deﬁnition 3 (Trap) A trap is a formula such that if a state
+s satisﬁes the formula, all states reachable from s satisfy the
+formula as well.
+
+(a)
+
+The notion of a trap generalizes the notion of invariant,
+and connects it with dead-end formulas:
+
+Figure 1: The left sub-Figure illustrates a Sokoban instance
+where block B1 has to be pushed towards the goal location G. If the block is pushed towards any of the grey locations the problem becomes unsolvable. In the right Subﬁgure blocks B1 and B2 need to be pushed towards the goal
+positions G. The player can be located in any grey location.
+
+Theorem 4 (Invariant Trap) A formula is an invariant if
+and only if it is a trap that is true in the initial state.
+Theorem 5 (Dead-end Trap) If the terms ti in a DNF trap
+t1 ∨t2 ∨· · ·∨tn are mutually exclusive with the (conjunctive)
+goal, then the trap is a dead-end formula.
+
+• Terminate when no more nodes can be marked.
+
+Recall that two atoms p1 and p2 are said to be mutually
+exclusive (mutex) when ¬(p1 ∨ p2 ) is an invariant, and there
+are effective algorithms for computing such mutexes.
+These simple theorems indicate how the computation of
+traps can be used for deriving invariants and dead-end formulas. For obtaining dead-end formulas, we compute DNF
+traps whose terms are mutex with the goal. For obtaining
+invariants, select the traps that are true in the initial state.
+Furthermore, if a trap is both an invariant and a dead-end
+formula, it means that the problem is not solvable.
+
+3
+
+(b)
+
+If non-empty, the set of unmarked nodes represents a trap:
+Theorem 6 (Computation of Traps) Let T stand for the kDNF formula whose terms are the tuples Bi associated with
+the nodes that have not been marked at the end of the above
+process. Then T is a trap.
+Proof. If all nodes are marked, T is empty (i.e., false), and
+is trivially a trap as no states satisﬁes it. Otherwise, we show
+that the following conditional invariant must hold: if a state
+entails a disjunct Bi ∈ T , then for any action a applicable
+in s, the progression s of s through a entails some Bj ∈
+T . Indeed, Bi is not marked as Bi ∈ T , from the marking
+procedure, there must be an a-child of Bi , call it Bk , that
+is not marked either and belongs to T as well. But if Bk is
+an a-child of Bi , from the deﬁnition of a-children (cf. step
+3) and the fact that action a must be applicable in Bi if it is
+applicable in s (cf. step 2), it follows that Bk must hold in
+s . This means that the conditional invariant holds for j = k
+and hence that T is a trap. 
+The application of this result to the computation of invariants and dead-end traps is direct, from the discussion above.
+In the experiments below we focus on the computation of
+dead-end formulas only:
+
+Algorithm
+
+The algorithm for computing traps in k-DNF is conceptually simple and runs in time that is exponential in the parameter k. We call it Trapper. Trapper builds a graph whose
+nodes are the tuples Bi of at most k atoms in the problem,
+along with a dummy node D. For computing dead-end formulas, the only tuples Bi considered are the ones that are
+mutex with the goal. Otherwise, neither the goal or the initial state of the problem play a role in the construction of the
+graph that follows exclusively from the action descriptions.
+We assume STRIPS actions a for simplicity with precondition, add, and delete lists P re(a), Add(a), Del(a). The
+k-trap graph, or simply trap graph, is constructed as:
+1. Initialize the k-trap graph whose nodes are the tuples Bi
+of at most k atoms not mutex with one another, along with
+the dummy node D. For computing dead-end formulas,
+the only tuples considered are those mutex with the goal.
+2. Consider action a applicable in node Bi if P re(a) is not
+mutex with Bi
+3. For an action action a applicable in Bi deﬁne the achildren of Bi as the nodes Bj such that Bj is contained
+in the progression of Bi through the action a deﬁned as
+Bj ⊆ ((Bi ∪ P re(a)) \ Del(a)) ∪ Add(a).
+4. For an action a applicable in Bi , if the set of a-children of
+Bi is empty, set D as the only a-child of Bi .
+
+Theorem 7 (Computation of Dead-end Traps) Let the tuples Bi in the k-trap graph be restricted to those that are
+mutex with the goal, and let T be as in Theorem 6. Then T
+is a dead-end trap.
+In problems where there is an atom representing the negation of each ﬂuent, the algorithm will be complete when k is
+set to the number of ﬂuents.
+
+4
+
+Example
+
+We illustrate the traps derived in the Sokoban domain.
+Sokoban consists of a player pushing each block towards
+a goal location. Given that blocks can only be pushed, not
+pulled back, it is easy to fall into dead-ends.
+Consider the example of Figure 1a, where a single block
+is located in the middle (2,2) of a 3x3 grid. The goal is to
+push the block up into location (1,2) from location (2,2), but
+if the player pushes the block towards any other location, the
+problem becomes unsolvable. To capture all the dead-end
+
+Once the trap graph is built, its nodes are marked starting
+with the dummy node D after the following propagation:
+• Mark the dummy node D.
+• Mark node Bi if there is an action a applicable in Bi such
+that all the a-children of Bi are marked.
+
+212
+
+plicable action a. A partial trap graph is shown in Figure
+2. Let’s consider the Bi = {(at player 1, 2)} (at goal location). The applicable actions are move down,right or left
+and push-down block. The progression through move-down
+is entailed by only one Bj , namely {(clear 1, 2)}. Therefore a hyper-edge from {(at player 1, 2)} to {(clear 1, 2)}
+will be added. A hyper-edge towards {(clear 1, 2)}
+is added as well through the progression of action
+move-right and move-left. Consider now the progression
+through action push-down. The resulting partial state is
+{(at block 3, 2), (at player 2, 2), (clear 1, 2)}. This partial state is entailed by two Bj ’s, {(clear 1, 2)} and
+{(at block 3, 2)}, so a hyper-edge from {(at player 1, 2)}
+to {(clear 1, 2)} and {(at block 3, 2)} will be added
+to the graph. The only two Bi ’s that have an edge to
+the Dummy node among other edges to other Bj are
+{(at block 2, 2)} and {(clear 1, 2)}. The progression
+through action push-up block of both Bi ’s result in partial
+state {(at block 1, 2), (at player 2, 2), (clear 2, 3)}, which
+is not entailed by any other Bj , as all the single ﬂuents
+are not mutex with the goal. The other edges relevant to
+the propagation phase are the ones from {(clear 1, 2)} to
+{(at player 1, 2)}. These edges result from the other applicable actions on {(clear 1, 2)}, besides push-up block leading to dummy. These actions are move down, right or left
+towards {(clear 1, 2)}.
+Once the k-Graph is fully generated, the propagation
+starts marking the Dummy node, and then marking nodes
+that have a hyper-edge with all its children marked. This
+process is performed until a ﬁx point. Figure 2 shows
+the relevant hyper-edges from the graph that propagate the
+mark and the resulting Bi that end-up marked. The tuples
+{(at block 2, 2)} and {(clear 1, 2)} are marked as they
+have a hyper-edge to the dummy node. The next Bi marked
+is {(at player 1, 2)} as either of the hyper-edges from action move down,right or left have all their children marked,
+namely {(clear 1, 2)}. No other node is marked. The ﬁnal
+trap in k − DN F will be made by the remaining unmarked
+Bi , i.e. ∨x∈P os\{(1,2),(2,2)} {(at block x)}.
+
+Figure 2: Partial k-trap graph of instance shown in Figure
+1a. Dashed-edges propagate the mark from Dummy. The
+Bi in blue are marked at the end of the propagation.
+states we just need to consider Bi tuples of size 1 and derive
+the 1-trap ∨x∈P os\{(1,2),(2,2)} {(at block x)}, where P os is
+the set of locations in the grid. This example shows how in
+preprocessing our approach can detect the same dead-end
+states that h1 and h2 would detect if they are computed at
+every state in the search. To illustrate how we can capture
+dead-end states that are not detected by either h1 or h2 ,
+consider the example in Figure 1b. In this example a large
+narrow passage connects the bottom area of the main grid
+with its top area. Two blocks are considered; one located
+initially at the entrance and the other at the exit of the passage. The goal is to move these blocks into the middle-right
+area of the main grid. If the player is initially located at
+any location of the grid, marked in grey in the Figure, the
+problem becomes unsolvable. The solvable instances need
+to place the player in the passage between the blocks. h1
+and h2 would not detect any of the unsolvable instances,
+as the entrance and exit positions become free in their
+relaxation once the blocks are pushed. In order to capture
+all the unsolvable instances we need the 3-DNF formula
+{∨x∈Grid; y1 ,y2 ∈P sg; y1 =y2 {(atp x), (ats1 y1 ), (ats2 y2 )} }
+where P sg stands for the passage and Grid for
+the main area. Note that the 2-DNF formula
+}
+would
+{∨y1 ,y2 ∈P sg; adj(y1 ,y2 ) {(ats1 y1 ), (ats2 y2 )}
+capture only the dead-ends when the two blocks are in
+adjacent positions within the passage. These dead-ends
+would be captured by h2 , but not by h1 .
+We are going to show how we derive the 1-DNF formulae for the ﬁrst example by ﬁrst identifying the set of
+Bi ’s of size 1 that are mutex with the goal (Theorem 5).
+We will then build the k-graph and perform the propagation
+from the Dummy node to ﬁnally identify the Bi ’s that have
+not been marked as part of the trap. The set of Bi mutex
+with the block being at position (1,2) (i.e., the goal location) are (at block x) for every position that is not (1,2),
+(at player 1, 2) as the player cannot be in the goal location
+at the same time as the block, and (clear1, 2) as it states that
+no block is located at the goal position.
+The k-Graph will contain the aforementioned set of Bi
+and hyperedges connecting each Bi to a set of Bj ’s, labeled
+by a, if the Bj ’s are the a-children of Bi in the k-Graph.
+That is, we now have to add a hyper-edge from each Bi to
+each Bj entailed by the progression of Bi through every ap-
+
+5
+
+Preliminary Evaluation
+
+We evaluated the algorithm for deriving traps over a subset of benchmarks known to contain dead-ends. All algorithms are implemented using the LAPKT toolkit (Ramirez,
+Lipovetzky, and Muise 2015). In theses experiments we consider only 1-DNF and 2-DNF formulas, named 1-traps and
+2-traps respectively. Processes are limited to 1h of running
+time (including trap construction) and 2GB of RAM, and
+all experiments were conducted on a Linux desktop with
+2.5GHz Intel Processors. We derive mutex ﬂuents computing h2 once from the initial state. Averages per domain
+are computed among commonly solved instances by all approaches that solve at least 1 problem. The ﬁrst experiment,
+summarized in Table 1, aims to assess empirically the power
+of the k-DNF formulae for detecting dead-ends. We expand
+the same 10,000 states in a Breadth-First search (BRFS) for
+all methods and compare the number of dead-ends captured
+by the traps, derived in preprocessing, with respect to the
+number of dead-ends captured by h1 and h2 computed at ev-
+
+213
+
+h1
+1-trap
+h2
+2-trap
+Prn
+Prn
+Prn
+Prn
+T
+T
+T
+T
+640 0.8
+665
+Airport (50)
+1.6
+195 152.9
+683 481.7
+Floortile-sat14 (20)
+7278 0.9
+4.7
+6295 177.5 7777
+27.5 9549
+921 1.1
+8.9
+2399 720.3 3378 236.9 2526
+Mystery (30)
+Parc-sat11 (20)
+5874 1.3
+6.4
+8695 1362.9 8154 233.52 9155
+461 0.4
+0
+0.9
+0
+42.5 1155
+7.3
+Pegsol-sat11 (20)
+2681 0.9
+Sokoban-sat11 (20)
+3.9
+2472 589.6 2776 168.5 2683
+Trucks (30)
+13.3 18663 0.8 18650 346.3 18688
+3.9 18663
+Wood-sat11 (20)
+2297.0 299820 20.0 299820
+(0.1) 848.2
+Avg. Time
+584.2
+6.5
+289.9 (286.7)
+
+LM-Cut
+#S/T
+24 / 1.7
+2 / 1965.5
+15 /6.6
+3 / 56.4
+15 / 68.0
+7 / 220.3
+6 / 0.3
+1 / 0.1
+73 / 386.5
+
+LM-Cut-2
+#S/T
+16 / 382.8
+5 / 1839.7
+22 / 125.5
+3 / 95.3
+15 / 79.0
+6 / 174.4
+7 / 0.5
+1 / 0.2
+76 / 449.6
+
+BRFS
+#S/T
+18 / 1.8
+0/0
+13 / 10.1
+0/0
+15 / 6.0
+2 / 14.4
+2 / 9.4
+1 / 1.0
+51 / 10.7
+
+1-trap
+G
+#S/T
+19 / 1.2 1.86
+–
+0/0
+24 / 5.0 1
+–
+0/0
+15 / 4.5 1
+7 / 3.8 3.83
+4 / 0.2 101.7
+1 / 0.4 1
+70 / 3.8
+
+2-trap
+G
+#S/T
+3.97
+15 / 375.6
+–
+8 / 86.6
+1
+18 / 99.5
+–
+1 /113.3
+1
+15 / 10.07
+4.98
+7 / 26.7
+733.44
+5 / 0.7
+1
+1 / 0.3
+70 / 178.2
+
+Table 2: Performance of LM-Cut (1,2 traps), plain BRFS,
+BRFS + 1-trap or 2-trap pruning. #S stands for the number of
+solved instances, T as avg. time in sec., and G as the reduction factor in terms of generated states w.r.t plain BRFS (e.g.,
+half of the nodes are generated w.r.t BRFS when G = 2).
+
+Table 1: Times (sec.) and number of nodes generated that are
+pruned in a BrFS search cut after expanding 10,000 nodes
+using h1, 1-traps, h2, and 2-traps. Numbers are Blue when
+x-trap outperforms hx . In Bold the best performers.
+ery state. 1-traps detects more dead-end states than h1 in 2
+out of 8 domains, 2-traps in 3 domains compared to h2 , and
+6 domains compared to h1 . {1,2}-traps are empty in Pegsol,
+and both 2-traps and h2 run out of time in Woodworking.
+1-traps is by far the fastest approach expanding the 10,000
+states, spending on average 0.1 out of 6 seconds computing
+traps, while 2-traps spends 286.7 out of 289.9 seconds.
+As it can be seen from the table, the precomputed k-traps
+and the hk heuristics computed at run-time do not identify
+the same dead-end states, even if they both reason with tuples of k atoms. We can see the difference with a simple
+example. Let’s assume that we have a STRIPS problem encoding two multivalued variables X and Y that can take three
+values 1,2,3, starting with values 1. The goal is for both variables to have value 3. The STRIPS actions allow to increase
+the value of a variable by 1, but the action that increases X
+to 3 resets Y to 1, and similarly, the action that increases
+Y to 3, resets X to 1. The problem is thus unsolvable, yet
+the heuristic h1 will ignore the deletes and hence the resets,
+and yield a value of 2 for the heuristic at the initial state. On
+the the other hand, it’s easy to see that the 1-DNF formula
+whose terms are the atoms X=1, X=2, Y=1, and Y=2 form a
+1-traps. This is because all the terms (atoms) are mutex with
+the goal, and in addition, every action that deletes one atom
+in this set, adds another atom in the set as well, including the
+actions that add X=3 or Y=3.
+The power of 2-traps in Floortile has a substantial impact
+in our second experiment, summarized in Table 2. We explore a preliminary use of the k-DNF formulae in optimal
+planning, and evaluate how a plain BRFS beneﬁts from the
+traps pruning dead-ends as well as the optimal planner A∗
++ LM-Cut heuristic (Helmert and Domshlak 2009), as a reference of a high performance optimal planner1 . 1-traps and
+2-traps improve the coverage over BRFS or LM-CUT across
+all the benchmarks but Woodworking and Pegsol. In the former, even if we trap dead-ends, it is not enough to increase
+coverage, while in the latter we derive only the empty trap,
+false. In Airport, while 1-traps solves 1 more instance than
+BRFS, 2-traps solves less due to the sheer number of Bi ’s,
+timing out during the 2-traps construction. In Trucks we witness the biggest pruning impact, 1-traps reduces the search
+by a factor of 101.70, and 2-traps by 733.44, solving 2 and
+1
+
+LM-Cut-1
+#S/T
+24 / 3.2
+2 / 1944.1
+26 / 11.0
+3 / 45.2
+15 / 72.1
+7 / 184.8
+7 / 0.2
+1 / 0.1
+86 / 376.9
+
+3 more instances than BRFS respectively. Another domain
+where 2-traps has a huge impact is in Floortile where it is
+the only approach that manages to solve 8 instances, while
+BRFS and 1-traps solves none, and LM-Cut solves 2. The
+only unsolvable tasks were 9 instances of Mystery, 2 instances detected by the FD-parser in preprocessing. Among
+the remaining 7 unsolvable instances 1-traps directly prunes
+all the children of the initial state, while 2-traps prunes 4
+and times-out in 3. Overall, LM-Cut with 1-traps pruning
+has higher coverage, while BFRS with 1-traps is the fastest.
+It remains as future work to explore how to enhance other
+classical and non classical planners. One avenue is to use the
+traps B1 ...Bn to make the negation of these traps an invariant of the classical problem, E.g. if the Bi ’s have size 2, one
+adds the negation of one of the 2 atoms to the preconditions
+of actions that add the other atom. These DNFs can be compiled into classical problems to enforce their negation in all
+reachable states.
+
+6
+
+Summary
+
+The notion of traps has been explored before in the context
+of non-deterministic and probabilistic planning (Ramı́rez
+and Sardiña 2014; Kolobov et al. 2011; Keyder and Geffner
+2008), but key differences are that our approach is purely
+syntactic, executed in preprocessing only (unlike heuristics
+h1 and h2), and polynomial for ﬁxed k.
+For the future, we would like to explore the relation between traps, dead-ends, and different heuristics such as critical path heuristics like hm , and pattern database heuristics.
+For example, it is trivial to show that if s is a dead-end in
+the delete relaxation (i.e., h1 (s) = ∞), then the conjunction
+made up of the negations of the atoms not reachable from
+s in the relaxation that includes some goal atom is a trap,
+although not necessarily a k-trap for a bounded k. Also, if
+the projection of a problem on a subset DB of k multivalued
+variables (Edelkamp 2001), has optimal cost h∗DB (ŝ) = ∞,
+where ŝ is the projection of the state s over such variables,
+then clearly s is a dead-end that can be identiﬁed by a k-trap
+deﬁned over such variables. There is thus much to be learned
+about these relationships, and much to be gained computationally given the importance of dead-end detection in a variety of planning models.
+
+Costs are ignored in LM-Cut as we compare with BRFS.
+
+214
+
+References
+
+Conference on Automated Planning and Scheduling (ICAPS
+2012).
+Ramı́rez, M., and Sardiña, S. 2014. Directed ﬁxed-point
+regression-based planning for non-deterministic domains. In
+Proceedings of the Twenty-Fourth International Conference
+on Automated Planning and Scheduling (ICAPS 2014).
+Ramirez, M.; Lipovetzky, N.; and Muise, C.
+2015.
+Lightweight Automated Planning ToolKiT. http://lapkt.org/.
+Accessed: 2016-03-11.
+Rintanen, J. 2000. An iterative algorithm for synthesizing
+invariants. In Proceedings of the Seventeenth National Conference on Artiﬁcial Intelligence (AAAI 2000), 806–811.
+
+Bäckström, C.; Jonsson, P.; and Ståhlberg, S. 2013. Fast
+detection of unsolvable planning instances using local consistency. In Proceedings of the Sixth Annual Symposium on
+Combinatorial Search, SOCS 2013, Leavenworth, Washington, USA, July 11-13, 2013.
+Blum, A. L., and Furst, M. L. 1997. Fast planning through
+planning graph analysis. Artiﬁcial intelligence 90(1):281–
+300.
+Edelkamp, S. 2001. Planning with pattern databases. In Preproceedings of the Sixth European Conference on Planning
+(ECP 2001).
+Gerevini, A. E., and Schubert, L. 2001. Discoplan: an efﬁcient on-line system for computing planning domain invariants. In Pre-proceedings of the Sixth European Conference
+on Planning (ECP 2001).
+Haslum, P., and Geffner, H. 2000. Admissible heuristics for
+optimal planning. In Proceedings of the Fifth International
+Conference on Artiﬁcial Intelligence Planning and Scheduling (AIPS 2000), 140–149.
+Helmert, M., and Domshlak, C. 2009. Landmarks, critical
+paths and abstractions: what’s the difference anyway? In
+Proceedings of the Nineteenth International Conference on
+Automated Planning and Scheduling (ICAPS 2009), 162–
+169.
+Helmert, M. 2006. The fast downward planning system.
+Journal of Artiﬁcial Intelligence Research (JAIR) 26:191–
+246.
+Hoffmann, J.; Kissmann, P.; and Torralba, Á. 2014. ”Distance”? Who Cares? Tailoring Merge-and-Shrink Heuristics
+to Detect Unsolvability. In 21st European Conference on
+Artiﬁcial Intelligence (ECAI 2014), 441–446.
+Hoffmann, J. 2011. Analyzing search topology without running any search: On the connection between causal graphs
+and h+. Journal of Artiﬁcial Intelligence Research (JAIR)
+155–229.
+Junghanns, A., and Schaeffer, J. 1998. Single-agent search
+in the presence of deadlocks. In Proceedings of the Fifteenth
+National Conference on Artiﬁcial Intelligence (AAAI 1998),
+419–425.
+Keyder, E., and Geffner, H. 2008. The hmdpp planner for
+planning with probabilities. Sixth International Planning
+Competition at (ICAPS 2008).
+Kolobov, A.; Mausam; Weld, D. S.; and Geffner, H. 2011.
+Heuristic search for generalized stochastic shortest path
+mdps. In Proceedings of the Twenty-First International
+Conference on Automated Planning and Scheduling (ICAPS
+2011).
+Lipovetzky, N., and Geffner, H. 2011. Searching for
+plans with carefully designed probes. In Proceedings of the
+Twenty-First International Conference on Automated Planning and Scheduling (ICAPS 2011), 154–161.
+Muise, C. J.; McIlraith, S. A.; and Beck, J. C. 2012. Improved non-deterministic planning by exploiting state relevance. In Proceedings of the Twenty-Second International
+
+215
+
+

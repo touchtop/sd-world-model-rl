@@ -1,0 +1,1133 @@
+% !TEX program = xelatex
+\PassOptionsToPackage{unicode=true}{hyperref} % options for packages loaded elsewhere
+\PassOptionsToPackage{hyphens}{url}
+%
+\documentclass[UTF8]{ctexart}
+\usepackage{lmodern}
+\usepackage{amssymb,amsmath}
+\usepackage{ifxetex,ifluatex}
+\usepackage{fixltx2e} % provides \textsubscript
+\ifnum 0\ifxetex 1\fi\ifluatex 1\fi=0 % if pdftex
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provides euro and other symbols
+\else % if luatex or xelatex
+  \usepackage{unicode-math}
+  \defaultfontfeatures{Ligatures=TeX,Scale=MatchLowercase}
+\fi
+% use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+% use microtype if available
+\IfFileExists{microtype.sty}{%
+\usepackage[]{microtype}
+\UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\IfFileExists{parskip.sty}{%
+\usepackage{parskip}
+}{% else
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt plus 2pt minus 1pt}
+}
+\usepackage{hyperref}
+\hypersetup{
+            pdfborder={0 0 0},
+            breaklinks=true}
+\urlstyle{same}  % don't use monospace font for urls
+\usepackage{xcolor}
+\usepackage[normalem]{ulem}
+\usepackage[margin=1in]{geometry}
+\usepackage{longtable,booktabs}
+% Fix footnotes in tables (requires footnote package)
+\IfFileExists{footnote.sty}{\usepackage{footnote}\makesavenoteenv{longtable}}{}
+\usepackage{graphicx,grffile}
+\graphicspath{{./}{../figures/}{../results/multi_step_rollout/20260215_213008/figures/}{../results/causal_intervention/20260224_201339/}}
+\makeatletter
+\def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth\else\Gin@nat@width\fi}
+\def\maxheight{\ifdim\Gin@nat@height>\textheight\textheight\else\Gin@nat@height\fi}
+\makeatother
+% Scale images if necessary, so that they will not overflow the page
+% margins by default, and it is still possible to overwrite the defaults
+% using explicit options in \includegraphics[width, height, ...]{}
+\setkeys{Gin}{width=\maxwidth,height=\maxheight,keepaspectratio}
+\setlength{\emergencystretch}{3em}  % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\setcounter{secnumdepth}{0}
+% Redefines (sub)paragraphs to behave more like sections
+\ifx\paragraph\undefined\else
+\let\oldparagraph\paragraph
+\renewcommand{\paragraph}[1]{\oldparagraph{#1}\mbox{}}
+\fi
+\ifx\subparagraph\undefined\else
+\let\oldsubparagraph\subparagraph
+\renewcommand{\subparagraph}[1]{\oldsubparagraph{#1}\mbox{}}
+\fi
+
+% set default figure placement to htbp
+\makeatletter
+\def\fps@figure{htbp}
+\makeatother
+
+\newcommand{\revadd}[1]{\textcolor{red}{#1}}
+\newcommand{\revdel}[1]{\textcolor{gray}{\sout{#1}}}
+
+
+\title{Structured World Models for Sample-Efficient Planning\\[0.4em]
+\large 面向高效采样规划的结构化世界模型}
+\author{}
+\renewcommand{\abstractname}{摘要 (Abstract)}
+\date{}
+
+\begin{document}
+
+\maketitle
+\begin{abstract}
+
+现代基于模型强化学习（Model-Based Reinforcement Learning, MBRL）依赖大规模神经网络近似隐状态转移，在复杂决策任务中取得显著进展。然而，这类无结构先验的端到端学习范式对海量交互数据高度依赖，且由于缺乏底层物理与守恒律约束，常在多步展开时出现误差累积与物理一致性破坏，面对分布外（OOD）扰动亦表现出明显退化。
+
+在供应链与物理控制等安全性和长期稳定性要求突出的场景中，系统往往具有已知的宏观拓扑、守恒关系或解析动力学，但现有通用 MBRL 难以有效注入并利用此类结构先验。为此，我们提出 \textbf{SD-MCTS (System Dynamics Monte Carlo Tree Search)}。该框架以结构化世界模型刻画环境动力学，将学习重点压缩到少量未知参数的系统辨识，并结合离线训练的终端价值网络，对有限规划视界下的截断误差进行补偿；同时，显式结构表示也使模型能够在测试时直接响应已知干预。
+
+\revdel{在包含延时反馈与 OOD 扰动的评测任务中，我们在 Beer Game 上观察到显著的样本效率优势，并在公开基准 DMControl Cartpole-Swingup 上表明，该框架在较低真实交互预算下仍能取得有竞争力的控制结果。进一步地，通过对搜索树内部轨迹一致性与多步误差传播的分析，我们说明了结构约束如何转化为更稳定的规划表现。最后，在干预可观测且可映射到结构方程修改的前提下，我们在 Beer Game 的两类 OOD 结构干预设置中展示了无需重新训练神经网络的零样本（Zero-Shot）适应能力。}
+\revadd{在包含延时反馈与 OOD 扰动的评测任务中，我们在 Beer Game 上观察到显著的样本效率优势，并在公开基准 DMControl Cartpole-Swingup 上表明，该框架在较低真实交互预算下仍能取得有竞争力的控制结果。进一步地，在更高难度公开基准 Hopper-Hop 上，结构化扩展仅用 \(50\text{k}\) 步真实环境交互，已取得高于公开 \(100\text{k}\) 基线的平均回报。接着，通过对搜索树内部轨迹一致性与多步误差传播的分析，我们说明了结构约束如何转化
+为更稳定的规划表现。最后，在干预可观测且可映射到结构方程修改的前提下，我们在 Beer Game 的两类 OOD 结构干预设置中展示了无需重新训练神经网络的零样本（Zero-Shot）适应能力。}
+\end{abstract}
+
+\hypertarget{sec-introduction}{%
+\section{1. 引言 (Introduction)}\label{sec-introduction}}
+
+\begin{quote}
+\emph{``既然多数复杂系统运行在已被科学界长年提炼的物理法则之上，为何要求智能体在缺乏结构先验的条件下于隐空间学习这些守恒规律？''}
+\end{quote}
+
+在处理高度复杂的序列规划（Sequential Decision-Making）任务时，基于模型的强化学习（MBRL）框架近年来凭借对环境动力学的建模能力成为研究焦点。主流方法（如 Dreamer 系列与 TD-MPC2）倾向于在隐空间中采用 MLP、RNN 或大规模 Attention 结构作为高维环境特征的连续推演器（World Model）。这种通用函数逼近的``白板学习（Tabula Rasa）''理念依赖超大参数量与自回归损失，在视觉密集、规则同质的模拟环境中展现了较强的经验泛化能力。
+
+然而，当该机制迁移到容错要求极高的现实高风险序列决策任务（如物流供应链调度、长期设备老化控制、流行病学干预）时，其结构性缺陷逐渐显露：第一，\textbf{样本效率不足 (Data Inefficiency)}。真实场景交互成本高昂，在仅有约 \(\approx 10^3 \sim 10^4\) 级样本预算下，缺乏归纳偏置的隐空间模型很难从噪声中稳定抽取满足守恒约束的状态转移机制。第二，\textbf{缺乏不变量约束导致的外推阶段的约束违反 (Violations in Extrapolation)}。现有通用 MBRL 的转移核未显式嵌入守恒限制，在超出视界截断后进行多步展开时，易遭遇非线性映射带来的特征误差发散，从而引发``非物理的产出增加''或``状态违反非负约束''等物理不一致。尤其关键的是，动作掩码（action masking）等事后规避措施只能限制动作可行性，并不保证 MCTS 搜索树内部轨迹的物理一致性，因此仍会引入系统性规划偏差。第三，\textbf{对因果干预的脆弱性 (Vulnerability to Causal Interventions)}。当系统出现分布外突变（如生产力骤减或拓扑链路断裂）时，全连接模型由于规则与参数的黑盒耦合，往往缺乏零样本干预适应能力。
+
+事实上，在多数科学计算与工业控制系统中，系统底层事件的逻辑图谱（如流量沿上游至下游传导、传染满足接触动态率等结构不变量）并非完全未知。本文将结构先验（Structural Priors）形式化为：已知系统拓扑 \(\mathcal{T}\)、在该拓扑上定义的动力学算子 \(f_{\mathcal{T}}\)，以及由守恒与可行性约束刻画的可行集 \(\mathcal{C}\)。真正缺失的通常是局部的标量效率或时变残差（例如未观测的老化敏感系数）。若因这些局部参数的不确定而放弃已知的系统级因果拓扑全局结构（Causal Graph Structure / Structural Priors），转而让通用神经逼近器重新学习系统动力学方程，不仅降低样本利用率，还会削弱预测过程的稳定性。
+
+针对上述挑战，本文提出 \textbf{系统动力学与蒙特卡洛树搜索融合控制框架（SD-MCTS）}。其中，本文所称“系统动力学（System Dynamics, SD）”特指 Forrester~(1961) 与 Sterman~(1989) 的存量-流量-反馈（stock-flow-feedback）建模范式，而非一般无结构的黑盒动力系统拟合。该方法强调先验结构与深度神经功能的解耦，避免纯黑盒的无约束函数映射。为应对长视野延迟反馈与分布外异变，我们将方案组织为三个核心模块：
+
+\begin{enumerate}
+\item \textbf{系统动力学结构模型 (System Dynamics Structural Model)}：以 stock-flow-feedback 白盒系统动力图及其流量守恒约束构建生成核，仅用少量数据估计其中低维未知参数，从而抑制多步前推中的雅可比放大效应。
+\item \textbf{基于局部图遍历的蒙特卡洛树搜索 (Constraints-Bound MCTS)}：在线规划时，搜索仅在满足质量守恒等先验约束的图拓扑边界内展开。
+\item \textbf{离线终端价值对齐 (Terminal Value Alignment)}：随着搜索深度的增加，MCTS 往往面临动作空间组合复杂度呈指数增长的挑战，因此我们在较短的深度 \(H\) 处截断叶节点，并引入异步离线训练的近似价值 \(V_{\psi}\) 进行势能补偿，以较低的在线计算开销获得相当于长视野的规划收益。
+\end{enumerate}
+
+本研究的主要贡献如下：
+
+\begin{enumerate}
+\item \revdel{\textbf{结构先验驱动的样本效率提升}：在涵盖离散延迟（Beer Game）与连续欠驱动物理控制（Cartpole-Swingup）的复杂环境中，SD-MCTS 在仅拥有极低交互预算时即可取得有竞争力的性能；其中，在未经修改的公开基准 DMControl Cartpole-Swingup 上，我们采用共享先验 + 按种子微调（shared prior + per-seed finetune）的协议，在一次“35,000 步共享先验预训练 + 5,000 步目标种子微调”的统一口径下获得 802.9 的三种子聚合均值，且无单个种子低于 700。结合流形非负截断、系统图守恒算子与共享先验初始化，该框架在保持可解释性的同时有效遏制了树搜索内部的物理失真、敏感状态附近的策略漂移以及跨种子性能塌缩。}\revadd{\textbf{结构先验驱动的样本效率提升}：在涵盖离散延迟（Beer Game）、连续欠驱动物理控制（Cartpole-Swingup）以及更高难度公开运动控制基准（Hopper-Hop）的环境中，结构化方法在极低交互预算下均取得了有竞争力的性能；其中，在未经修改的公开基准 DMControl Cartpole-Swingup 上，我们采用共享先验 + 按种子微调（shared prior + per-seed finetune）的协议，在一次“35,000 步共享先验预训练 + 5,000 步目标种子微调”的统一口径下获得 802.9 的三种子聚合均值，且无单个种子低于 700；在更高难度的 Hopper-Hop 上，结构化扩展仅用 \(50\text{k}\) 步真实环境交互，已取得高于公开 \(100\text{k}\) 基线的平均回报。结合流形非负截断、系统图守恒算子、共享先验初始化等设计，该框架在保持可解释性的同时有效遏制了树搜索内部的物理失真、敏感状态附近的策略漂移以及跨种子性能塌缩。}
+\item \textbf{多步预测泛化的误差上界收敛与规划视界缩减}：我们从理论上证明，将转移矩阵限制在不变包络集内可将多步自回归误差上界压缩至常量阶 \(\mathcal{O}(1)\)。在此基础上，终端价值补偿能够缓解有限视界截断带来的性能损失，为以较浅规划深度实现稳定决策提供理论依据。
+\item \textbf{基于可编辑因果图的强干预鲁棒性}：为对齐真实 OOD 环境演变，我们在预训练世界模型上引入基于结构方程局部修改的拓扑干预 \(f \leftarrow g(f, \iota_t)\)。在此类强干预设置下，依托白盒守恒结构的响应性，SD-MCTS 能显著抑制纯神经映射的失真与跨种子方差，为无需重新训练条件下的在线突变适应提供可行范式。
+\end{enumerate}
+
+在接下来的篇幅中：第 2 节回顾相关背景；第 3 节构建连续 MDP
+的物理控制公理；第 4 节呈现涵盖参数识别与价值搜索的核心框架全貌；第
+5、第 6 两节将分别从理论和实证消融入手分析该框架能够克服 OOD 场景下的常数阶误差局限与其优于纯黑盒架构的原因；最后在第 7 节进行总结与探讨。
+
+\hypertarget{sec-related-work}{%
+\section{2 相关工作 (Related
+Work)}\label{sec-related-work}}
+
+SD-MCTS
+融合了基于模型的强化学习（MBRL）、物理启发式机器学习以及经典运筹学的滚动优化控制思想。我们将本研究置于以下研究脉络中进行定位：
+
+\textbf{基于模型的强化学习 (Model-Based Reinforcement Learning)}
+近年来，MBRL 在样本效率和长时域规划上取得了广泛关注。Dreamer
+系列将环境的动态映射压缩到隐空间（Latent
+Space）内通过自回归循环网络（RSSM）进行端到端学习，而 MuZero 与 TD-MPC
+则同样摒弃先验直接在潜空间内展开蒙特卡洛树或滚动视界评估。尽管在游戏或纯视觉模拟环境中取得了有竞争力的性能，但这类纯数据驱动的“从零先验学习”模型在泛化时缺乏物理一致性约束。相比之下，SD-MCTS
+摒弃了从极高维权重中内隐地学习动态方程，它要求预设环境的结构化逻辑，转而在较低样本复杂度下对低维环境流形残差进行基于结构先验的残差校正。
+
+\textbf{物理启发式深度学习 (Physics-Informed Machine Learning)}
+将先验结构注入神经网络在科学计算中已被证明极为有效。Physics-Informed
+Neural Networks (PINNs) 通过将偏微分方程引入损失函数实现软约束，Neural
+ODEs 与 Hamiltonian Networks
+则将能量守恒硬编码进入模型的导层推演中。SD-MCTS
+在方法论上与之相近：以硬约束保持结构的物理不变量，同时利用梯度下降搜寻局部未知系数。然而，我们的重点不仅在于完成系统辨识（System
+Identification），而是将其与树搜索和近似动态规划紧密耦合，进而实现从建模到控制的一体化框架。
+
+\textbf{带终端代价的滚动优化 (Rolling Horizon Optimization with Terminal
+Costs)}
+模型预测控制（MPC）在工业决策中被广泛应用，但面对系统延迟时效长远的场景，受限的探索深度
+\(H\) 必然引发有限视界导致的短视偏差（Truncation
+Bias）。近似动态规划（ADP）通过值函数（Value
+Function）估计尾部回报以代偿短视。SD-MCTS
+是这一机制在含参推断下的参数化函数逼近扩展：离线拟合的神经网络参数化的终端价值近似器 \(V_{\psi}\) 本质上扮演了非线性且高维的自适应终端代价估计，赋予了有限深度的
+MCTS 逼近无穷视界的最优性。
+
+\begin{center}\rule{0.5\linewidth}{0.4pt}\end{center}
+
+\hypertarget{sec-problem-setup}{%
+\section{3 问题定义 (Problem
+Setup)}\label{sec-problem-setup}}
+
+我们将具有物理不变量约束的动态决策问题建模为一个带结构的离散时间马尔可夫决策过程
+(Structured MDP)
+\(\mathcal{M}=\langle \mathcal{S},\mathcal{A},\mathcal{P},\mathcal{R},\gamma\rangle\)，其中
+\(\gamma\in(0,1)\)。物理可行域记为 \(\mathcal{C}\subseteq\mathcal{S}\)，并通过投影算子 \(\Pi_{\mathcal{C}}\) 表示约束满足。默认观测为全状态 \(s_t\)；若为部分可观测情形，则以观测 \(o_t\) 作为策略输入。在时刻 \(t\)，智能体根据策略 \(\pi(a_t\mid s_t)\)
+选择动作 \(a_t\)，获得奖励 \(r_t=\mathcal{R}(s_t,a_t)\)，并由环境转移核
+\(\mathcal{P}(s_{t+1}\mid s_t,a_t)\) 生成下一状态。目标是求解： \[
+J(\pi)=\mathbb{E}_{\tau\sim(\pi,\mathcal{P})}\!\left[\sum_{t=0}^{\infty}\gamma^t r_t\right]
+\] 其中 \(\tau=(s_0,a_0,s_1,\ldots)\) 为由 \((\pi,\mathcal{P})\)
+诱导的轨迹分布。
+
+与标准无结构 RL 不同，本文关注具有已知物理交互结构但未知动力学参数的系统。本文中的 System Dynamics（SD）采用 Forrester 式抽象：状态对应库存（stock），转移由流量（flow）守恒与反馈回路共同决定。为此，我们在转移建模上引入如下结构化设定：
+
+\textbf{假设 1：结构--参数分离 (Structure--Parameter Separation)}
+真实环境可写为 \( s_{t+1}=f(s_t,a_t;\theta^\star)+\xi_t \)，其中 \(f\)
+的解析形式（如守恒关系、非负流约束、网络拓扑耦合）是已知的，未知成分仅为参数
+\(\theta^\star\in\Theta\subset\mathbb{R}^d\)。噪声项 \(\xi_t\)
+描述未建模扰动与随机性，满足 \(\mathbb{E}[\xi_t\mid s_t,a_t]=0\) 且
+\(\mathbb{E}\!\left[\|\xi_t\|^2\mid s_t,a_t\right]\le \sigma^2\)。此外，\(f\)
+对 \(\theta\) 可微，并对 \((s,a)\) 局部
+Lipschitz，以支持基于梯度的参数辨识与策略优化。约束投影 \(\Pi_{\mathcal{C}}\) 假设为非扩张算子（例如闭凸集 \(\mathcal{C}\) 上的欧氏投影），即 \(\|\Pi_{\mathcal{C}}(x)-\Pi_{\mathcal{C}}(y)\|\le \|x-y\|\)。
+
+\textbf{假设 2：低维隐流形与均值场近似 (Low-Dimensional Manifold \&
+Mean-Field Approximation)}
+尽管状态与动作可能高维，决定系统演化的有效参数往往位于极低维流形，即
+\(d=\dim(\theta^\star)\ll \dim(\mathcal{S})+\dim(\mathcal{A})\)。同时，为获得可稳定反向传播的长时域前向展开（rollout），我们以条件期望动力学作为优化代理：\(\bar f(s_t,a_t;\theta)\triangleq \mathbb{E}[s_{t+1}\mid s_t,a_t;\theta]\)，并在训练中采用均值场近似
+\(s_{t+1}\approx \bar f(s_t,a_t;\theta)\)，将高频、离散的外源扰动留在残差项中处理。该近似保留了主导性的系统演化趋势，同时显著降低了梯度估计方差，提高了学习残差动力学的稳定性（但当高方差、离散外源冲击占主导时，该均值场近似可能失效并低估尾部风险）。
+
+在上述设定下，问题可分解为：在已知结构约束下辨识 \(\theta^\star\)，并在由
+\(f(\cdot,\cdot;\theta)\)
+参数化的转移族上学习高回报策略。该分解不仅为我们在第 5
+节的样本复杂度界分析提供了理论基础，也使得针对算子实施分布外（OOD）干预具有明确的可解释性与可操作性。我们定义干预协议（Intervention Protocol）为：可观测干预 \(\iota_t\in\mathcal{I}\) 映射为对结构方程的局部修改 \(f \leftarrow g(f,\iota_t)\)，且不进行额外神经网络重训练。
+
+\hypertarget{sec-method}{%
+\section{4 方法 (Method)}\label{sec-method}}
+
+沿用第\hyperlink{sec-problem-setup}{3}节的 MDP 定义与结构化设定，本节详述 SD-MCTS 的核心机制。SD-MCTS 摒弃了由神经网络无约束拟合全局转移的黑盒范式，转而由三个紧耦合的模块构成：
+(1) \textbf{结构化动力学先验}：用满足物理守恒/可行性约束的可微转移模型替代全连接世界模型；
+(2) \textbf{截断树搜索}：在结构化流形内进行深度受限的在线 MCTS 规划；
+(3) \textbf{终端价值对齐（Terminal Value Alignment, TVA）}：将价值网络训练目标与 MCTS 叶节点自举（bootstrap）目标对齐，消除规划截断偏差。
+
+\hypertarget{sub-overview}{%
+\subsection{4.1 整体框架}\label{sub-overview}}
+
+\includegraphics[width=\textwidth]{fig_architecture.pdf}
+\emph{图 1: SD-MCTS 整体架构图。由左至右包含四大核心机制：(A) \textbf{结构化世界模型}利用物理投影算子 $\Pi_{\mathcal C}$ 保障转移可行性，避免黑盒误差；(B) \textbf{结构约束 MCTS}（Structure-Constrained MCTS）在先验物理模型上开展深度受限（最大深度 $H$）的树搜索规划，利用价值网络 $V_\psi$ 进行叶节点自举；(C) \textbf{终端价值对齐（TVA）}驱动评价函数更新，将 MCTS 的搜索估计值 $\hat{V}_{\text{search}}$ 转化为软目标直接对齐 $V_\psi$；(D) 基于显式物理拓扑，系统支持测试时\textbf{零样本干预}（例如直接阻断图网络边连接），无需任何模型重训。}
+
+在每个决策时刻 $t$，给定真实状态 $s_t$，智能体的执行闭环如下：首先执行 $n$ 次在 $\hat{\mathcal P}_\theta$ 上的 MCTS 模拟（最大深度 $H$），并使用神经网络 $V_\psi$ 评估叶节点势能；随后根据根节点动作访问统计量执行动作 $a_t$；最后将真实转移 $(s_t,a_t,r_t,s_{t+1})$ 存入回放池 $\mathcal D$，并每 $K$ 步异步更新模型参数 $\theta$ 与价值网络 $\psi$。
+
+该设计的核心在于：\textbf{在线规划和离线价值学习共享同一个终端语义}。MCTS 在叶节点依赖 $V_\psi$ 提供长期视界的代偿，而 $V_\psi$ 又被显式训练以拟合 MCTS 产生的截断回报目标（详见 4.4 节），从而形成互相强化的闭环。
+
+\hypertarget{sub-structured-model}{%
+\subsection{4.2 结构化可微世界模型 (Differentiable Structural World Model)}\label{sub-structured-model}}
+
+与依赖黑盒神经网络直接拟合全局转移的世界模型不同，SD-MCTS 并不让模型从数据中重新学习整个动力学映射，而是先按照系统动力学（SD）的存量--流量--反馈表示设计状态更新骨架，再仅对其中少量未知参数进行辨识。这样做的一个重要目的，是在这类典型问题中有效利用已知的领域知识；与此同时，它也将多步展开中的主要结构关系固定下来，从而在结构层面抑制误差累积与发散。
+
+更具体地说，SD 在这里并不是泛指任意动力系统，而是指一种显式的因果图建模方式：系统中的关键状态量被表示为存量（stocks），节点之间的局部转移、补给、消耗或作用被表示为流量（flows），而反馈回路（feedback loops）则刻画当前状态如何进一步影响后续流量或控制作用。于是，一步状态更新不再被视为一个黑盒函数值，而是由“存量变化 = 流入 - 流出 + 局部作用”这一类结构化关系组合而成；不同任务之间变化的是具体变量和局部方程，而不是这一建模范式本身。
+
+\textbf{参数化与投影约束.}
+我们将环境状态转移刻画为受约束的状态更新过程：
+\[
+\hat s_{t+1}= \hat{\mathcal P}_\theta(s_t,a_t) = \Pi_{\mathcal C}\!\left(f_{\mathcal T}(s_t,a_t;\theta)\right)
+\]
+其中，\(\mathcal T\) 表示已知的因果拓扑，\(f_{\mathcal T}\) 表示在该拓扑上由局部方程拼接而成的可微更新算子，\(\theta\) 为待在线估计的低维未知参数，\(\Pi_{\mathcal C}\) 则将更新结果投影回物理可行域 \(\mathcal C\)；这里的可行域通常由非负性、容量边界和守恒关系等约束刻画，当 \(\mathcal C\) 非凸时可采用近似投影 \(\tilde{\Pi}_{\mathcal C}\)。
+
+这一设计的关键在于：模型的自由度只保留在少量具有明确物理意义的参数上，而不再交给一个无结构网络去吸收全部动力学关系。因此，与黑盒潜在动力学相比，\(\hat{\mathcal P}_\theta\) 更容易在低样本条件下完成系统辨识，并在多步前推时保持物理一致性。
+
+\textbf{系统辨识目标.}
+整个前向操作图 $\hat{\mathcal P}_\theta$ 完全由基础张量算子构建，几乎处处可微。世界模型的学习由此化简为基于回放数据的重构优化：
+\[
+\mathcal L_{\text{model}}(\theta)= \mathbb E_{(s_t,a_t,s_{t+1})\sim\mathcal D} \left[ \left\| s_{t+1}- \hat{\mathcal P}_\theta(s_t,a_t)\right\|_2^2 \right]
+\]
+这种显式结构约束为后文在约束多步联合展开下推导常数级 $O(1)$ 误差上界提供了关键条件。
+
+\hypertarget{sub-mcts}{%
+\subsection{4.3 基于结构先验的截断 MCTS (Structure-Constrained MCTS)}\label{sub-mcts}}
+
+对给定环境特征 $s_t$，SD-MCTS 在 $\hat{\mathcal P}_\theta$ 上执行在线搜索。单次迭代包含节点选择、扩展与模拟、以及叶节点自举与回传：
+
+\textbf{节点选择 (Selection).}
+在搜索树内部，状态通过 \(\Pi_{\mathcal C}\) 保持可行，并在可行动作集合 \(\mathcal A(s)\) 上按照置信区间上界（UCB）法则沿树下降以平衡探索与利用（Exploitation）：
+\[
+a^\star = \arg\max_a \left[ Q(s,a) + c_{\text{ucb}} \sqrt{\frac{\log(N(s)+1)}{N(s,a)+1}} \right]
+\]
+其中 $N(s,a)$ 为动作访问次数，$c_{\text{ucb}}$ 为调节探索强度的常数。
+
+\textbf{扩展与模拟 (Expansion and Rollout).}
+对于未扩展叶节点，系统使用 $\hat{\mathcal P}_\theta$ 及相应的可行域约束前向模拟至最大搜索深度 $H$，由此获得符合物理约束的模拟轨迹，提取预测奖励序列 $\hat{r}_{t:t+d-1}$ 以及深度为 $d$ 的叶节点状态 $\hat{s}_{t+d}$。
+
+\textbf{叶节点自举与回传 (Leaf Bootstrap and Backup).}
+该遍历路径的回报估计 $\hat{G}_H$ 结合了展开阶段的累计折扣回报及基于价值网络 $V_\psi$ 的长期价值估计（自举项）：
+\[
+\hat G_H = \sum_{k=0}^{d-1}\gamma^k \hat r_{t+k} +\gamma^d V_\psi(\hat s_{t+d})
+\]
+搜集完毕后，使用标量 $\hat{G}_H$ 沿历史路径反向回传（backup），更新沿途节点的访问计数与 $Q$ 价值估计。一旦达到搜索预算上限，在真实环境中执行的真实动作将从根节点访问次数最多的动作中选出（即通常测试时的 $\arg\max_a N(s_t,a)$）。
+
+\hypertarget{sub-tva}{%
+\subsection{4.4 终端价值对齐 (Terminal Value Alignment)}\label{sub-tva}}
+
+长周期任务中过度依赖纯 MCTS 会受指数级计算复杂度限制（即 $\mathcal{O}(|\mathcal{A}|^H)$ 计算瓶颈）。仅凭传统的单步时序差分（1-Step TD）驱动价值评估器亦经常提供缺乏长时程信息的短期偏置价值估计。借鉴近期策略优化与规划方法，我们提出 TVA，将价值网络目标对齐到由 MCTS 搜索树统计构造的价值目标中。
+
+在每次与系统交互时，根据树搜索得到的访问计数与动作价值统计形成加权目标：
+\[
+\hat V_{\text{search}}(s_t)= \sum_{a \in \mathcal{A}} \pi_{\text{mcts}}(a|s_t)\,\hat Q_H(s_t,a),
+\quad \text{其中}\ \pi_{\text{mcts}}(a|s_t)=\frac{N(s_t,a)^\alpha}{\sum_b N(s_t,b)^\alpha}
+\]
+上式中 $N(s_t,a)$ 为访问次数，$\alpha$ 为温度系数，$\hat Q_H(s_t,a)$ 为根节点动作价值并融合了局部搜索结构信息。在此依托下，异步优化的价值网络 $V_\psi$ 的更新目标可写为加权组合损失函数：
+\[
+\mathcal L_{\text{val}}(\psi)= \underbrace{ \mathbb E_{s_t\sim\mathcal D} \left[ \left( V_\psi(s_t)-\operatorname{sg}\!\left(\hat V_{\text{search}}(s_t)\right) \right)^2 \right]}_{\text{TVA Alignment Loss}} + \lambda_{\text{td}} \underbrace{ \mathbb E_{\mathcal D} \left[ \left( V_\psi(s_t)-\left(r_t+\gamma \bar V_\psi(s_{t+1})\right) \right)^2 \right]}_{\text{1-step TD Target}}
+\]
+$\operatorname{sg}(\cdot)$ 作为停止梯度操作（stop-gradient）标识保证训练收敛。这让截断于极浅探索前瞻（如 $H=1$）的短前瞻 MCTS 也能获取并比拟长距决策视野的高质量引导信号。
+
+\hypertarget{sub-inference-prior}{%
+\subsection{4.5 共享价值先验与按种子微调 (Shared Value Prior and Per-seed Finetuning)}\label{sub-inference-prior}}
+
+这里所说的共享价值先验与按种子微调，针对的正是第 4.4 节 TVA 中用于叶节点自举的终端价值网络 \(V_\psi\)。换言之，本节讨论的不是一个额外引入的新模块，而是：在低样本、多种子条件下，如何更稳定地学习截断规划所需的终端价值估计。
+
+在低样本条件下，结构化世界模型可以将动力学学习压缩到少量具有物理意义的参数上，但叶节点终端价值估计的稳定性仍然可能成为规划性能的主要瓶颈。尤其在连续控制任务中，如果仅依赖单个随机种子的有限数据训练 \(V_\psi\)，不同运行实例之间往往会因为状态覆盖差异而形成较大的估值方差；这种差异在敏感状态附近会进一步放大，并直接影响 MCTS 的叶节点自举质量与动作选择结果。
+
+为此，我们在 SD-MCTS 中采用\textbf{共享价值先验 + 按种子微调}的训练协议。具体而言，先在一组与论文评测所用种子相分离的开发种子上训练共享价值先验，使 \(V_\psi\) 先学习跨种子相对稳定的终端价值几何；随后再以该先验为初始化，对目标随机种子进行局部微调，以吸收其特有的状态分布与残余动力学差异。前者用于降低低样本条件下的价值估计方差，后者则保留对目标实例的局部适配能力。
+
+这一设计并非试图抹平所有随机种子之间的差异，而是在\textbf{共享稳定先验}与\textbf{保留个体适配}之间取得平衡。对于本文所关注的“结构化动力学 + 截断搜索 + 终端价值补偿”框架而言，这一步尤为关键：一旦 TVA 所训练的 \(V_\psi\) 在不同随机种子之间出现系统性漂移，MCTS 叶节点自举的质量就会直接下降；而通过共享价值先验初始化，再辅以目标种子的少量微调，可以更稳定地支撑搜索阶段的终端价值评估。相关公开基准结果见第 6.5 节。
+
+\hypertarget{sub-zero-shot}{% 
+\subsection{4.6 因果图上的显式零样本干预 (Explicit Graph Editing for Zero-Shot Formulation)}\label{sub-zero-shot}}
+
+对于通用 MLP 或注意力组装的黑箱函数近似器，如果在演化过程中发生局部物理属性的结构突变（如灾害截断某物流支线），由于隐含耦合关系（未显式建模的依赖），智能体将会产生严重的分布外泛化误差并要求大量新样本进行参数更新。
+
+SD-MCTS 天然保留着物理拓扑结构表示，这赋予了它精细的局部结构干预能力。我们将干预 $\iota_t \in \mathcal{I}$ 映射为替换算子集合中的局部方程 $f \leftarrow g(f, \iota_t)$，规划仅在该修改后重新运行 MCTS，有效规避了纯神经模型的全局灾难性遗忘。该局部变动会依凭微分图逻辑通过因果传播机制影响至多步未来的代价流。尽管原有学习建立的基础判别势能 $V_\psi$ 会在此刻经历因果模型失配导致的估计偏差，但依托 MCTS 鲁棒的树搜索机制，模型依然可规避不可行或高风险状态区域，在短时尺度上展现出相当的系统鲁棒性与恢复能力。
+
+\hypertarget{ux7406ux8bbaux7ed3ux679c-theoretical-analysis}{%
+\section{5 理论结果 (Theoretical
+Analysis)}\label{ux7406ux8bbaux7ed3ux679c-theoretical-analysis}}
+
+本节提供了有限样本理论保证（Finite-Sample Guarantees），以解释结构化先验如何在分布偏移下约束估计维度并提升系统泛化鲁棒性。为表述简洁，本节核心结论将主要陈述非正式命题（Informal Propositions）与理论误差界，完整的严格数学分析与证明见补充附录 A.7。
+
+\hypertarget{ux7ed3ux6784ux5316ux63a8ux65adux7684ux6837ux672cux590dux6742ux5ea6-sample-complexity-of-structured-inference}{%
+\subsection{5.1 结构化推断的样本复杂度 (Sample Complexity of Structured
+Inference)}\label{ux7ed3ux6784ux5316ux63a8ux65adux7684ux6837ux672cux590dux6742ux5ea6-sample-complexity-of-structured-inference}}
+
+在有限样本下，未引入结构先验的离散世界模型需要无约束地估计高维联合转移类，这显著增大了统计复杂度。相比之下，SD-MCTS 利用结构先验将假设类从全状态特征体积约束至极低维的物理参数子空间，从而实现了样本复杂度的数量级削减。
+
+\textbf{命题 1：结构化推断的样本复杂度 (Sample Complexity of Structured Inference). }
+假设非线性转移受控于隐含的结构化转移映射（Structural Transition Map）
+\(s' = \mathcal{P}(s, a ; \theta^\star) + \xi\)，其中物理参数
+\(\theta^\star \in \mathbb{R}^d\)（\(d\) 为有效参数维度），为简化推导，假设智能体能够通过环境模拟器（Environment
+Simulator, 充当Generative Oracle）在任意状态进行独立重采样，其转移观测遭遇的附加环境白噪声遵从
+\(\sigma\)-次高斯分布 (\(\|\xi\|_{\psi_2} \leq \sigma\))。
+
+在特征变量满足持续激励（Persistent Excitation，即其协方差阵最小特征值满足界限 $\lambda_{\text{min}}(\Sigma) \ge \mu > 0$）的条件下，为以至少 $1-\delta$ 的概率使参数估计误差收敛至 $\|\hat{\theta} - \theta^\star\|_2 \le \epsilon$，所需探索集大小的充分条件为：
+\[ N_{\text{SD}} = \mathcal{O}\left( \frac{\sigma^2}{\mu} \frac{d + \log(1/\delta)}{\epsilon^2} \right) \]
+
+相比之下，若对物理系统不作任何先验结构假定（如经典的表格型有限 MDP 转移估计），则所需的样本复杂度至少随 \(|\mathcal{S}||\mathcal{A}|\) 呈线性增长，甚至可达
+\(\mathcal{O}\big( \frac{|\mathcal{S}|^2|\mathcal{A}| \log(1/\delta)}{\epsilon^2} \big)\) 级。该命题揭示了基于结构的系统辨识任务的样本需求仅与有效物理维度 \(d\) 呈线性依赖，可直接化归（reduce to）为一个与系统状态空间基数无关的低维标定问题。这预示了后续第 6.2.1 节中评估的 SD-MCTS 极高经验样本效率的理论根源。
+
+\hypertarget{ux6291ux5236-ood-ux6563ux9038ux4eceux6307ux6570ux7ea7ux590dux5408ux8befux5deeux5230ux5b88ux6052ux754cux5ea6-bounding-compounding-errors-via-conservation}{%
+\subsection{5.2 正不变约束下的多步预测误差上界 (Multi-step Error Bounds under Positive Invariance)}\label{ux6291ux5236-ood-ux6563ux9038ux4eceux6307ux6570ux7ea7ux590dux5408ux8befux5deeux5230ux5b88ux6052ux754cux5ea6-bounding-compounding-errors-via-conservation}}
+
+在离散时间点进行多步展开是 Model-based
+规划器的典型难点。在缺乏物理不变量的自回归生成中，由于单步雅可比（Jacobian）连乘效应，多步累加的误差递推常常呈几何增长（Compounding
+Errors）。
+
+\textbf{命题 2：正不变与 Lipschitz 假设下的多步状态误差上界 (Multi-step Error Bounds under Positive Invariance). }
+定义多步推演的绝对残差期望为 \( e_t := \mathbb{E}[\|s_t - \hat{s}_t\|] \)，假设单步映射存在固有估计扰动 \(\epsilon_{\text{model}}\)。对于无结构约束的全连接网络
+\(f_{\text{MLP}}\)，其全局 Lipschitz 常数通常满足 \(L_f > 1\)，则 \(H\)
+步展开误差遵循指数界度：
+\[ e_H^{\text{MLP}} \le L_f^H e_0 + \frac{L_f^H - 1}{L_f - 1} \epsilon_{\text{model}} = \mathcal{O}(L_f^H) \]
+
+而在具有正不变集（Positively Invariant Set）性质的结构化动力学系统下，如果状态流形通过守恒流动（Mass
+Balance）及非负包络收缩算子（例如库存 \(q \ge 0\) 的投影截断算子
+\(\Pi_{\mathcal{C}}\)）严格维持在可行域内，当 \(\mathcal{C}\) 闭凸时，此类投影算子天然具有非扩张性。若受控系统在工作区间内满足局部收缩界限 \(L_f \le 1\)，则系统预测差异随时间的累加可被严格限制在线性增长范围内，并在 \(0 \le L_f < 1\) 时具有常数级上界：
+\[
+e_H^{\text{SD}} \le 
+\begin{cases}
+e_0 + H\epsilon_{\text{model}} = \mathcal{O}(H), & L_f = 1 \\
+L_f^H e_0 + \frac{1 - L_f^H}{1 - L_f} \epsilon_{\text{model}} \le e_0 + \frac{\epsilon_{\text{model}}}{1 - L_f} = \mathcal{O}(1), & 0 \le L_f < 1
+\end{cases}
+\]
+
+当系统自带强阻尼项或具备稳定吸引子（如需求消耗或受限流转带来的收敛阻尼），其结构算子具备收敛映射属性。以我们在第
+6 节 Beer Game 主实验中所观测的系统动力学环境为例，附录 A.3 的经验测算给出了 \(\hat L_f \approx 0.96\) 的局部估计，表明该工作区间内呈现出近似收缩特征；在这一经验事实下，多步绝对展开误差可被限制在 \(\mathcal{O}(1)\)
+的常量上界内。该现象也与存量系统积分型状态更新的噪声平均效应一致，为上述误差收缩现象提供了解析意义上的物理直觉。这一理论结果不仅解释了第 6 节表 2（物理一致性）中观测到的显著稳定性提升，也与 BlackBox 在缺乏结构约束时出现的更高误差增长率形成了定量对照（即平均每步误差增量约 6.35\%，详见附录 A.3 测算）。
+
+\hypertarget{ux957fux89c6ux91ceux622aux65adux8865ux507fux539fux7406-addressing-horizon-truncation-via-value-alignment}{%
+\subsection{5.3 截断搜索的终端价值补偿原理 (Addressing Horizon Truncation via Value Alignment)}\label{ux957fux89c6ux91ceux622aux65adux8865ux507fux539fux7406-addressing-horizon-truncation-via-value-alignment}}
+
+如果推演过程是稳定可控的，为何我们不利用 SD 结构化系统进行高深度甚至无穷深度规划？原因是在离散动作空间中，树搜索的计算复杂度依旧呈 \(\mathcal{O}(|\mathcal{A}|^H)\) 随深度呈指数剧增。因此，必须利用离线逼近的值函数 \(V_\psi\) 补偿极短视野处的截断（Truncation），避免高昂的延迟变量展开计算。
+
+\textbf{命题 3：截断偏差与参数精确度的视界平衡 (The Horizon-Accuracy Trade-off). }
+设任务的有效时间跨度（Effective Horizon）为 \(\tau\)。作为对比基线，我们考虑 \textbf{(1) Oracle MPC}：假设规划器拥有真实物理参数 \(\theta^\star\) 但不具备终端价值引导（终端值 \(V_H=0\)），截断深度为 \(H\)。由于短视探索，其必然引入截断偏差 (Truncation Bias) \(\le \frac{\gamma^H R_{\max}}{1-\gamma}\)。
+
+相对地，考虑 \textbf{(2) SD-MCTS}：设 \(\hat{\theta}\) 为基于有限观测得到的带偏系统参数估计量，具有分布外估计误差界 \(\|\hat{\theta} - \theta^\star\| \leq \delta_\theta\)。由于性能约束，SD-MCTS 的展开深度同样被限制为极短的 \(H\)，但通过在叶节点引入离线价值网络代偿，其估值满足上界 \(\|V_\psi - V^*\|_\infty \leq \epsilon_V\)。
+
+在策略行为分布中，由于 SD-MCTS 获得了结构保护且满足多步误差有界（命题 2），智能体 \textbf{(2) SD-MCTS} 产生的价值预测误差（Value Prediction Error）上确界将严格优于 \textbf{(1) 完美参数 Oracle MPC}，若满足如下充分条件：
+\[
+\underbrace{L_\theta \delta_\theta}_{\text{SD 参数误差导致的价值偏差}} + \underbrace{\gamma^H \epsilon_V}_{\text{折扣终端估计误差}} < \underbrace{\frac{\gamma^H R_{\max}}{1-\gamma}}_{\text{Oracle 的绝对视距截断盲区}}
+\]
+\emph{(其中 \(L_\theta\) 是预期累积奖励关于环境变量映射的全局 Lipschitz 常数).}
+
+\textbf{理论推论}：这一不等式明确了``参数模型 + 短视窗探索 + 全局终端价值''架构在求解复杂长线系统规划时的必要性。即便离线拟合的网络 \(V_\psi\) 和经验识别量 \(\hat{\theta}\) 均包含固定的估计残差（不等式左侧项），只要物理系统的有效时间跨度 \(\tau\) 远大于可用搜索窗口 \(H\)，由于缺乏终端引导而丢失的深远影响（不等式右侧）便占据绝对主导。在此条件下，将计算资源从高成本的深度扩展中转移，转投于短视窗内的宽分支搜索，并辅以叶节点 $V_\psi$ 的自举代偿，是一项稳健的决策替代方案。
+
+\hypertarget{ux89c4ux5212ux8d28ux91cfux7684ux6839ux672cux5deeux5f02q-ux4f30ux8ba1ux7684ux4e0dux53efux7ea6ux504fux5dee-irreducible-bias-in-q-estimation}{%
+\subsection{5.4 规划质量的根本差异：Q 估计的不可约偏差 (Irreducible Bias
+in
+Q-Estimation)}\label{ux89c4ux5212ux8d28ux91cfux7684ux6839ux672cux5deeux5f02q-ux4f30ux8ba1ux7684ux4e0dux53efux7ea6ux504fux5dee-irreducible-bias-in-q-estimation}}
+
+前三个命题共同表明，SD-MCTS 与黑盒 MCTS 在规划质量上的差异不仅体现在方差收敛速度，更体现在由世界模型失配导致的偏差是否可消除。
+
+\textbf{命题 4：黑盒世界模型的 Q 估计存在不可约偏差。} 设 $\hat{Q}_{n}(s,a)$ 为 MCTS 在动作 $a$ 上经过 $n$ 次 rollout 后得到的估计，$Q_H^\pi(s,a)$ 为真实的 $H$ 步截断 Q 值。其误差可写为
+\[
+\hat{Q}_{n}(s,a)-Q_H^\pi(s,a)=b_H(s,a)+\varepsilon_n(s,a),\qquad \varepsilon_n(s,a)=\mathcal{O}_p(n^{-1/2}),
+\]
+其中 $b_H(s,a)$ 为模型结构失配产生的确定性偏差，$\varepsilon_n(s,a)$ 为可随采样次数衰减的随机项。
+
+对于黑盒 MLP 世界模型，若其有效 Lipschitz 常数满足 $\gamma L>1$，由命题 2 的多步误差传播可得，偏差项随规划深度呈指数放大：
+\[
+\left|b_H^{\mathrm{BB}}(s,a)\right|\le C_{\mathrm{BB}}(\gamma L)^H,
+\]
+其中 $C_{\mathrm{BB}}$ 由世界模型单步误差、奖励 Lipschitz 常数、终端价值逼近误差及 rollout 分布共同决定，但与 $n$ 无关。因而即使 $n\to\infty$，随机项 $\varepsilon_n$ 消失后，$\left|b_H^{\mathrm{BB}}(s,a)\right|$ 仍保留为不可约系统误差。
+
+相比之下，SD-MCTS 的结构约束将预测轨迹限制在物理可行域内，并显著抑制多步误差累积。对应地，
+\[
+\left|b_H^{\mathrm{SD}}(s,a)\right|\le C_{\mathrm{SD}},
+\]
+且在结构完全匹配、转移确定且终端价值估计无误差的理想条件下，有 $b_H^{\mathrm{SD}}(s,a)\equiv 0$（即系统性误差完全消失）。
+
+\textbf{推论（效率差距的根因）。} SD-MCTS 的样本效率优势主要来源于结构化建模对偏差项的抑制，而非随机波动或超参数的偶然匹配。当 $n$ 增大时，两类方法的方差项均衰减，但黑盒模型的不可约偏差 $\mathcal{O}((\gamma L)^H)$ 仍限制其最终规划质量。这一分析为第 6 节中观察到的实验现象提供了理论解释：缺乏结构约束的黑盒模型即使增加训练或规划预算，其性能提升仍会受到系统性偏差的限制；相比之下，SD-MCTS 更容易在低样本和长时延任务中保持规划优势。完整的 bias-variance 分解见附录 A.7。
+
+\hypertarget{ux5b9eux9a8c-experiments}{%
+\section{6 实验 (Experiments)}\label{ux5b9eux9a8c-experiments}}
+
+本节通过实证评估 SD-MCTS，旨在回答以下核心问题：
+
+\begin{enumerate}
+\item \textbf{采样效率与性能}：相比于缺乏结构先验的通用 MBRL 方法，显式编码系统守恒律能否显著提升样本效率与规划性能，并抑制物理约束违规？
+\item \textbf{多步泛化与视野缩减}：结构先验是否有助于抑制多步展开中的误差累积，并在终端价值补偿下以较短的规划视野匹配更长视野方法的性能？
+\item \textbf{零样本鲁棒性}：当环境的因果结构发生已知突变时，可编辑的结构化世界模型能否实现对未知干预分布的零样本适配？
+\end{enumerate}
+
+\hypertarget{ux5b9eux9a8cux8bbeux7f6e-experimental-setup}{%
+\subsection{6.1 实验设置 (Experimental
+Setup)}\label{ux5b9eux9a8cux8bbeux7f6e-experimental-setup}}
+
+\textbf{评估环境}：\revdel{为了覆盖低样本延迟规划、敏感状态控制以及结构突变干预等关键情形，我们围绕两个代表性评测环境开展实验（环境设定与复现细节见附录
+A.1）：}
+\revadd{为了覆盖低样本延迟规划、敏感状态控制、结构突变干预以及更高难度连续运动控制等关键情形，我们围绕三个代表性评测环境开展实验（环境设定与复现细节见附录
+A.1）：} 
+(1) \textbf{Beer Game}：一个经典的离散时间多智能体库存控制环境，对应四级供应链结构，系统固有的
+$2 \sim 3$ 步物理延迟极易诱发著名的“牛鞭效应”（Bullwhip Effect），对长线规划能力提出了极限考验；此外，我们也在该环境上进一步构造结构突变干预，用于检验零样本适配能力。 
+(2) \textbf{DMControl Cartpole-Swingup}：一个标准的连续控制基准，要求将倒立摆从悬垂状态甩起并维持竖直平衡；该任务在近竖直平衡区间对状态误差高度敏感，适合检验结构先验在敏感状态下的规划稳定性与鲁棒性。
+\revadd{(3) \textbf{DMControl Hopper-Hop}：一个难度更高的连续控制基准，包含明显的接触切换、相位转换与更稀疏的奖励信号；该任务更适合作为检验结构化方法能否在复杂运动控制中维持低预算有效性的压力测试。}
+
+\textbf{基线方法}：为了客观评估，我们将 SD-MCTS 与以下具有代表性的算法进行对比：
+
+\begin{itemize}
+\item \textbf{通用 MBRL}: DreamerV3，作为代表性的模型基强化学习方法。
+\item \textbf{无模型强化学习}: PPO，作为经典无模型强化学习基线。
+\item \textbf{结构与规划消融基线}: BlackBox-MCTS（使用无结构 MLP 替换结构化世界模型的变体），以及 1-Step VNet Lookahead（保留单步前瞻与终端价值估计，但不进行树搜索）。
+\item \textbf{规划参照上界}: Oracle MPC，作为拥有完美环境先验参数的理论上限参考。
+\end{itemize}
+
+\hypertarget{ux6837ux672cux6548ux7387ux4e0eux7269ux7406ux4e00ux81f4ux6027-sample-efficiency-and-physical-consistency}{%
+\subsection{6.2 样本效率与物理一致性 (Sample Efficiency and Physical
+Consistency)}\label{ux6837ux672cux6548ux7387ux4e0eux7269ux7406ux4e00ux81f4ux6027-sample-efficiency-and-physical-consistency}}
+
+本小节围绕 Beer Game 的低样本主结果展开，并进一步通过规划内部轨迹一致性分析说明结构约束为何能够带来这一优势。在该环境中，SD 的构成是较为典型的：四级供应链各节点的库存与积压构成核心存量，订单传递、发货与到货构成受时滞影响的流量过程，而上游补货决策、下游需求冲击及其延迟传导共同形成反馈回路。因此，这里的结构化世界模型实质上就是一个显式的存量--流量--反馈系统，而非仅仅对库存控制过程施加若干事后约束。
+
+\subsubsection{6.2.1 低样本区间的主要结果 (Main Results in the Low-Sample Regime)}
+
+为考察低样本条件下的规划性能，我们在标准四级 Beer Game 环境（\(H=36\)）中比较了各算法的表现。实验目标是最大化多步累积回报（Return，惩罚项的相反数）。如
+表 1 所示，SD-MCTS 在低数据区间展示了显著的效率优势。
+
+\begin{table}[ht]
+\centering
+\caption{采样效率对比 (固定 3 个种子的平均累积回报与标准误)}
+\begin{tabular}{l c c c}
+\toprule
+样本预算 & SD-MCTS (Ours) & DreamerV3 & PPO \\
+\midrule
+1,000 步 & \textbf{-710 ± 32} & -6785 ± 2764 & -4335 ± 855 \\
+3,000 步 & \textbf{-732 ± 41} & -1373 ± 237 & -4472 ± 1173 \\
+10,000 步 & \textbf{-713 ± 23} & \textbf{-713 ± 110} & -6200 ± 2380 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{显著的样本效率}：在极度数据受限（仅 1000 步）时，SD-MCTS (-710)
+的表现显著优于 DreamerV3 (-6785)。进一步地，在 1000 至 10000
+步的范围内，SD-MCTS 的回报基本稳定在同一可用区间，而 DreamerV3
+约需到 10000 步时才接近这一水平。这表明结构先验的主要价值在于将规划更早带入有效性能区间（见下方图
+2）。Model-free
+方法在所有预算下均无法收敛至有效解，反映了具有严重长延迟和稀疏反馈的领域对有效环境建模机制的强依赖。
+
+\includegraphics{figure1_sample_efficiency.png} \emph{图 2:
+各模型在极端受限数据下的累积回报曲线。SD-MCTS
+凭借先验结构在极早期即实现可用策略，而纯神经探索模型需消耗远超其的数据量。}
+
+\textbf{结构先验的优势区间}：当样本量增加到 10000 时，DreamerV3
+收敛并基本追平了 SD-MCTS（-713 vs -713）。这一结果表明，两类方法的优势主要体现在不同的数据区间：SD-MCTS
+依靠结构先验，在极低样本条件下即可进入可用性能区间；而
+DreamerV3 虽然前期样本效率明显较低，但随着交互数据逐步增加，也能够逼近相近的回报水平。结合表 1 与图 2
+可以看出，SD-MCTS 的主要价值并不主要体现为最终回报上限更高，而在于显著降低获得有效策略所需的数据门槛。与此同时，PPO
+在各个预算下均未能得到有效解，也进一步说明在具有长延迟与稀疏反馈的任务中，环境建模能力仍是决定性能的关键因素。上述现象与第 5.4 节关于结构化建模能够抑制规划偏差累积的分析是一致的。
+
+\subsubsection{6.2.2 规划内部轨迹一致性 (Planning-Internal Trajectory Fidelity)}
+
+\textbf{规划内部轨迹一致性保证}：模型基强化学习（MBRL）的性能很大程度上取决于规划器对未来轨迹分布的保真程度。MCTS
+在搜索树内构建多步展开轨迹时，模型输出的想象状态（imagined
+states）如果发生物理失真（如产生负库存、违反守恒方程），就会系统性地污染树内的价值估计和路径回报，导致规划偏差。\textbf{此处关键的区分是}：动作掩码（action
+masking）或事后裁剪（post-hoc clamping）只能保证最终执行动作的合法性，却无法修复
+MCTS 搜索树内部想象轨迹的物理失真。换言之，这类方法只能约束“最终输出什么动作”，却不能改变搜索过程中已经生成并参与回传的非物理状态，因此树内价值估计的系统性偏差仍会被保留下来。即：\textbf{输出层的事后修补（patch）不能替代模型动力学层面的结构约束。}
+
+为进一步解释 6.2.1 中主结果所体现的性能差异，这里引入一个机制性对照：在保持相同
+MCTS 规划框架与终端价值估计方式不变的前提下，仅将结构化世界模型替换为无结构的黑盒
+MLP。这样，二者在搜索树内部想象轨迹上的差异，便可更直接地归因于结构约束本身，而非规划算法或价值补偿机制的改变。
+
+SD-MCTS 的结构化先验从设计层面保证了 MCTS 搜索树内的想象状态始终满足守恒约束。我们进一步通过如下证据链对这种内部一致性进行验证：
+
+\[\underbrace{\text{物理一致性}}_{{\text{Table 2}}} \;\Rightarrow\; \underbrace{\text{多步误差有界}}_{\text{图 3}} \;\Rightarrow\; \underbrace{\text{规划回报更优}}_{\text{Table 1}}\]
+
+其中，表 2 汇报搜索树内部想象状态的物理一致性统计结果，图 3 展示多步预测误差的传播特性，而表 1 则反映这些性质最终如何体现为规划回报差异。
+
+\begin{table}[ht]
+\centering
+\caption{搜索树内部想象状态的物理一致性对比}
+\begin{tabular}{l c c}
+\toprule
+评估指标 & SD-MCTS (Ours) & BB-MCTS (无结构 MLP) \\
+\midrule
+\textbf{想象状态物理违规率} & \textbf{0.00\% ± 0.00\%} & 93.66\% ± 1.95\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{quote}
+\emph{表 2 说明}:
+实验采用训练预算 3000、MCTS 模拟次数为 50、3 个种子，表中结果均以均值 $\pm$ 标准误报告。违规率定义为\textbf{搜索树内部生成的想象状态中，出现物理违规的状态占比}，而非出现违规的 episode
+占比；在当前设置下，每个 seed 于 10 个评估 episode 中共记录 18000 个想象状态。这里的“物理违规”指想象状态的物理相关维度中任一维出现负值。结果表明，结构约束在本实验中完全消除了搜索树内部的物理违规，而无结构 MLP
+即使置于同一规划框架下，仍会产生大面积非物理状态。
+\end{quote}
+
+这一证据链说明，\textbf{物理一致性是高质量 MCTS
+规划的重要前提}，而非仅仅是模型层面的附属性质。这进一步由图 3
+的多步误差分析中得到实证。
+
+\hypertarget{ux9884ux6d4bux8befux5deeux7684ux754cux5ea6ux4e0eux7ed3ux6784ux5316ux6cdbux5316-error-bounding-and-structured-generalization}{%
+\subsection{6.3 预测误差的界度与结构化误差控制 (Error Bounding and
+Structured Error
+Control)}\label{ux9884ux6d4bux8befux5deeux7684ux754cux5ea6ux4e0eux7ed3ux6784ux5316ux8befux5deeux63a7ux5236-error-bounding-and-structured-error-control}}
+
+为检验理论揭示的误差控制机制（相关经验测算见补充附录 A.3），我们在四级啤酒游戏（Beer
+Game）测试集上从随机初始状态出发，考察了各模型在开环多步预测（1-15
+步前瞻）中的状态预测误差（以 RMSE 衡量）。结果如图 3
+所示，更完整的时序残差曲线见附录 A.3。
+
+\includegraphics{fig1_error_growth_main.png}
+\emph{图 3: 不同世界模型在 1\textasciitilde{}15
+步开环预测中的状态 RMSE 及其随预测步数的变化。BlackBox
+的误差随步数持续增长，而 SD-MCTS 保持近似常数级。}
+
+与前文理论分析一致，图 3
+表明，结构约束会显著影响多步误差的传播方式。全连接 BlackBox
+模型的初始误差更高，且误差随展开步数持续上升；按附录 A.3
+的拟合结果，其平均相对误差增长率约为 6.35\% / 步，对应约 11
+步翻倍。相比之下，SD-MCTS
+模型的误差曲线始终维持在极低水平，在观测窗口内基本不随步数增长。这说明，显式流转约束和非负可行域限制能够有效抑制多步展开中的误差累积。
+
+基于这种近似常数级的误差界，SD-MCTS
+在规划时可以显著减轻长视野展开带来的复合噪声，也为在较浅规划深度下结合叶节点价值估计提供了更稳定的前提。
+
+\hypertarget{ux9762ux5bf9ux7ed3ux6784ux7a81ux53d8ux7684ux96f6ux6837ux672cux56e0ux679cux5e72ux9884-zero-shot-transfer-via-causal-intervention}{%
+\subsection{6.4 面对结构突变的零样本因果干预 (Zero-shot Transfer via
+Causal
+Intervention)}\label{ux9762ux5bf9ux7ed3ux6784ux7a81ux53d8ux7684ux96f6ux6837ux672cux56e0ux679cux5e72ux9884-zero-shot-transfer-via-causal-intervention}}
+
+在前述 Beer Game 的样本效率与误差泛化证据之外，我们进一步检验该框架在结构突变下的适应能力。当供应链中出现节点失效或链路中断等突发变化时，缺乏可编辑结构的黑盒模型通常难以及时利用已知干预信息。为此，我们在四级啤酒游戏中构造了两类可观测的\textbf{因果干预实验}：容量冲击与链路中断（训练样本预算为 5000 步，评估基于 3 个随机种子）。
+
+\subsubsection{6.4.1 干预设定与总体结果}
+
+\textbf{核心设定}：干预事件本身对决策者是可观测的，即其发生时点与作用位置已知，例如供应链中的容量受限或链路中断可以作为外部信息被明确获知。困难之处不在于识别干预是否发生，而在于智能体此前从未在该参数分布或图拓扑下接受训练。
+
+具体而言，我们在每个 episode 中施加两类结构突变：一类是在 \(t \geq 15\) 后将产能约束下调的容量冲击（capacity shock），另一类是在 \(10 \leq t \leq 20\) 区间内切断关键订单链路的链路中断（communication severed）。
+
+我们对以下 3 种变体的累计成本以及它们世界模型的绝对多步预测误差（RMSE）进行了零样本评估：
+
+\begin{itemize}
+\item \textbf{SD}：本文方法，在受到干预时对内部转移计算图施加与外部事件一致的 \(do()\) 式结构修改。
+\item \textbf{SD\_no\_update}：同一预训练的 SD 模型，但拒绝进行内部图响应修改，用以剥离图编辑的作用。
+\item \textbf{BlackBox (BB)}：基于同等数据训练的无结构 MLP 的 MCTS 世界模型。
+\end{itemize}
+
+为考察结构编辑在此类干预下的作用，我们首先比较三种变体在两类结构突变中的累计成本表现，结果如图 4 所示。
+
+\includegraphics{fig_intervention_cost.png}
+\emph{图 4:
+在两类结构突变下，SD 变体通过零样本图编辑将干预信息直接纳入内部转移过程，从而显著降低了累计规划成本。}
+
+\subsubsection{6.4.2 结构编辑带来的增益分析}
+
+为更清楚地比较三种方法在两类干预下的总体表现，表 3 汇总了累计成本与多步预测误差的对比结果。基于表 3，可以看到结构编辑带来的增益主要体现在以下几个方面。
+
+\begin{table}[t]
+\centering
+\caption{因果干预零样本评估对比 (跨 3 种子均值 ± 标准差)}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{l c c c c c}
+\toprule
+干预类型 & SD (Cost ↓) & SD\_no\_update & BB (Cost ↓) & 图编辑增益 & 结构精度增益 \\
+\midrule
+\multicolumn{6}{c}{\textit{累计成本 (Cost, 越小越好)}} \\
+\midrule
+基准（none） & 913 ± 57 & \textbf{884 ± 40} & 2104 ± 231 & -3.4\% & 2.38x \\
+容量冲击（capacity shock） & \textbf{1331 ± 107} & 1791 ± 230 & 3585 ± 144 & \textbf{+25.7\%} & 2.00x \\
+链路中断（communication severed） & \textbf{1865 ± 132} & 2216 ± 122 & 4059 ± 171 & \textbf{+15.9\%} & 1.83x \\
+\midrule
+\multicolumn{6}{c}{\textit{多步预测精度 RMSE}} \\
+\midrule
+干预类型 & SD (RMSE) & SD\_no\_update & BB (RMSE) & - & - \\
+\midrule
+基准（none） & 0.00 ± 0.00 & 0.00 ± 0.00 & 9.11 ± 1.08 & - & - \\
+容量冲击（capacity shock） & 0.00 ± 0.00 & 5.02 ± 0.89 & 12.35 ± 0.40 & - & - \\
+链路中断（communication severed） & 0.00 ± 0.00 & 11.46 ± 4.18 & 13.87 ± 1.92 & - & - \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+\begin{enumerate}
+\item \textbf{结构先验与结构编辑带来两层增益。} 即使不进行图编辑，SD\_no\_update 仅凭结构化转移与守恒约束，在两类干预场景下也均明显优于 BB：在容量冲击（capacity shock）下，累计成本由 3585 降至 1791；在链路中断（communication severed）下，累计成本由 4059 降至 2216。这说明结构先验本身已经能够降低 OOD 条件下的规划失真。在此基础上，SD 进一步将已知干预直接写入内部转移过程，相比 SD\_no\_update 又继续改善：在容量冲击下由 1791 降至 1331，在链路中断下由 2216 降至 1865，对应额外提升约 25.7\% 与 15.9\%。这表明结构编辑能够进一步利用外部干预信息提升零样本适应能力。
+
+\item \textbf{守恒结构仍能提供更可靠的规划依据。} 在链路中断（communication severed）场景下，\texttt{SD\_no\_update} 的多步预测误差（11.46）已经接近 BB（13.87），但累计成本仍明显更低（2216 vs 4059）。这说明，即使未显式更新内部图结构，结构化模型保留的守恒关系仍能提供更合理的状态表征。换言之，\texttt{SD\_no\_update} 虽然会错估局部库存分布，但总体流转关系仍受守恒约束，因此规划不会偏离基本物理逻辑；相比之下，BB 一旦违反守恒，就可能在预测中产生并不存在的库存或流量，从而系统性高估某些动作的收益。
+
+\item \textbf{结构编辑显著降低了跨种子波动。} 在链路中断（communication severed）场景下，\texttt{SD\_no\_update} 的多步预测误差跨种子标准差达到 \textbf{±4.18}，说明在未更新内部结构时，不同随机种子会对未见干预产生较不一致的预测结果。相比之下，SD 在显式写入干预后，其 RMSE 跨种子标准差降为 0.00。这表明，当干预事件本身已知时，显式结构更新不仅能够改善平均性能，也能够减少不同随机种子之间的响应分歧。
+\end{enumerate}
+
+\textbf{小结}：以上对照表明，干预下的性能改善主要来自两个层面。其一，即使不进行结构编辑，\texttt{SD\_no\_update} 仅凭结构化转移与守恒约束，也已在两类场景下明显优于 BB，这可视为结构先验本身带来的收益。其二，在此基础上，SD 再将已知干预写入内部转移过程，相比 \texttt{SD\_no\_update} 继续取得约 15.9\%\textasciitilde{}25.7\% 的额外改善，说明结构编辑能够进一步利用外部干预信息提升零样本适应能力。以容量冲击（capacity shock）为例，累计成本由 BB 的 3585 依次降至 \texttt{SD\_no\_update} 的 1791 和 SD 的 1331，较清楚地体现了这两层作用的叠加。
+
+\hypertarget{sub-cartpole-rescue}{%
+\subsection{6.5 Cartpole-Swingup：公开基准上的样本效率与敏感状态稳健性 (Public-Benchmark Validation under Sensitive States)}\label{sub-cartpole-rescue}}
+
+在前述 Beer Game 系列实验之外，我们进一步转向 DeepMind Control Suite 的标准任务 \texttt{Cartpole-Swingup}
+进行评估，以补充公开基准上的对比证据。虽然该任务不具有 Beer Game 那样直观的库存流转语义，但其 SD 构成同样是明确的：小车位置、杆角及其速度状态可视为连续存量，控制输入以及由重力、惯性耦合决定的状态变化率项，可视为驱动这些存量演化的“流”，而“偏离竖直平衡会进一步放大后续修正难度”的机制则体现了反馈回路。该任务的动力学可由经典倒立摆方程刻画；同时，系统在接近竖直平衡时对状态误差极为敏感，因此也为检验
+SD-MCTS 在敏感状态附近的规划稳定性提供了一个直接场景。
+
+在该任务上，我们采用如下评估协议：先基于一组多种子开发数据训练共享价值先验，再对目标随机种子进行独立微调。对每个目标随机种子，微调阶段仅使用
+5k 步真实环境交互；若将共享先验的预训练成本一并计入，则该协议对应的一次``预训练
++ 单种子微调''总交互量为 40k
+步。这样做的目的不是抹平所有随机种子之间的差异，而是先利用多种子数据学习较稳定的价值几何初始化，再保留目标随机种子对自身状态分布的局部适配能力。最终三种子结果如下表所示。
+
+\begin{table}[ht]
+\centering
+\caption{Cartpole-Swingup 评估结果与公开基线对照}
+\begin{tabular}{l c c c}
+\toprule
+方法 & 环境交互步数 & 均值回报 & 最差种子回报 \\
+\midrule
+SD-MCTS（共享先验 + 微调） & 35,000+5,000 & 802.9 & 772.8 \\
+DreamerV3 (proprio) & 500,000 & 850.0 & - \\
+\bottomrule
+\end{tabular}
+\par\smallskip
+{\small 注：SD-MCTS 的环境交互步数按一次共享先验预训练（35,000）与单种子微调（5,000）合并计算；DreamerV3 结果取自官方论文附录。}
+\end{table}
+
+\textbf{公开基准上的主结果}：如上表所示，结合结构化动力学先验的
+SD-MCTS 在该公开基准上取得了 802.9 的三种子聚合均值，最差种子回报仍达到
+772.8。作为对照，DreamerV3 在该任务上的官方可核验结果为 500k-step proprio 设定下的
+850.0；按官方学习曲线估读，其在 50k 步附近通常处于约 500--600
+的分数区间，在 100k 步附近进入约 700--750 的分数区间。若将共享先验预训练与单种子微调的真实环境交互一并计入，本文协议总计约使用
+40k 步真实环境交互，仅为该 500k 官方结果的约
+1/12；同时，本文方法的总可训练参数仅为 17284，其中系统动力学本体仅包含 3 个可训练物理参数。按
+DreamerV3 常见约 8M 参数规模计，约为其
+1/460。还需指出，本文在该实验上采用的是离散动作分支的 MCTS 实现，评测时将连续控制离散为有限个动作 bins，因此与公开基准的比较对本文方法实际上是偏保守的。即便如此，这一结果也并不旨在宣称超越该任务的高预算最终 SOTA，而是表明：在未经改造的公开基准上，当底层动力学形式已知时，将学习重点压缩到少量系统辨识参数与价值估计，仍能够在较低真实交互预算下达到较高分数区间。
+
+\textbf{多种子稳健性与最差情况保障}：除均值之外，更关键的是，在这一评估设置下并未出现明显失稳的随机种子。三个目标随机种子的最终回报分别为
+772.8$\pm$33.5、817.9$\pm$29.6 与 818.2$\pm$18.8，且无单个种子低于
+700。这说明，这组结果并非依赖某个偶然有利的单个种子得到的高分，而是在不同初始条件下都维持了可用的控制性能。尤其从公开基准评估的角度看，最差种子仍保持在 772.8
+这一水平，比单独报告均值更能说明方法在敏感状态附近的稳定性。
+
+\textbf{价值网络初始化与按种子微调的作用}：共享先验 + 按种子微调（per-seed finetune）
+的作用，不只是抬高平均分数，更在于改善最差情况并降低跨种子波动。从修订过程看，在保持结构模型与共享先验主链不变的前提下，仅调整价值网络微调阶段的正则设置，就可能导致部分随机种子的最终回报显著变化。例如，较早配置下三种子结果约为 541.9、801.3 与 779.3，聚合均值约为 707.5；经修订后提升为 772.8、817.9 与 818.2，聚合均值达到 802.9。这说明，价值网络质量本身就是影响最终决策效果的关键因素之一，尤其直接关系到不同随机种子之间性能差异的收敛情况。其机制在于：先通过多种子共享初始化降低价值估计方差，再通过单种子微调保留局部适配能力，从而缓解近竖直敏感区间因状态覆盖差异引起的性能分化。为进一步检验在线树搜索本身的贡献，下一小节给出与表
+4 同一协议下的树搜索消融。
+
+\hypertarget{ux5bf9ux6a21ux578bux7684ux6d88ux878dux5206ux6790-ablation-study}{%
+\subsection{6.6 Cartpole-Swingup：在线树搜索的补充消融 (Supplementary Ablation on Tree Search)}\label{ux5bf9ux6a21ux578bux7684ux6d88ux878dux5206ux6790-ablation-study}}
+
+为解释表 4 中 Cartpole 主结果的来源，我们在与第 6.5 节完全一致的设置下补充了一个树搜索消融：保持同一组共享先验、按种子微调后的模型检查点、同一环境设置与评估随机种子不变，仅将在线决策从完整的
+SD-MCTS 替换为 \textbf{1-Step VNet Lookahead}，即仅做一步前瞻并调用终端价值网络打分，而不再进行树搜索。这样，二者之间的差异便可主要归因于在线规划本身，结果如表 5 所示。
+
+\begin{table}[ht]
+\centering
+\caption{Cartpole-Swingup 中在线树搜索作用的补充消融}
+\begin{tabular}{l c c c c}
+\toprule
+方法 & 均值回报 & Seed 0 & Seed 42 & Seed 84 \\
+\midrule
+SD-MCTS（完整规划） & \textbf{802.9} & \textbf{772.8} & \textbf{817.9} & \textbf{818.2} \\
+1-Step VNet Lookahead & 779.9 & 751.0 & 781.9 & 806.7 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+由表 5 可见，这一树搜索消融主要揭示了以下几点。
+
+\textbf{结构模型与终端价值本身已经提供了较强控制能力}：即便移除了树搜索，1-Step VNet Lookahead 仍能在三种子上取得
+779.9 的均值回报，且无单个种子低于 700。这说明在这一 Cartpole 任务中，结构化动力学先验与微调后的价值网络本身已经能够提供相当可用的控制性能，因此表 4 的主结果并非建立在一个过弱对照之上。
+
+\textbf{但完整 MCTS 仍然带来稳定且不可忽略的增益}：与 1-Step VNet Lookahead 相比，完整
+SD-MCTS 在三个随机种子上均取得更高回报，三种子均值由 779.9 提升至
+802.9，增益约为 23.0。其中差距在 Seed 42 上最为明显（781.9
+\(\rightarrow\) 817.9），说明在敏感状态附近，在线树搜索不仅提升了平均性能，也能够在某些随机种子上带来更显著的收益。当然，这里的增益幅度也应结合实现方式理解：由于本文采用的是离散动作分支的 MCTS，连续控制量需要先离散化为有限候选动作，搜索本身受到动作量化精度的约束。因此，表 5 中观测到的提升可以理解为一种较为保守、但依然稳定成立的规划增益。
+
+\textbf{因此，表 4 中的 Cartpole 主结果不能简单归因于某一个单独组件}：更合理的解释是，结构化世界模型负责提供可信的局部动力学，价值网络负责补偿短视截断，而在线 MCTS 则在敏感状态附近进一步改善动作选择质量。正是这三者的结合，才构成了表 4 中所报告的 Cartpole 主结果，也使得该结果更不容易被解释为仅仅来自某个偶然有利的单个种子或单步启发式的偶然收益。
+
+\hypertarget{sub-hopper-extension}{%
+\subsection{\textcolor{red}{6.7 Hopper-Hop：更高难度公开基准上的延伸}}\label{sub-hopper-extension}}
+
+{\color{red}
+在前述 Cartpole 的公开基准结果之外，我们进一步将验证扩展到 DeepMind Control Suite 中难度更高的 \texttt{Hopper-Hop}。引入该实验的目的有二：其一，检验结构化先验在更高难度、奖励更稀疏的公开任务上，是否仍能保持低预算下的样本效率优势；其二，验证结构化世界模型与现有黑盒 MBRL 求解框架的兼容性。与 \texttt{Cartpole-Swingup} 相比，该任务同时包含更强的接触切换、更明显的相位转换以及更稀疏的奖励信号，因此更适合作为检验结构化方法能否在复杂运动控制中保持低预算有效性的压力测试。同时，该实验并非对前文 SD-MCTS 设计的直接复制，而是在保留 TD-MPC2 求解闭环的前提下，以结构化 SD 主干替换其黑盒世界模型，并将由结构状态导出的规划奖励、课程式塑形（Curriculum Shaping）与辅助监督一并纳入训练与决策闭环。其结果如\textcolor{red}{表 6}所示。}
+
+\begingroup
+\makeatletter
+\def\fnum@table{\textcolor{red}{表 \thetable}}
+\makeatother
+\begin{table}[ht]
+\centering
+\caption{\textcolor{red}{Hopper-Hop 在更高难度公开基准上的结果对比}}
+\begin{tabular}{l c c c}
+\toprule
+\textcolor{red}{方法} & \textcolor{red}{50k} & \textcolor{red}{100k} & \textcolor{red}{200k} \\
+\midrule
+\textcolor{red}{结构化 Hopper 扩展（本文方法，3 个种子）} & \textcolor{red}{32.93 $\pm$ 13.03} & \textcolor{red}{?} & \textcolor{red}{-} \\
+\textcolor{red}{结构化 Hopper 扩展（本文方法，1 个种子）} & \textcolor{red}{-} & \textcolor{red}{-} & \textcolor{red}{?} \\
+\textcolor{red}{TD-MPC2（官方结果，3 个种子）} & \textcolor{red}{-} & \textcolor{red}{13.6 $\pm$ 10.4} & \textcolor{red}{166.6 $\pm$ 34.9} \\
+\textcolor{red}{DreamerV3（官方结果，3 个种子）} & \textcolor{red}{-} & \textcolor{red}{9.7 $\pm$ 13.6} & \textcolor{red}{51.2 $\pm$ 50.4} \\
+\bottomrule
+\end{tabular}
+\end{table}
+\endgroup
+
+{\color{red}
+\textbf{实验结果}：在当前已完成的 50k 三种子评估中，结构化 Hopper 扩展取得了 \(32.93 \pm 13.03\) 的均值回报，三个种子分别达到 \(24.78\)、\(22.70\) 与 \(51.32\)。作为对照，TD-MPC2 在该任务上的官方可核验结果为 100k 步设定下的 \(13.6 \pm 10.4\)，DreamerV3 在 100k 步设定下为 \(9.7 \pm 13.6\)。这表明，即使面对 \texttt{Hopper-Hop} 这一更高难度、奖励信号更稀疏的公开基准，该实验仅用 50k 步真实环境交互，已取得高于两项公开基线在 100k 步口径下的平均回报。}
+
+{\color{red}
+\textbf{结果分析}：与 Cartpole 相比，\texttt{Hopper-Hop} 的难点在于，成功跳跃通常并不是由单一步动作直接触发，而是依赖一串先后衔接的中间条件，例如机体抬升、支撑逐步卸载、离地间隙形成、姿态保持稳定以及竖直速度建立。这些条件大多先于环境中的显式奖励出现，因此若求解过程只围绕训练早期较弱的环境回报展开，算法就很难在低预算阶段稳定辨认哪些状态正在朝成功轨迹演化。该实验中，结构化世界模型将高度、支撑、离地间隙、压缩与摆动等机制量显式表示出来，而规划奖励、课程式塑形（Curriculum Shaping）与辅助监督则进一步把这些结构量转化为可用于动作评估的偏置，因此即使在环境奖励尚不充分时，求解过程仍能较早围绕正确方向组织探索。}
+
+{\color{red}
+\textbf{进一步的启发}：该实验提示，在那些成功行为依赖阶段性条件逐步满足的任务中，结构化收益不应仅理解为“把世界模型从黑盒换成结构化形式”。更关键的因素在于，这类任务的成功往往依赖若干具有先后关系的结构条件；如果这些条件只体现在状态递推里，而不进一步进入动作评估、搜索偏置与训练信号，那么求解器在早期仍主要依赖稀疏的终局奖励，结构知识就难以转化为稳定的低预算收益。相反，当这些结构量同时进入建模与求解两侧时，算法便能够在奖励尚弱的阶段优先保留那些更可能通向成功轨迹的候选动作。这也说明，在更复杂的任务上，结构化方法的后续发展方向很可能不仅是继续改进世界模型表达，还包括将更多求解过程纳入结构化空间中完成。}
+
+\hypertarget{sub-boxoban-extension}{%
+\subsection{6.8 Boxoban：结构化推箱规划的补充外部基准}\label{sub-boxoban-extension}}
+
+作为对 SD-MCTS 较广泛适用性的补充检验，我们进一步在 Boxoban 的公开 \texttt{unfiltered/test} 切分上评估动态运输阶段 GFT-TVA 版本。该实验使用完整 \(1000\) 关测试集，配置在内部 heldout 主线冻结后不再调参：底层转移由 exact-grid stock-flow provider 给出，MCTS 以 push-level 动作为搜索单位，叶值由显式 GFT-SD 读数与 GFT-TVA 按状态门控混合。最终结果为 \(989/1000\)，即 \(98.9\%\) 解题率。
+
+下表将该结果与已发表的 Boxoban/Sokoban 规划结果放在同一量级表中。需要强调的是，这里的目的不是宣称在原始解题率上严格超过所有搜索器；Orseau et al. 与 Orseau and Lelis 的策略/启发式搜索方法已经在该类 \(1000\) 关测试口径上报告过 \(1000/1000\)。本表更关心的是：在接近这些强搜索结果的同时，本文方法把可学习部分压缩到很小的 TVA 状态集合，并保留了显式结构化世界模型与可解释的 stock-flow/GFT 读数。
+
+\begin{table}[ht]
+\centering
+\caption{Boxoban/Sokoban 外部基准与训练、审计规模对照}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{p{0.19\textwidth} p{0.16\textwidth} p{0.34\textwidth} p{0.24\textwidth} p{0.13\textwidth}}
+\toprule
+方法 & 类型 & 训练或审计规模 & teacher / 搜索监督口径 & 测试结果 \\
+\midrule
+本文：SD-MCTS + 动态运输阶段 GFT-TVA & 显式结构世界模型 + push-level MCTS & exact-grid 转移；TVA 训练来自 \texttt{medium/train/001.txt} 的 40 关在线轨迹，\(1{,}378\) 个 raw 状态、\(834\) 个去重状态，其中 value 训练状态 \(114\) 个；独立审计为 \(120\) 个叶状态、\(78\) 个高置信 teacher 标签 & 训练和在线测试 teacher 调用均为 \(0\)；teacher 仅用于独立审计，预算为 \(4{,}000\) expansions/leaf & \(989/1000\) \\
+Guez et al. DRC(3,3), 2019 & model-free recurrent planning & Boxoban unfiltered large train set 为 \(900\text{k}\) 关；DRC(3,3) 训练至 \(10^9\) environment steps & 不使用显式世界模型或离线 teacher；通过大规模 RL 从奖励中学习隐式规划 & 约 \(99\%\) \\
+Orseau et al. LevinTS, 2018 & 带保证的 policy-guided tree search & 使用 A3C 预训练策略指导测试时树搜索；论文测试集为 \(1{,}000\) 个 Boxoban/Sokoban 关卡 & 强测试时搜索；LevinTS 总 expansions 约 \(6.6\times10^6\)，加入 \(1\%\) policy noise 后约 \(5.0\times10^6\) & \(1000/1000\) \\
+Orseau and Lelis PHS*, 2021 & policy + heuristic guided search & 使用 Boxoban 前 \(50{,}000\) 个训练问题；5 次随机初始化训练；训练预算为 7 天 CPU，测试预算为 2 天 & 通过 bootstrap search 交替学习 policy 与 heuristic；PHS* 平均 expansions 约 \(1{,}522.1\) & \(1000/1000\) \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+该补充结果支持的结论应表述为“接近已发表强搜索器和 model-free planning 方法的 Boxoban \texttt{unfiltered/test} 性能，同时显著降低可学习价值模块的训练/审计样本规模，并保留显式可解释结构”。它不应被表述为严格 SOTA：一方面，策略/启发式搜索文献已报告满分结果；另一方面，本文方法利用已知 Sokoban 规则构造 exact-grid 转移，因而其样本效率优势不能与从零学习规则的 model-free RL 在完全同协议下直接相除。更准确地说，该实验说明，在规则可显式编码的离散规划任务中，将学习集中到截断叶值与结构化 prior 的少量状态校准上，可以在公开测试集上达到接近最强已发表结果的求解率。
+
+\hypertarget{ux8ba8ux8bbaux4e0eux7ed3ux8bed-discussion-and-conclusion}{%
+\section{7 讨论与结语 (Discussion and
+Conclusion)}\label{ux8ba8ux8bbaux4e0eux7ed3ux8bed-discussion-and-conclusion}}
+
+本文提出了 SD-MCTS 框架，将结构化世界模型、有限视界树搜索与终端价值补偿结合起来，用于已知系统结构可被显式利用的低样本决策问题。全文的核心结论可以概括为：当任务中存在可设计在模型中的因果拓扑、守恒关系或解析动力学时，将学习重点压缩到少量未知参数与终端价值估计，能够显著降低获得可用规划性能所需的真实交互成本。
+
+\revdel{Beer Game 与 Cartpole-Swingup 的结果表明，这类方法并不是对黑盒 MBRL 或传统 MPC 的简单替代，而更像二者之间的一种中间方案：一方面，结构化世界模型有助于抑制多步误差传播和搜索树内部的物理失真；另一方面，终端价值补偿又能够缓解浅搜索带来的截断损失。在干预事件可观测且能够映射为结构方程局部修改的场景下，模型的可编辑性还进一步支持了零样本结构适应。换言之，本文更想强调的是：\textbf{在结构先验明确的任务中，规划质量的提升很大程度上来自偏差控制，而不仅是来自更大模型或更多样本。}}
+\revadd{Beer Game、Cartpole-Swingup 与 Hopper-Hop 的结果共同表明，这类方法并不是对黑盒 MBRL 或传统 MPC 的简单替代，而更像二者之间的一种中间方案：一方面，结构化世界模型有助于抑制多步误差传播和搜索树内部的物理失真；另一方面，终端价值补偿与必要的结构化求解偏置又能够缓解浅搜索带来的截断损失。在干预事件可观测且能够映射为结构方程局部修改的场景下，模型的可编辑性还进一步支持了零样本结构适应；而在 Hopper 这类成功行为依赖阶段性条件逐步满足的任务中，结构收益则进一步显示出“建模侧结构化”与“求解侧结构化”相互配合的重要性。换言之，本文更想强调的是：\textbf{在结构先验明确的任务中，规划质量的提升很大程度上来自偏差控制，而不仅是来自更大模型或更多样本。}}
+
+\hypertarget{ux73b0ux5b9eux90e8ux7f72ux542bux4e49-online-overhead}{%
+\subsubsection{计算开销与部署讨论}\label{ux73b0ux5b9eux90e8ux7f72ux542bux4e49-online-overhead}}
+
+除样本效率外，在线计算开销也是实际应用中的一个重要考量。就本文方法而言，世界模型的可训练部分主要集中在少量具有物理意义的参数上，在线阶段的主要开销来自有限视界搜索与少量结构化一步前推，而不是大规模潜空间展开。与依赖高维隐状态模型的黑盒世界模型相比，这种结构化表示在参数规模和单步更新路径上通常更轻量。
+
+不过，本文并未对真实部署场景下的时延、吞吐或硬件占用进行专门测量，因此这里更适合将其理解为一种\textbf{复杂度层面的讨论}，而非对特定实时约束的实证结论。更准确地说，本文结果表明：在结构已知、样本昂贵且解释性重要的任务中，结构化世界模型有望在保持较低样本需求的同时，避免引入过重的模型计算负担；至于其在特定工业系统中的实际部署表现，仍需进一步的工程验证。
+
+\hypertarget{ux9884ux5148ux5e94ux5bf9ux53efux80fdux8d28ux7591ux4e3aux4ec0ux4e48-action-masking-ux4e0dux591fux7528}{%
+\subsubsection{为什么动作掩码（Action Masking）不能替代结构约束？}\label{ux9884ux5148ux5e94ux5bf9ux53efux80fdux8d28ux7591ux4e3aux4ec0ux4e48-action-masking-ux4e0dux591fux7528}}
+
+一个自然的问题是：如果黑盒模型在预测过程中出现物理违规，是否可以通过动作掩码（action masking）、状态裁剪（state clamping）等事后手段进行修补，从而削弱结构约束的必要性？从本文的角度看，这类手段可以提升\textbf{最终执行动作}的可行性，但仍不足以替代对\textbf{搜索树内部想象轨迹}的结构约束。
+
+\textbf{原因在于，动作掩码（action masking）关注的是动作可行性（action feasibility），而本文更关心的是轨迹动力学保真（trajectory fidelity）。} 在 MCTS 中，规划器需要依赖世界模型对未来状态进行多步展开；如果搜索树内部生成的想象状态已经违反守恒关系、非负约束或其他基本结构条件，那么后续的价值回传和动作选择就会从一开始建立在失真的轨迹上。此时，即便最终输出动作经过额外筛选而保持合法，树内误差也已经对规划质量产生了系统性影响。
+
+同理，状态裁剪也是对预测结果的事后修补，而不是对动力学本身的修正。它虽然可以在数值上强行把状态拉回可行区域，但并没有恢复原有的守恒流转关系，因此仍可能在规划过程中引入额外的隐式动力学偏差。第 6.2.2 节的结果正说明了这一点：真正影响规划质量的，不只是动作是否可执行，更是搜索树内部的想象轨迹是否保持了与环境一致的结构关系。
+
+\hypertarget{ux5c40ux9650ux6027ux4e0eux5f00ux653eux6311ux6218-limitations}{%
+\subsubsection{局限性与开放挑战
+(Limitations)}\label{ux5c40ux9650ux6027ux4e0eux5f00ux653eux6311ux6218-limitations}}
+
+不过，当前框架依然存在一些局限性，有待在未来的工作中持续攻克：
+
+\begin{enumerate}
+\item \textbf{结构已知假设 (The Known Structure Assumption)}：本文框架依赖一个基本正确的存量--流量或解析动力学骨架。这一设定适用于具有明确机理约束的工程系统；但如果先验结构本身存在遗漏或系统性偏误，预测与规划质量仍会受到限制。未来一个值得继续推进的方向，是将结构参数辨识与因果结构修正结合起来，而不只停留在固定拓扑下的参数学习。
+\item \textbf{理想动力学假设与未建模残差 (Idealized Dynamics and Residual Components)}：本文的研究重点，是验证结构化世界模型、终端价值补偿与结构编辑三者结合后，能否在低样本条件下改善规划质量，而不是在本篇中直接追求一个尽可能全面、尽可能高性能的通用学习模型。为突出这一核心主张，本文实验所使用的数据均来自理想仿真器，因此建模时默认训练数据中不存在显著观测噪声，也不额外包含结构化动力学主干之外的未覆盖成分。在这一设定下，直接利用结构化世界模型进行参数辨识是合适的；但在更普遍的现实问题中，系统往往呈现“主体动力学机制 + 随机扰动 + 未建模残差”并存的形态。对于这类情形，仅依赖纯结构主干可能不足以完整吸收偏差，未来更值得考虑的方向，是在保留结构化动力学主体的前提下，引入残差网络等补充模块，对未被显式建模的成分进行学习。
+\item \textbf{大规模动作空间下的搜索扩展性 (Scalability to Massive Actions)}：本文的树搜索在当前任务规模下是可行的，但当动作空间进一步扩大，尤其是进入高维连续控制时，离散化分支与搜索宽度都会迅速增加。此时可能需要将本文框架与更强的候选动作生成机制、策略引导搜索或分层规划方法结合，才能保持可接受的计算成本。
+\end{enumerate}
+
+\hypertarget{ux5e7fux4e49-neuro-orux4e0bux4e00ux4e2aux524dux6cbf-towards-generalized-neuro-or}{%
+\subsubsection{更广泛的启示与未来方向}\label{ux5e7fux4e49-neuro-orux4e0bux4e00ux4e2aux524dux6cbf-towards-generalized-neuro-or}}
+
+本文结果的一个更一般启示是：在结构先验明确、真实交互昂贵且模型失真代价较高的任务中，直接利用领域机理构造世界模型，往往比完全依赖黑盒函数逼近更容易获得稳定的早期规划性能。对于这类问题，学习与规划并不一定是“先学一个通用隐空间模型，再由搜索或策略去利用”，也可以是“先固定主要结构，再学习少量未知参数和终端价值补偿”。
+
+\revdel{从更长远的角度看，这类思路可能为运筹优化、控制与强化学习之间提供一种更紧密的结合方式。未来值得继续推进的方向包括：更一般的结构化世界模型表示、更灵活的结构修正机制，以及与连续控制和大动作空间搜索更紧密的结合。本文并不试图给出一个普适答案，但至少说明了一点：当问题本身已经包含可利用的因果结构和守恒规律时，让这些信息进入世界模型内部，确实可以改变低样本规划问题的求解条件（所有环境定义与复现入口见附录}
+\revadd{从更长远的角度看，这类思路可能为运筹优化、控制与强化学习之间提供一种更紧密的结合方式。未来值得继续推进的方向包括：更一般的结构化世界模型表示、更灵活的结构修正机制，以及与连续控制和大动作空间搜索更紧密的结合。Hopper 的延伸结果进一步提示，在某些复杂任务中，后续值得推进的并不只是“如何把世界模型写得更结构化”，还包括“如何让结构量以更直接的形式进入动作评估、搜索偏置与训练信号”。本文并不试图给出一个普适答案，但至少说明了一点：当问题本身已经包含可利用的因果结构和守恒规律时，让这些信息进入世界模型内部，并在必要时进一步进入求解过程，确实可以改变低样本规划问题的求解条件（所有环境定义与复现入口见附录}
+A.1 与 A.6）。
+
+\hypertarget{ux9644ux5f55-a-ux5b9eux9a8cux7ec6ux8282ux4e0eux590dux73b0ux6307ux5f15-appendix-experimental-details-and-reproducibility}{%
+\section{附录 A: 补充协议、结果与理论说明 (Appendix: Protocols, Results, and Theory)}\label{ux9644ux5f55-a-ux5b9eux9a8cux7ec6ux8282ux4e0eux590dux73b0ux6307ux5f15-appendix-experimental-details-and-reproducibility}}
+
+为了确保本研究所述结论的有效性和可复现性（Reproducibility），本附录详细列出了各基准环境的拓扑参数、SD-MCTS
+及基线算法的网络架构与超参数配置，以及由于主文篇幅限制而引用的扩展实验分析及其图表说明。
+
+\hypertarget{a.1-ux5b9eux9a8cux73afux5883ux8bbeux8ba1ux7ec6ux8282}{%
+\subsection{A.1
+任务中的 SD 实例化与环境定义}\label{a.1-ux5b9eux9a8cux73afux5883ux8bbeux8ba1ux7ec6ux8282}}
+
+\paragraph{四级啤酒游戏供应链（Beer Game）.}
+\revdel{在四级啤酒游戏中，SD 建模对象是具有显式延迟的物料与订单流转系统。工厂、分销商、批发商和零售商构成串联拓扑，终端需求仅在零售商侧被观测。就 SD 的基本构成而言，库存与积压是核心状态量；到货、发货、下单与需求满足构成流量；库存偏低、积压升高以及上游交付延迟共同影响后续订货决策，从而形成闭环反馈。本文世界模型在每一级节点上显式给出差分更新，并保留非负约束、发货受库存限制以及容量上限等结构条件，因此结构突变实验中的容量冲击与链路中断，都可以自然地表示为对容量参数或流量通道的直接干预。}
+
+{\color{red}
+\begin{enumerate}
+\item \textbf{状态表示：} SD 世界模型直接按环境的显式库存系统书写，内部状态为 \(26\) 维。四级节点各自包含库存 \(I\)、积压 \(B\)、两格在途发货管道 \(\text{ship}[0{:}1]\) 与两格订单信息管道 \(\text{order}[0{:}1]\)，此外还包含当前时间步与当期客户需求。
+\item \textbf{SD 语义对应：} 库存与积压对应 stock，在途发货、订单传递、终端需求满足与工厂补产对应 flow；“库存不足 \(\rightarrow\) 积压上升 \(\rightarrow\) 后续订货调整”构成带时滞的 feedback 回路。
+\item \textbf{结构方程：} 一步转移不由黑盒网络回归，而按固定顺序执行：先接收 \(\text{ship}[0]\) 到货，再将发货与订单管道整体移位；随后由零售端注入外部需求、其余各级接收上游延迟订单；接着依据 \(\min(\text{inventory},\text{backlog})\) 规则完成发货，并将上游实际发货写回下游在途管道；最后由工厂按产能上限生成新的补产流。
+\item \textbf{可学习参数：} 论文主结果中的 Beer Game SD 模型不学习拓扑与时滞结构，而固定四级串联系统、\(\tau_{\text{info}}=2\)、\(\tau_{\text{ship}}=2\)、成本函数形式及基线产能约束，仅学习 \(3\) 个标量参数，即 \(\text{demand\_low}\)、\(\text{demand\_high}\) 与 \(\text{demand\_step\_time}\)。
+\item \textbf{硬约束：} 为保持物理可行性，库存、积压、在途发货与在途订单在每一步更新后都被截断到非负域，工厂补产额外受 \(\text{production\_capacity}\) 约束。因此，守恒关系与可行域约束始终通过显式差分方程维护，而不是隐含在参数矩阵中。
+\item \textbf{干预接口：} 容量冲击实验通过在 \(t\ge 15\) 时将工厂产能上限由 \(20\) 改写为 \(2\) 实现；链路中断实验通过在 \(10\le t\le 20\) 时将批发商订货流强制置零实现。两类干预都表现为对结构方程局部项的直接编辑，因此 SD 模型可以在不重训神经网络的前提下完成测试时响应。
+\end{enumerate}
+}
+
+\paragraph{DMControl Cartpole-Swingup.}
+\revdel{在 Cartpole-Swingup 中，SD 结构不再表现为离散物流网络，而表现为受解析动力学约束的连续演化系统。小车位置、速度、杆角与角速度可视为随时间积分演化的状态量；控制输入以及由重力、惯性和耦合关系决定的状态导数，共同决定这些状态量在离散时间下的一步更新。本文结构化世界模型固定经典小车-倒立摆动力学方程的结构形式，仅对重力、质量、杆长等少量参数进行辨识，因此其结构先验来自动力学骨架本身，而不是完全依赖数据去拟合状态转移关系。该任务要求系统从悬垂状态完成摆起并维持近竖直平衡，因而适合检验在敏感状态附近，结构化动力学与在线规划能否共同提升决策稳健性。}
+
+{\color{red}
+\begin{enumerate}
+\item \textbf{观测与内部状态：} SD 世界模型采用连续解析动力学。DMControl 原始观测为 \([x,\cos\theta,\sin\theta,\dot x,\dot\theta]\)，其中 \(\theta=0\) 表示竖直向上、\(\theta=\pi\) 表示自然下垂；模型先用 \(\operatorname{atan2}(\sin\theta,\cos\theta)\) 将观测还原为内部状态 \([x,\theta,\dot x,\dot\theta]\)，再在该显式物理状态上执行一步预测。
+\item \textbf{动作解释：} 动作为区间 \([-1,1]\) 内的标量控制输入，在模型内乘以 actuator gear \(=10\) 后解释为小车所受水平驱动力。论文评测时再将连续动作离散为 \(11\) 个搜索分支，以便与当前 MCTS 实现对接。
+\item \textbf{结构方程：} 环境动力学固定为带阻尼的小车--倒立摆牛顿方程，并使用与 MuJoCo 配置一致的 RK4 积分器、时间步长 \(dt=0.01\) 做离散推进。状态导数由重力、杆端惯性耦合、车体与摆杆质量分配以及极小的滑轨/转轴阻尼共同决定。
+\item \textbf{可学习参数：} 论文口径的 Cartpole 结果中，重力参数固定为 \(9.81\)，仅学习 \(3\) 个标量参数，即车体质量 \(\text{masscart}\)、摆杆质量 \(\text{masspole}\) 与摆杆质心半长 \(\text{length}\)。这些参数均通过 softplus 与下界截断保持为正值，以避免非物理估计。
+\item \textbf{固定物理常数：} 滑轨阻尼 \(5\times10^{-4}\) 与转轴阻尼 \(2\times10^{-6}\) 按 MuJoCo 配置固定，不作为学习对象。这样可以保证搜索树内所有想象轨迹共享同一动力学骨架，模型只需校准少数与具体随机种子相关的物理常数。
+\item \textbf{与价值补偿的分工：} 与 Beer Game 类似，一步转移完全由解析动力学积分给出，终端价值网络只负责补偿有限规划视界后的长期回报，而不替代动力学本体。由于摆起任务在杆角接近竖直时对模型误差极其敏感，Cartpole 因而构成了检验 SD 结构先验是否能稳定支撑在线规划的连续控制实例。
+\end{enumerate}
+}
+
+\paragraph{DMControl Hopper-Hop.}
+{\color{red}
+\begin{enumerate}
+\item \textbf{观测与内部状态：} Hopper 实验采用 DMControl 的状态观测输入，原始观测为 \(15\) 维，包含根部高度与姿态、四个关节角、线速度与角速度，以及 toe/heel 两个接触读数。SD 世界模型并不直接把这 \(15\) 维观测当作规划状态，而是先编码为同样 \(15\) 维的机制状态：
+\[
+\begin{aligned}
+&[\text{height},\text{vx},\text{vz},\text{pitch},\text{pitch\_rate},\text{compression},\\
+&\text{compression\_rate},\text{swing},\text{swing\_rate},\text{foot\_angle},\\
+&\text{foot\_rate},\text{support},\text{stance\_mix},\text{impact},\text{clearance}].
+\end{aligned}
+\]
+其中，height、compression、support 与 clearance 对应任务中的关键结构量，vx、vz 与各类 rate 则描述连续演化趋势。
+\item \textbf{动作解释：} 动作为连续控制输入，先被分解为 drive、posture 与 foot 等控制分量，再分别作用到水平/竖直加速度、机体姿态、压缩量、摆动量与足端角等结构变量的更新中。也就是说，动作并不直接驱动一个无语义 latent 转移器，而是通过若干具有物理含义的中间通道影响一步递推。
+\item \textbf{系统动力学方程：} Hopper 实验的一步转移主要由显式系统动力学主干给出。模型根据动作构造 \(x/z\) 加速度、姿态变化、压缩/摆动/足端角的速率更新，并以欧拉积分得到下一步结构状态。更新后再通过 `project\_state()` 将高度、接触强度、姿态角与冲击量投影回合法域。
+\item \textbf{可学习参数：} 在该 Hopper 实现中，新增的可学习量主要是 \(11\) 个显式标量参数，即 `control\_scale` 的 \(4\) 个分量与 `rate\_damping` 的 \(7\) 个分量。与之对应，被替代的原 TD-MPC2 黑盒 latent dynamics 模块参数量为 \(300{,}128\)。
+\item \textbf{结构约束与奖励设计：} 环境奖励显式对齐为 `standing \times hopping`，其中 standing 由高度阈值给出，hopping 由前向速度是否达到任务目标决定。与此并行，规划器在叶节点评估时使用带 viability gate 的 planning reward：在真实奖励基础上，进一步考虑高度、姿态、支撑、离地间隙、向上速度与减粘连接触等结构信号，以缓解短规划视界下“只会站立或黏地前冲”的局部最优。论文所用配置同时采用课程式塑形（Curriculum Shaping）混合策略，初始塑形权重为 \(0.5\)，并在 \(10\text{k}\) 至 \(30\text{k}\) 训练步之间衰减至 \(0.25\)。
+\item \textbf{与求解层的分工：} Hopper 并未单独实现新的规划器，而是保留 TD-MPC2 的求解层接口，仅将世界模型替换为 SD 版本。具体而言，`encode / next / reward / pi / Q` 五个接口与原框架保持一致，训练阶段另对 `height\_head` 增加系数为 \(0.05\) 的辅助监督损失，使高度相关塑形分量不再处于无梯度漂移状态。因而，这一 Hopper 版本本质上属于“结构主干负责机制表达，原有求解闭环负责在线决策”的混合实现。
+\end{enumerate}
+}
+
+\hypertarget{a.2-experimental-protocols-and-hyperparameters}{%
+\subsection{A.2 实验总协议与超参数}\label{a.2-experimental-protocols-and-hyperparameters}}
+
+本节集中说明正文各实验所采用的评测协议与关键设置。
+
+\paragraph{Beer Game 主结果与补充分析.}
+Beer Game 的主结果、物理一致性分析与结构突变实验均基于同一四级确定性供应链环境。具体而言，订单信息传递延迟为 2 步，物流交付延迟为 2 步，每个 episode 长度为 36 步，需求扰动方差设为 0。表 1 按不同训练预算报告三随机种子的均值与标准误。表 2 的物理一致性分析采用受控对照：固定 Beer Game 环境、MCTS 规划器、终端价值网络结构与训练方式，仅替换世界模型结构（SD 或 BB），并统计搜索树内部想象状态的物理违规率。结构突变实验则统一在无干预环境中训练，在测试时注入外部结构变化，并比较能否显式更新模型结构。
+
+\paragraph{Cartpole 评测设置.}
+Cartpole-Swingup 采用开发种子与论文评测所用种子分离的“共享先验 + 按种子微调”（shared prior + per-seed finetune）设置。共享价值先验首先在开发种子 \(\{10,21,30,55,63,72,95\}\) 上训练，总真实环境交互为 \(35{,}000\) 步；随后在每个目标种子 \(\{0,42,84\}\) 上各自微调 \(5{,}000\) 步。正文对我们方法给出的预算口径统一写为 \(35{,}000+5{,}000\)。本文评测采用 \(11\) 个离散动作分支、动作重复步数（action repeat）为 2、每个种子 \(5\) 个评测 episode 的设置。由于基础 MCTS 实现并不直接支持连续动作优化，因此该离散化实现应理解为对公开连续控制基准的一种保守比较。
+
+\paragraph{\textcolor{red}{Hopper 评测设置.}}
+{\color{red}
+Hopper-Hop 的正文结果采用与公开基线对齐的三种子评测口径。具体而言，表 6 中 \(50\text{k}\) 的结构化 Hopper 结果基于随机种子 \(\{1,2,3\}\) 统计，每个评测点均对 \(10\) 个 episode 取平均；\(100\text{k}\) 的延长线与 \(200\text{k}\) 的单种子延长线均沿用同一训练与评测协议，仅改变真实环境交互预算。训练上，Hopper 扩展保留 TD-MPC2 的在线数据闭环与求解接口，使用状态观测输入、规划视界 \(H=3\)、batch size \(=256\)、学习率 \(3\times 10^{-4}\) 的设置；结构奖励采用课程式塑形（Curriculum Shaping），其权重由 \(0.5\) 在 \(10\text{k}\) 至 \(30\text{k}\) 步之间衰减至 \(0.25\)。此外，对 `height\_head` 额外加入系数为 \(0.05\) 的辅助监督损失，以稳定高度相关结构量在训练过程中的可用性。}
+
+\hypertarget{a.3-beer-game-supplementary-results}{%
+\subsection{A.3 Beer Game 的补充结果与指标定义}\label{a.3-beer-game-supplementary-results}}
+
+\paragraph{表 2 中“违规率”的定义.}
+正文表 2 统计的并不是 episode 级违规频率，而是搜索树\textbf{内部想象状态}的违规比例。具体地，若一次 MCTS 展开产生的某个想象状态在前 \(24\) 个物理维度上存在任一分量小于 \(-10^{-6}\)，则记为一次违规；时间步和当前需求这两个元数据维度不参与统计。因此，
+\[
+\text{violation rate}
+=
+\frac{\text{violating imagined states}}{\text{all imagined states}}.
+\]
+在同一受控协议下（训练预算 \(3000\)、三随机种子、每种子 \(10\) 个评测 episode，且固定规划器与终端价值网络），SD-MCTS 的违规率为 \(0.00\%\pm0.00\%\)，BB-MCTS 为 \(93.66\%\pm1.95\%\)。
+
+\paragraph{多步展开 RMSE 的定义与补充结果.}
+正文图 3 对应的误差指标，是从同一真实状态出发，将模型自回归展开 \(H\) 步后，与真实环境在相同步数上的物理状态做逐维比较得到的均方根误差（RMSE）。在 Beer Game 的确定性主环境中，SD 世界模型的状态更新与环境规则一致，因此多步展开误差保持为 \(0\)；相对地，BB 模型在同一分布内设置下的平均 RMSE 从 \(H=1\) 时的 \(0.345\) 上升到 \(H=10\) 时的 \(1.343\)，并在 \(H=50\) 时增至 \(8.412\)。对其误差曲线做指数拟合时，平均增长率约为 \(6.35\%\) 每步，这与正文关于误差链式累积的分析一致。
+
+\paragraph{经验 Lipschitz 常数的测算.}
+为呼应正文第 5 节关于收缩映射的讨论，我们对 Beer Game 主实验中的结构化一步动力学映射做了经验测算。具体地，在主实验状态分布上抽取一批状态--动作对 \((s,a)\)，并仅在物理状态维度上施加小扰动 \(\delta s\)，以有限差分方式近似计算局部增量比值
+\[
+\frac{\|f(s+\delta s,a)-f(s,a)\|}{\|\delta s\|}.
+\]
+随后对这些局部比值取样本统计量，可得一个经验 Lipschitz 常数估计 \(\hat{L}_f \approx 0.96\)。这里的 \(\hat{L}_f\) 不是严格解析上界，而是主实验工作区间内一步映射局部收缩性的经验近似，不应理解为对全局收缩性的严格证明。该结果仅说明，在这类以守恒更新为主、并带有交付与需求消耗阻尼的系统中，局部误差传播总体上未表现出发散式放大，从而为正文中“结构约束能够抑制多步误差累积”的判断提供了额外佐证。
+
+\hypertarget{a.4-structural-intervention-protocol-and-results}{%
+\subsection{A.4 结构突变干预协议与完整结果}\label{a.4-structural-intervention-protocol-and-results}}
+
+正文第 6.4 节的结构突变实验，统一在\textbf{无干预环境}中完成训练，仅在测试阶段注入训练期内未出现的结构变化。本文使用两类干预：其一为容量冲击，即工厂产能自 \(t\ge 15\) 起由 \(20\) 降至 \(2\)；其二为链路中断，即批发商的订货通道在 \(10\le t\le 20\) 期间被强制置零。三种比较方法分别为：\textbf{SD}，在获得干预信息后显式改写内部结构方程；\textbf{SD\_no\_update}，保留原结构不变，仅依赖既有模型推断；\textbf{BB}，使用黑盒世界模型，不具备结构编辑能力。
+
+累计成本与预测误差均在同一测试协议下统计，其中累计成本沿用正文表 3 的口径，数值越小表示表现越好；预测误差则采用预热 10 步、预测视界 15 步的多步 RMSE，以覆盖两类干预真正生效的时间窗口。按三随机种子的均值计算，在容量冲击场景下，SD、SD\_no\_update 和 BB 的累计成本依次为 \(1330.7\)、\(1791.0\) 和 \(3584.6\)，对应的多步 RMSE 依次为 \(0.00\)、\(5.02\) 和 \(12.35\)；在链路中断场景下，三者的累计成本依次为 \(1864.5\)、\(2216.1\) 和 \(4059.4\)，对应的多步 RMSE 依次为 \(0.00\)、\(11.46\) 和 \(13.87\)。这些结果说明，仅有结构化世界模型还不够，干预发生后能否按已知信息及时改写结构，仍然会显著影响 OOD 条件下的规划质量。
+
+\hypertarget{a.5-cartpole-protocol-and-ablation}{%
+\subsection{A.5 Cartpole 公开基准评测设置、稳定性与补充消融}\label{a.5-cartpole-protocol-and-ablation}}
+
+\paragraph{评测设置与共享价值先验.}
+正文 Cartpole 结果采用两阶段设置：先在开发种子 \(\{10,21,30,55,63,72,95\}\) 上训练共享价值先验，再在目标种子 \(\{0,42,84\}\) 上分别微调。对应的真实环境交互预算为共享先验预训练 \(35{,}000\) 步，加上单个目标种子的微调 \(5{,}000\) 步；本文评测采用 \(11\) 个离散动作分支、动作重复步数为 2、每个种子 5 个评测 episode 的设置。
+
+\paragraph{结果与稳定性补充.}
+正文表 4 仅给出三种子聚合均值与最差种子回报。对应的逐种子结果为：seed \(0\) 为 \(772.8\pm33.5\)，seed \(42\) 为 \(817.9\pm29.6\)，seed \(84\) 为 \(818.2\pm18.8\)。与此同时，系统辨识阶段恢复的杆质量相对误差分别为 \(2.69\%\)、\(0.87\%\) 和 \(0.86\%\)。这些补充结果说明，在本文结果口径下，动力学参数恢复与最终控制表现都未出现明显失稳的种子。
+
+\paragraph{补充消融：去掉树搜索后的 1-step 对照.}
+为区分“结构化世界模型 + 终端价值”与“在线树搜索”各自的贡献，我们在完全相同的 checkpoint 和评测协议下，将在线决策替换为一步前瞻加终端价值评估的 1-step 对照，不再执行树搜索。该对照在三种子上的结果分别为 \(751.0\pm7.4\)、\(781.9\pm81.3\) 和 \(806.7\pm19.6\)，整体均值为 \(779.9\)。因此，在保持同一结构化动力学与价值网络权重不变时，完整 SD-MCTS 仍带来约 \(+23.0\) 的均值提升；同时，由于这里的 MCTS 采用离散动作分支实现，这一增益应理解为在保守实现条件下观测到的补充证据。
+
+\hypertarget{a.6-complexity-and-reproducibility-index}{%
+\subsection{A.6 算法复杂度与复现索引}\label{a.6-complexity-and-reproducibility-index}}
+
+从实现角度看，SD-MCTS 的主要在线开销来自有限视界树搜索。在离散动作设置下，其计算量主要由动作分支数、搜索深度和模拟次数共同决定，可近似写为 \(\mathcal{O}(n_{\text{sims}} \cdot H \cdot |\mathcal{A}|)\)。Beer Game 的动作空间本身离散，因此这一复杂度表达较为直接；Cartpole 则需先将连续动作离散化为有限分支，因此其实际计算开销除受 \(n_{\text{sims}}\) 与 \(H\) 影响外，还与离散动作分支数以及动作重复步数（action repeat）有关。
+
+为便于独立复现，本文同时提供独立的评审附件包
+\path{Attachments/}。该附件包不依赖作者工作目录中的绝对路径，而按
+\path{code/} 与 \path{data/}
+组织代码、结果文件、日志与复现说明。本文核心结果与附件中主要入口及支撑材料对应如下：
+\begin{itemize}
+\item \textbf{Beer Game 样本效率、表 1、表 4 与图 3}：脚本
+\path{Attachments/code/experiments/run_comparison_revised.py}、
+\path{Attachments/code/experiments/run_beer_game_v2_revised.py} 与
+\path{Attachments/code/experiments/plot_sample_efficiency.py}；结果与图片位于
+\path{Attachments/data/beer_game/}。
+\item \textbf{Beer Game 物理一致性与图 2(a)}：脚本
+\path{Attachments/code/experiments/run_internal_physics_consistency.py}；结果文件
+\path{Attachments/data/physics_consistency/results.json}。
+\item \textbf{Beer Game 多步误差与图 2(b)}：脚本
+\path{Attachments/code/experiments/run_multi_step_rollout.py}；结果目录
+\path{Attachments/data/multi_step_rollout/}。
+\item \textbf{结构突变干预、表 2 与图 4}：脚本
+\path{Attachments/code/experiments/run_causal_intervention.py} 与
+\path{Attachments/code/experiments/plot_intervention_results.py}；结果与图片位于
+\path{Attachments/data/interventions/}。
+\item \textbf{Cartpole 主结果与表 5 补充消融}：脚本
+\path{Attachments/code/scripts/run_cartpole_sharedprior_paper.py} 与
+\path{Attachments/code/scripts/run_cartpole_onestep_paper.py}；论文口径的主结果与消融摘要位于
+\path{Attachments/data/cartpole/}。
+\item \textbf{Hopper-Hop 表 1 与表 6}：结构化 Hopper 主干位于
+\path{Attachments/code/src/world_model/dmcontrol_hopper_sd_model.py}；TD-MPC2
+结构化适配补丁位于 \path{Attachments/code/tdmpc2_sd_patch/}；三种子
+50k 评估日志与汇总位于
+\path{Attachments/data/hopper/table6_50k/}。
+\end{itemize}
+
+附件根目录中的 \path{README.md} 给出了对应运行命令；
+\path{requirements.txt} 给出了 Python 依赖。为避免提交无关过程材料，探索脚本、重复图、字节码缓存与大体量 checkpoint 未随包提供；影响论文表格的聚合
+JSON、CSV、图片和关键日志均已纳入附件。论文中明确标注为官方公开基线的 DreamerV3 与
+TD-MPC2 数值仍以相应公开论文/附录结果为准。
+
+\hypertarget{a.7-q-ux4f30ux8ba1ux7684-bias-variance-ux5206ux89e3ux63a8ux5bfc-bias-variance-decomposition-of-q-estimation}{%
+\subsection{A.7 固定 rollout 策略下的 Q 估计偏差-方差分解推导 (Bias-Variance
+Decomposition of
+Q-Estimation)}\label{a.7-q-ux4f30ux8ba1ux7684-bias-variance-ux5206ux89e3ux63a8ux5bfc-bias-variance-decomposition-of-q-estimation}}
+
+本节在固定 rollout 策略的简化设定下，对 §5.4 命题 4 给出一版可严格化的推导。首步动作固定为 \(a\)，后续动作由固定 rollout 策略 \(\pi\) 生成；同时，将 \(n\) 次模拟视为在该固定 rollout 分布下得到的样本。该设定旨在隔离世界模型误差对截断回报偏差的影响，因此不涉及完整 MCTS 自适应树策略的收敛性分析。
+
+\textbf{设定}：令真实轨迹满足 \(s_0=s\)、\(a_0=a\)、\(a_t=\pi(s_t)\ (t\ge1)\)，并记对应的 \(H\) 步截断价值为
+\[
+Q_H^\pi(s,a)
+=
+\mathbb E\!\left[
+\sum_{t=0}^{H-1}\gamma^t r(s_t,a_t)+\gamma^H V^\pi(s_H)
+\right].
+\]
+相应地，在世界模型 \(\hat T\) 上定义模型内轨迹 \(\hat s_0=s\)、\(\hat a_0=a\)、\(\hat a_t=\pi(\hat s_t)\ (t\ge1)\)。一次模型 rollout 的截断回报记为
+
+\[
+\hat{R}_i(s,a)
+=
+\sum_{t=0}^{H-1} \gamma^t r(\hat{s}_t,\hat{a}_t)
+\;+\;
+\gamma^H V_\psi(\hat{s}_H).
+\]
+
+定义模型内期望回报
+\[
+\tilde Q_H^{\hat T,\pi,V_\psi}(s,a)
+=
+\mathbb E[\hat R_i(s,a)],
+\]
+以及 \(n\) 次样本平均估计量
+\[
+\hat{Q}_n(s,a) = \frac{1}{n} \sum_{i=1}^n \hat{R}_i(s,a).
+\]
+
+于是有如下误差分解：
+
+\[
+\hat{Q}_n(s,a) - Q^\pi_H(s,a)
+=
+\underbrace{\bigl(\hat Q_n(s,a)-\tilde Q_H^{\hat T,\pi,V_\psi}(s,a)\bigr)}_{\varepsilon_n(s,a)}
+\;+\;
+\underbrace{\bigl(\tilde Q_H^{\hat T,\pi,V_\psi}(s,a)-Q_H^\pi(s,a)\bigr)}_{b_H(s,a)}.
+\]
+
+其中，\(\varepsilon_n(s,a)\) 是样本平均相对于模型内期望回报的随机项；若进一步假设这些 rollout 回报样本独立同分布，或满足标准次高斯集中条件，则有 \(\varepsilon_n(s,a)=\mathcal O_p(n^{-1/2})\)。因此，命题 4 的关键在于刻画系统性偏差项 \(b_H(s,a)\) 如何随模型误差和规划深度变化。
+
+\textbf{命题 4 的关键推导}：
+
+\textbf{（一）由状态误差到回报偏差的一般上界。} 记闭环单步奖励为 \(\bar r_\pi(s):=r(s,\pi(s))\)，并假设：(1) \(\bar r_\pi\) 对状态是 \(L_r\)-Lipschitz 且真实终端值函数 \(V^\pi\) 是 \(L_V\)-Lipschitz 的；（2）第 5.2 节中的 \(L_f\) 表示 rollout 策略 \(\pi\) 诱导下闭环一步映射的有效 Lipschitz 常数；（3）终端价值网络在本文讨论的相关状态域上满足统一逼近误差
+\[
+|V_\psi(x)-V^\pi(x)|\le \epsilon_V
+\]
+再定义多步状态误差
+\[
+e_t := \mathbb E\bigl[\|\hat s_t-s_t\|\bigr].
+\]
+由于初始条件相同，即 \(\hat s_0=s_0=s\)、\(\hat a_0=a_0=a\)，故 \(t=0\) 项不产生状态失配。由三角不等式、Lipschitz 条件以及期望与求和可交换，可得
+
+\[
+\begin{aligned}
+|b_H(s,a)|
+&=
+\left|
+\mathbb E\!\left[
+\sum_{t=0}^{H-1}\gamma^t \bigl(\bar r_\pi(\hat s_t)-\bar r_\pi(s_t)\bigr)
+\;+\;
+\gamma^H\bigl(V_\psi(\hat s_H)-V^\pi(s_H)\bigr)
+\right]
+\right| \\
+&\le
+\sum_{t=1}^{H-1}\gamma^t L_r\, e_t
+\;+\;
+\gamma^H\!\left(L_V e_H + \epsilon_V\right).
+\end{aligned}
+\]
+因此，Q 偏差的阶数由多步状态误差 \(e_t\) 的传播方式直接决定。
+
+\textbf{（二）BlackBox 模型的偏差来自误差的级联放大。} 由 §5.2 命题 2，若无结构约束的黑盒模型满足有效 Lipschitz 常数 \(L_f>1\)，且初始状态无误差 \(e_0=0\)，则其 \(t\) 步状态误差满足
+
+\[
+e_t^{\mathrm{BB}}
+\le
+\frac{L_f^t-1}{L_f-1}\,\epsilon_{\text{model}}
+=
+\mathcal O(L_f^t).
+\]
+代回上式可得
+\[
+\begin{aligned}
+|b_H^{\mathrm{BB}}(s,a)|
+&\le
+\sum_{t=1}^{H-1}\gamma^t L_r\, e_t^{\mathrm{BB}}
+\;+\;
+\gamma^H\!\left(L_V e_H^{\mathrm{BB}}+\epsilon_V\right) \\
+&=
+\mathcal O\!\left(\sum_{t=1}^{H-1}(\gamma L_f)^t\right)
+\;+\;
+\mathcal O\!\left(\gamma^H L_f^H\right)
+\;+\;
+\mathcal O(\gamma^H\epsilon_V).
+\end{aligned}
+\]
+特别地，当 \(\gamma L_f>1\) 时，上式主导项呈指数增长，因此可简写为
+\[
+\left|b_H^{\mathrm{BB}}(s,a)\right|
+\le
+C_{\mathrm{BB}}(\gamma L_f)^H,
+\]
+其中 \(C_{\mathrm{BB}}\) 吸收了单步模型误差、奖励与终端值的 Lipschitz 常数以及终端价值逼近误差等与 \(n\) 无关的常数项。
+
+因此，增加样本数 \(n\) 只能减小 \(\varepsilon_n\)，无法消除由模型结构失配导致的 \(b_H^{\mathrm{BB}}\)；这正是正文所说的“不可约偏差”。
+
+\textbf{（三）SD 模型的偏差保持有界，并在理想条件下消失。} 对结构化动力学模型，由 §5.2 命题 2，若其在工作区间内满足 \(0\le L_f<1\)，则同样在 \(e_0=0\) 下有
+
+\[
+e_t^{\mathrm{SD}}
+\le
+\frac{1-L_f^t}{1-L_f}\,\epsilon_{\text{model}}
+\le
+\frac{\epsilon_{\text{model}}}{1-L_f}.
+\]
+于是
+\[
+\begin{aligned}
+|b_H^{\mathrm{SD}}(s,a)|
+&\le
+\sum_{t=1}^{H-1}\gamma^t L_r\, e_t^{\mathrm{SD}}
+\;+\;
+\gamma^H\!\left(L_V e_H^{\mathrm{SD}}+\epsilon_V\right) \\
+&\le
+\frac{L_r\gamma}{(1-\gamma)(1-L_f)}\,\epsilon_{\text{model}}
+\;+\;
+\frac{L_V}{1-L_f}\,\epsilon_{\text{model}}
+\;+\;
+\epsilon_V
+\;=:\;
+C_{\mathrm{SD}}.
+\end{aligned}
+\]
+因此，SD 侧的系统性偏差被控制在与 \(H\) 和 \(n\) 都无关的常数量级内。
+
+进一步地，若结构完全匹配、转移确定且终端价值估计无误差，即 \(\epsilon_{\text{model}}=0\) 且 \(\epsilon_V=0\)，则对所有 \(t\) 有 \(e_t^{\mathrm{SD}}=0\)，从而
+\[
+b_H^{\mathrm{SD}}(s,a)\equiv 0.
+\]
+
+\textbf{推论}：在相同的样本预算 \(n\) 下，随机项 \(\varepsilon_n\) 的衰减速度对两类方法是相同量级的；真正拉开差距的是系统性偏差项。BlackBox 模型对应的 \(b_H^{\mathrm{BB}}\) 会随规划深度恶化，而 SD 模型对应的 \(b_H^{\mathrm{SD}}\) 则保持有界，并在理想匹配条件下消失。这便严格化了正文 §5.4 的核心结论：SD-MCTS 的优势主要来自结构化动力学对不可约偏差的抑制，而不是来自 rollout 次数增加所带来的随机方差下降。
+
+\hypertarget{a.8-symbol-table}{%
+\subsection{A.8 符号表 (Symbol Table)}\label{a.8-symbol-table}}
+
+为便于查阅，下面汇总全文推导中使用的核心数学符号。
+
+\begin{table}[ht]
+\centering
+\caption{核心数学符号表 (Mathematical Symbols)}
+\renewcommand{\arraystretch}{1.08}
+\begin{tabular}{p{0.28\columnwidth} p{0.64\columnwidth}}
+\toprule
+\textbf{数学符号} & \textbf{变量与算子释义} \\
+\midrule
+\multicolumn{2}{c}{\textit{系统空间与物理不变算子}} \\
+\midrule
+$\mathcal{S}, \mathcal{A}, \gamma$ & 分别表示状态空间、动作空间与折现因子。 \\
+$\mathcal{T}, \mathcal{C}, \Pi_{\mathcal{C}}$ & \(\mathcal{T}\) 为已知因果拓扑，\(\mathcal{C}\) 为物理可行域，\(\Pi_{\mathcal{C}}\) 为将状态投影回可行域的约束算子。 \\
+$f_{\mathcal{T}}(s_t, a_t; \theta),\ \hat{\mathcal P}_\theta$ & 在拓扑 \(\mathcal{T}\) 上定义的结构化一步更新算子，以及包含可行域投影后的状态转移映射。 \\
+\midrule
+\multicolumn{2}{c}{\textit{噪声、参数与价值估计}} \\
+\midrule
+$\theta,\ \theta^\star$ & \(\theta\) 为待辨识的低维物理参数，\(\theta^\star\) 为其真实取值。 \\
+$V_\psi,\ V^\pi$ & \(V_\psi\) 为学习得到的终端价值网络，\(V^\pi\) 为固定 rollout 策略 \(\pi\) 下的真实终端价值函数。 \\
+$\pi,\ \bar r_\pi(s)$ & \(\pi\) 表示 rollout 策略；\(\bar r_\pi(s):=r(s,\pi(s))\) 表示闭环单步奖励。 \\
+$\hat T,\ \tilde Q_H^{\hat T,\pi,V_\psi}(s,a)$ & \(\hat T\) 为世界模型诱导的转移；\(\tilde Q_H^{\hat T,\pi,V_\psi}(s,a)\) 为在 \(\hat T\)、\(\pi\) 与 \(V_\psi\) 下得到的模型内期望截断回报。 \\
+\midrule
+\multicolumn{2}{c}{\textit{规划算法与树搜索推演统计}} \\
+\midrule
+$H,\ c_{\text{ucb}},\ n$ & 分别表示搜索前瞻视界、UCB 探索强度系数和给定动作上的 rollout 或模拟次数。 \\
+$\hat{V}_{\text{search}},\ \hat{Q}_H(s_t,a)$ & \(\hat{V}_{\text{search}}\) 为由搜索统计构造的价值目标，\(\hat{Q}_H(s_t,a)\) 为深度 \(H\) 下的动作价值估计。 \\
+$\hat{Q}_n(s,a),\ \hat R_i(s,a)$ & \(\hat R_i(s,a)\) 为一次模型 rollout 的截断回报，\(\hat Q_n(s,a)\) 为 \(n\) 次 rollout 的样本平均估计。 \\
+\midrule
+\multicolumn{2}{c}{\textit{误差理论与结构干预}} \\
+\midrule
+$\tau, R_{\max}$ & 物理任务的有效时间跨度界限（通常满足 $\tau \gg H$），以及单步所能获得的最大奖励绝对值。 \\
+$e_t,\ \epsilon_{\text{model}},\ \epsilon_V$ & \(e_t\) 为第 \(t\) 步状态预测误差，\(\epsilon_{\text{model}}\) 为世界模型的单步近似误差，\(\epsilon_V\) 为终端价值网络的统一逼近误差。 \\
+$L_f,\ L_r,\ L_V$ & 分别表示闭环一步映射、闭环单步奖励和真实终端值函数的 Lipschitz 常数。 \\
+$b_H(s,a),\ \varepsilon_n(s,a)$ & \(b_H(s,a)\) 为由模型失配带来的系统性偏差项，\(\varepsilon_n(s,a)\) 为随样本数衰减的随机项。 \\
+$f \leftarrow g(f,\iota_t),\ \iota_t \in \mathcal{I}$ & 分布外干预下的结构编辑表示，指在外部事件 \(\iota_t\) 已知时对内部方程或约束算子进行局部改写。 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\end{document}

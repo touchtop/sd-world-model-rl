@@ -1,0 +1,71 @@
+{
+  "num_states": 20,
+  "num_actions": 24,
+  "detail_csv": "results/hopper_sd_action_sensitivity/geommid_seed3_step50000_after_fix/action_sensitivity_details.csv",
+  "aggregate": {
+    "height": {
+      "abs_err_mean": 0.01005857742081086,
+      "abs_err_std": 0.004495499257442695,
+      "dir_match_mean": 0.7395833333333334
+    },
+    "vx": {
+      "abs_err_mean": 0.053110000123395666,
+      "abs_err_std": 0.05152554045370506,
+      "dir_match_mean": 0.21458333333333332
+    },
+    "vz": {
+      "abs_err_mean": 0.184789035776339,
+      "abs_err_std": 0.15233583600968606,
+      "dir_match_mean": 0.8791666666666667
+    },
+    "pitch": {
+      "abs_err_mean": 0.0214371364646378,
+      "abs_err_std": 0.02338426996366095,
+      "dir_match_mean": 0.4479166666666667
+    },
+    "pitch_rate": {
+      "abs_err_mean": 0.7517316325175367,
+      "abs_err_std": 0.6595738663716187,
+      "dir_match_mean": 0.33125
+    },
+    "support_contact": {
+      "abs_err_mean": 0.10005164594176873,
+      "abs_err_std": 0.20941797195137787,
+      "dir_match_mean": 0.9104166666666667
+    },
+    "full_foot_support": {
+      "abs_err_mean": 6.420874546370233e-06,
+      "abs_err_std": 1.6613591810153917e-05,
+      "dir_match_mean": 1.0
+    },
+    "body_contact_z": {
+      "abs_err_mean": 0.011499969703921427,
+      "abs_err_std": 0.004598160067320852,
+      "dir_match_mean": 0.51875
+    },
+    "z_min": {
+      "abs_err_mean": 0.011908325017429888,
+      "abs_err_std": 0.004864995380093196,
+      "dir_match_mean": 0.55625
+    }
+  },
+  "dominant_state_match_mean": 1.0,
+  "trace_csvs": [
+    "logs/hopper-hop/3/sd_hopper_50000_v5geommid_nouprightomega_seed3_20260427_run1/official_eval/step_0050000/episode_csv/episode_00.csv",
+    "logs/hopper-hop/3/sd_hopper_50000_v5geommid_nouprightomega_seed3_20260427_run1/official_eval/step_0050000/episode_csv/episode_01.csv",
+    "logs/hopper-hop/3/sd_hopper_50000_v5geommid_nouprightomega_seed3_20260427_run1/official_eval/step_0050000/episode_csv/episode_02.csv",
+    "logs/hopper-hop/3/sd_hopper_50000_v5geommid_nouprightomega_seed3_20260427_run1/official_eval/step_0050000/episode_csv/episode_03.csv",
+    "logs/hopper-hop/3/sd_hopper_50000_v5geommid_nouprightomega_seed3_20260427_run1/official_eval/step_0050000/episode_csv/episode_04.csv",
+    "logs/hopper-hop/3/sd_hopper_50000_v5geommid_nouprightomega_seed3_20260427_run1/official_eval/step_0050000/episode_csv/episode_05.csv",
+    "logs/hopper-hop/3/sd_hopper_50000_v5geommid_nouprightomega_seed3_20260427_run1/official_eval/step_0050000/episode_csv/episode_06.csv",
+    "logs/hopper-hop/3/sd_hopper_50000_v5geommid_nouprightomega_seed3_20260427_run1/official_eval/step_0050000/episode_csv/episode_07.csv",
+    "logs/hopper-hop/3/sd_hopper_50000_v5geommid_nouprightomega_seed3_20260427_run1/official_eval/step_0050000/episode_csv/episode_08.csv",
+    "logs/hopper-hop/3/sd_hopper_50000_v5geommid_nouprightomega_seed3_20260427_run1/official_eval/step_0050000/episode_csv/episode_09.csv"
+  ],
+  "amplitudes": [
+    0.25,
+    0.5,
+    0.75
+  ],
+  "samples_per_trace": 2
+}

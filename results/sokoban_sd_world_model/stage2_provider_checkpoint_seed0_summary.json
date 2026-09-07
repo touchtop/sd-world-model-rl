@@ -1,0 +1,1808 @@
+{
+  "material_passport": {
+    "origin_skill": "experiment-agent",
+    "origin_mode": "run",
+    "verification_status": "ANALYZED",
+    "version_label": "sokoban_flow_rollout_smoke_v1"
+  },
+  "baseline_contract": {
+    "baseline_id": "sokoban_six_stock_nonnegative_flow_rollout_sup_base_v1",
+    "status": "diagnostic_learned_stock_flow_baseline",
+    "is_frozen_minimal_baseline": false,
+    "required_config": {
+      "model_kind": "base",
+      "flow_parameterization": "softplus",
+      "feature_mode": "stock_action",
+      "stock_loss_preset": "uniform",
+      "flow_l1_weight": 0.0,
+      "raw_boundary_loss_weight": 0.0,
+      "raw_boundary_stock_weights": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "flow_pair_scales": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "capacity_projection_stock_mask": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "capacity_projection_passes": 2,
+      "feedback_target_loss_weight": 0.0,
+      "rollout_depth": 2,
+      "rollout_loss_weight": 1.0,
+      "rollout_final_step_weight": 1.0,
+      "rollout_final_stock_weights": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "split_mode": "level",
+      "action_scope": "legal_single_push_option",
+      "transition_labels_from": "exact_single_push_diagnostic_provider",
+      "sd_mcts_enabled": false
+    },
+    "observed_config": {
+      "model_kind": "base",
+      "flow_parameterization": "paired_net",
+      "feature_mode": "stock_action",
+      "stock_loss_preset": "uniform",
+      "flow_l1_weight": 0.0,
+      "raw_boundary_loss_weight": 0.0,
+      "raw_boundary_stock_weights": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "flow_pair_scales": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "capacity_projection_stock_mask": [
+        1.0,
+        1.0,
+        1.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "capacity_projection_passes": 2,
+      "feedback_target_loss_weight": 0.0,
+      "rollout_depth": 2,
+      "rollout_loss_weight": 1.0,
+      "rollout_final_step_weight": 1.2,
+      "rollout_final_stock_weights": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "split_mode": "level",
+      "action_scope": "legal_single_push_option",
+      "transition_labels_from": "exact_single_push_diagnostic_provider",
+      "sd_mcts_enabled": false
+    }
+  },
+  "config": {
+    "levels": "datasets/sokoban_boxoban/boxoban-levels/medium/train/000.txt",
+    "max_levels": 30,
+    "max_depth": 2,
+    "max_states_per_level": 30,
+    "epochs": 200,
+    "batch_size": 128,
+    "hidden_dim": 64,
+    "lr": 0.001,
+    "flow_loss_weight": 0.1,
+    "flow_l1_weight": 0.0,
+    "raw_boundary_loss_weight": 0.0,
+    "raw_boundary_stock_weights": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "flow_pair_names": [
+      "goal_fill_flow__goal_unfill_flow",
+      "assignment_relief_flow__assignment_worsening_flow",
+      "mobility_loss_flow__mobility_recovery_flow",
+      "reachability_loss_flow__reachability_recovery_flow",
+      "congestion_generation_flow__congestion_release_flow",
+      "risk_accumulation_flow__risk_relief_flow"
+    ],
+    "flow_pair_scales": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "capacity_projection_stock_mask": [
+      1.0,
+      1.0,
+      1.0,
+      0.0,
+      0.0,
+      1.0
+    ],
+    "capacity_projection_passes": 2,
+    "rollout_depth": 2,
+    "rollout_loss_weight": 1.0,
+    "rollout_final_step_weight": 1.2,
+    "rollout_final_stock_weights": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "max_rollout_samples_per_level": 2000,
+    "model_kind": "base",
+    "flow_parameterization": "paired_net",
+    "feature_mode": "stock_action",
+    "stock_loss_preset": "uniform",
+    "stock_loss_weights": [
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0,
+      1.0
+    ],
+    "feedback_target_loss_weight": 0.0,
+    "valid_fraction": 0.2,
+    "split_mode": "level",
+    "seed": 0,
+    "alias_round_decimals": 2,
+    "audit_top_k": 8
+  },
+  "design_scope": {
+    "learned_component": "nonnegative_flow_model",
+    "flow_parameterization": "paired_net",
+    "opposite_flow_pair_exclusivity": true,
+    "flow_l1_penalty_enabled": false,
+    "raw_boundary_penalty_enabled": false,
+    "raw_boundary_stock_weighting_enabled": false,
+    "flow_pair_scaling_enabled": false,
+    "capacity_projection_enabled": true,
+    "feedback_enabled": false,
+    "rollout_supervision_enabled": true,
+    "feedback_target_enabled": false,
+    "sd_mcts_enabled": false,
+    "action_scope": "legal_single_push_option",
+    "transition_labels_from": "exact_single_push_diagnostic_provider"
+  },
+  "dataset": {
+    "samples": 3435,
+    "rollout_samples": 20242,
+    "train_samples": 2581,
+    "valid_samples": 854,
+    "train_rollout_samples": 15096,
+    "valid_rollout_samples": 5146,
+    "input_dim": 15,
+    "feedback_dim": 9,
+    "stock_names": [
+      "goal_completion",
+      "unresolved_box_pressure",
+      "mobility",
+      "reachable_capacity",
+      "congestion",
+      "irreversibility_risk"
+    ],
+    "flow_names": [
+      "goal_fill_flow",
+      "goal_unfill_flow",
+      "assignment_relief_flow",
+      "assignment_worsening_flow",
+      "mobility_loss_flow",
+      "mobility_recovery_flow",
+      "reachability_loss_flow",
+      "reachability_recovery_flow",
+      "congestion_generation_flow",
+      "congestion_release_flow",
+      "risk_accumulation_flow",
+      "risk_relief_flow"
+    ],
+    "feedback_names": [
+      "target_pressure",
+      "goal_completion",
+      "mobility_deficit",
+      "reachability_deficit",
+      "congestion_pressure",
+      "congestion_mobility_coupling",
+      "congestion_reachability_coupling",
+      "risk_pressure",
+      "risk_congestion_coupling"
+    ],
+    "levels_with_samples": 30,
+    "split": {
+      "split_mode": "level",
+      "train_levels": [
+        "datasets/sokoban_boxoban/boxoban-levels/medium/train/000.txt:0",
+        "datasets/sokoban_boxoban/boxoban-levels/medium/train/000.txt:1",
+        "datasets/sokoban_boxoban/boxoban-levels/medium/train/000.txt:11",
+        "datasets/sokoban_boxoban/boxoban-levels/medium/train/000.txt:12",
+        "datasets/sokoban_boxoban/boxoban-levels/medium/train/000.txt:13",
+        "datasets/sokoban_boxoban/boxoban-levels/medium/train/000.txt:14",
+        "datasets/sokoban_boxoban/boxoban-levels/medium/train/000.txt:15",
+        "datasets/sokoban_boxoban/boxoban-levels/medium/train/000.txt:16",
+        "datasets/sokoban_boxoban/boxoban-levels/medium/train/000.txt:17",
+        "datasets/sokoban_boxoban/boxoban-levels/medium/train/000.txt:19",
+        "datasets/sokoban_boxoban/boxoban-levels/medium/train/000.txt:2",
+        "datasets/sokoban_boxoban/boxoban-levels/medium/train/000.txt:21",
+        "datasets/sokoban_boxoban/boxoban-levels/medium/train/000.txt:22",
+        "datasets/sokoban_boxoban/boxoban-levels/medium/train/000.txt:23",
+        "datasets/sokoban_boxoban/boxoban-levels/medium/train/000.txt:24",
+        "datasets/sokoban_boxoban/boxoban-levels/medium/train/000.txt:25",
+        "datasets/sokoban_boxoban/boxoban-levels/medium/train/000.txt:26",
+        "datasets/sokoban_boxoban/boxoban-levels/medium/train/000.txt:27",
+        "datasets/sokoban_boxoban/boxoban-levels/medium/train/000.txt:28",
+        "datasets/sokoban_boxoban/boxoban-levels/medium/train/000.txt:29",
+        "datasets/sokoban_boxoban/boxoban-levels/medium/train/000.txt:3",
+        "datasets/sokoban_boxoban/boxoban-levels/medium/train/000.txt:5",
+        "datasets/sokoban_boxoban/boxoban-levels/medium/train/000.txt:7",
+        "datasets/sokoban_boxoban/boxoban-levels/medium/train/000.txt:9"
+      ],
+      "valid_levels": [
+        "datasets/sokoban_boxoban/boxoban-levels/medium/train/000.txt:10",
+        "datasets/sokoban_boxoban/boxoban-levels/medium/train/000.txt:18",
+        "datasets/sokoban_boxoban/boxoban-levels/medium/train/000.txt:20",
+        "datasets/sokoban_boxoban/boxoban-levels/medium/train/000.txt:4",
+        "datasets/sokoban_boxoban/boxoban-levels/medium/train/000.txt:6",
+        "datasets/sokoban_boxoban/boxoban-levels/medium/train/000.txt:8"
+      ]
+    }
+  },
+  "metrics": {
+    "train": {
+      "stock_mae": 0.03466688096523285,
+      "stock_mse": 0.006049157585948706,
+      "flow_mae": 0.017276914790272713,
+      "flow_mse": 0.0029124049469828606,
+      "zero_flow_stock_mae": 0.0963733047246933,
+      "zero_flow_stock_mse": 0.04860407114028931
+    },
+    "valid": {
+      "stock_mae": 0.04721938446164131,
+      "stock_mse": 0.01083583477884531,
+      "flow_mae": 0.023561421781778336,
+      "flow_mse": 0.0050282953307032585,
+      "zero_flow_stock_mae": 0.09030485898256302,
+      "zero_flow_stock_mse": 0.041728340089321136
+    },
+    "train_rollout": {
+      "rollout_depth": 2,
+      "stock_mae_by_step": {
+        "step_1": 0.032049115747213364,
+        "step_2": 0.04310491308569908
+      },
+      "stock_mse_by_step": {
+        "step_1": 0.004840191453695297,
+        "step_2": 0.008302520960569382
+      },
+      "zero_flow_stock_mae_by_step": {
+        "step_1": 0.09309052675962448,
+        "step_2": 0.1510709971189499
+      },
+      "flow_mae_by_step": {
+        "step_1": 0.015966398641467094,
+        "step_2": 0.019765086472034454
+      },
+      "per_stock_mae_by_step": {
+        "step_1": {
+          "goal_completion": 0.0030191398691385984,
+          "unresolved_box_pressure": 0.014807280153036118,
+          "mobility": 0.0370326042175293,
+          "reachable_capacity": 0.0518280491232872,
+          "congestion": 0.07068159431219101,
+          "irreversibility_risk": 0.014926017262041569
+        },
+        "step_2": {
+          "goal_completion": 0.005429734941571951,
+          "unresolved_box_pressure": 0.02138543874025345,
+          "mobility": 0.034790292382240295,
+          "reachable_capacity": 0.0832989439368248,
+          "congestion": 0.09458993375301361,
+          "irreversibility_risk": 0.01913515292108059
+        }
+      },
+      "stock_mae_mean": 0.03757701441645622,
+      "zero_flow_stock_mae_mean": 0.12208076193928719,
+      "stock_mae_improvement_over_zero_flow_mean": 0.6921954465262602
+    },
+    "valid_rollout": {
+      "rollout_depth": 2,
+      "stock_mae_by_step": {
+        "step_1": 0.04322969540953636,
+        "step_2": 0.0566064827144146
+      },
+      "stock_mse_by_step": {
+        "step_1": 0.009365895763039589,
+        "step_2": 0.014370578341186047
+      },
+      "zero_flow_stock_mae_by_step": {
+        "step_1": 0.08501353114843369,
+        "step_2": 0.1348928064107895
+      },
+      "flow_mae_by_step": {
+        "step_1": 0.0215776227414608,
+        "step_2": 0.024645298719406128
+      },
+      "per_stock_mae_by_step": {
+        "step_1": {
+          "goal_completion": 0.0038663442246615887,
+          "unresolved_box_pressure": 0.012667279690504074,
+          "mobility": 0.03054523468017578,
+          "reachable_capacity": 0.08767835795879364,
+          "congestion": 0.10389788448810577,
+          "irreversibility_risk": 0.020723093301057816
+        },
+        "step_2": {
+          "goal_completion": 0.00678063090890646,
+          "unresolved_box_pressure": 0.017618117853999138,
+          "mobility": 0.029685277491807938,
+          "reachable_capacity": 0.13512486219406128,
+          "congestion": 0.12550115585327148,
+          "irreversibility_risk": 0.024928869679570198
+        }
+      },
+      "stock_mae_mean": 0.04991808906197548,
+      "zero_flow_stock_mae_mean": 0.10995316877961159,
+      "stock_mae_improvement_over_zero_flow_mean": 0.5460059076420933
+    },
+    "valid_stock_mae_improvement_over_zero_flow": 0.4771113648407456
+  },
+  "audit": {
+    "train_dimensional": {
+      "per_stock_mae": {
+        "goal_completion": 0.0028821632731705904,
+        "unresolved_box_pressure": 0.014798403717577457,
+        "mobility": 0.036531008780002594,
+        "reachable_capacity": 0.0639147013425827,
+        "congestion": 0.07304005324840546,
+        "irreversibility_risk": 0.016834957525134087
+      },
+      "per_stock_delta_mae": {
+        "goal_completion": 0.002882163506001234,
+        "unresolved_box_pressure": 0.014798403717577457,
+        "mobility": 0.036531008780002594,
+        "reachable_capacity": 0.0639147013425827,
+        "congestion": 0.07304005324840546,
+        "irreversibility_risk": 0.016834955662488937
+      },
+      "per_flow_mae": {
+        "goal_fill_flow": 0.0016814412083476782,
+        "goal_unfill_flow": 0.0012007219484075904,
+        "assignment_relief_flow": 0.0017321945633739233,
+        "assignment_worsening_flow": 0.012365531176328659,
+        "mobility_loss_flow": 0.026409508660435677,
+        "mobility_recovery_flow": 0.010121501050889492,
+        "reachability_loss_flow": 0.04407918453216553,
+        "reachability_recovery_flow": 0.019835518673062325,
+        "congestion_generation_flow": 0.05766292288899422,
+        "congestion_release_flow": 0.015399476513266563,
+        "risk_accumulation_flow": 0.016806790605187416,
+        "risk_relief_flow": 2.816641608660575e-05
+      },
+      "clip_audit": {
+        "any_stock_clipped_fraction": 0.0003874467220157385,
+        "stock_value_clipped_fraction": 6.457445124397054e-05,
+        "mean_abs_clip_correction": 3.7251941193972016e-06,
+        "max_abs_clip_correction": 0.057688355445861816,
+        "per_stock_clipped_fraction": {
+          "goal_completion": 0.0,
+          "unresolved_box_pressure": 0.0,
+          "mobility": 0.0,
+          "reachable_capacity": 0.0,
+          "congestion": 0.0003874467220157385,
+          "irreversibility_risk": 0.0
+        },
+        "per_stock_clipped_low_fraction": {
+          "goal_completion": 0.0,
+          "unresolved_box_pressure": 0.0,
+          "mobility": 0.0,
+          "reachable_capacity": 0.0,
+          "congestion": 0.0,
+          "irreversibility_risk": 0.0
+        },
+        "per_stock_clipped_high_fraction": {
+          "goal_completion": 0.0,
+          "unresolved_box_pressure": 0.0,
+          "mobility": 0.0,
+          "reachable_capacity": 0.0,
+          "congestion": 0.0003874467220157385,
+          "irreversibility_risk": 0.0
+        },
+        "per_stock_mean_abs_clip_correction": {
+          "goal_completion": 0.0,
+          "unresolved_box_pressure": 0.0,
+          "mobility": 0.0,
+          "reachable_capacity": 0.0,
+          "congestion": 2.235116517113056e-05,
+          "irreversibility_risk": 0.0
+        },
+        "per_stock_max_abs_clip_correction": {
+          "goal_completion": 0.0,
+          "unresolved_box_pressure": 0.0,
+          "mobility": 0.0,
+          "reachable_capacity": 0.0,
+          "congestion": 0.057688355445861816,
+          "irreversibility_risk": 0.0
+        },
+        "per_stock_raw_next_min": {
+          "goal_completion": 0.0,
+          "unresolved_box_pressure": 0.3641928434371948,
+          "mobility": 0.0,
+          "reachable_capacity": 0.14499953389167786,
+          "congestion": 0.16054004430770874,
+          "irreversibility_risk": 0.0
+        },
+        "per_stock_raw_next_max": {
+          "goal_completion": 0.5194239020347595,
+          "unresolved_box_pressure": 1.0,
+          "mobility": 0.642982006072998,
+          "reachable_capacity": 0.9765908718109131,
+          "congestion": 1.0576883554458618,
+          "irreversibility_risk": 1.0
+        },
+        "per_stock_raw_next_mean": {
+          "goal_completion": 0.0690554827451706,
+          "unresolved_box_pressure": 0.8353820443153381,
+          "mobility": 0.15246407687664032,
+          "reachable_capacity": 0.7543683648109436,
+          "congestion": 0.6134918928146362,
+          "irreversibility_risk": 0.5028390288352966
+        }
+      },
+      "per_stock_target_delta_summary": {
+        "goal_completion": {
+          "mean": 0.024312281981110573,
+          "mean_abs": 0.04135993868112564,
+          "std": 0.09873650223016739,
+          "min": -0.25,
+          "max": 0.25,
+          "nonzero_fraction": 0.16543975472450256
+        },
+        "unresolved_box_pressure": {
+          "mean": 0.029026055708527565,
+          "mean_abs": 0.0757104903459549,
+          "std": 0.1279565542936325,
+          "min": -0.17875003814697266,
+          "max": 0.4637500047683716,
+          "nonzero_fraction": 0.7303370833396912
+        },
+        "mobility": {
+          "mean": -0.0853351429104805,
+          "mean_abs": 0.1057729572057724,
+          "std": 0.14944353699684143,
+          "min": -0.6875,
+          "max": 0.4375,
+          "nonzero_fraction": 0.5532739162445068
+        },
+        "reachable_capacity": {
+          "mean": -0.021154433488845825,
+          "mean_abs": 0.05730462074279785,
+          "std": 0.15172381699085236,
+          "min": -0.7428571581840515,
+          "max": 0.7894736528396606,
+          "nonzero_fraction": 0.3630375862121582
+        },
+        "congestion": {
+          "mean": 0.08000774681568146,
+          "mean_abs": 0.11134250462055206,
+          "std": 0.13354912400245667,
+          "min": -0.5625,
+          "max": 0.75,
+          "nonzero_fraction": 0.6780317425727844
+        },
+        "irreversibility_risk": {
+          "mean": 0.18674932420253754,
+          "mean_abs": 0.18674932420253754,
+          "std": 0.3897101581096649,
+          "min": 0.0,
+          "max": 1.0,
+          "nonzero_fraction": 0.18674932420253754
+        }
+      },
+      "per_stock_pred_delta_summary": {
+        "goal_completion": {
+          "mean": 0.02265874110162258,
+          "mean_abs": 0.04137711226940155,
+          "std": 0.09619671106338501,
+          "min": -0.26356011629104614,
+          "max": 0.2695627510547638,
+          "nonzero_fraction": 0.3025958836078644
+        },
+        "unresolved_box_pressure": {
+          "mean": 0.03575403615832329,
+          "mean_abs": 0.07623909413814545,
+          "std": 0.1206107959151268,
+          "min": -0.19197887182235718,
+          "max": 0.45625001192092896,
+          "nonzero_fraction": 0.7547461986541748
+        },
+        "mobility": {
+          "mean": -0.08014925569295883,
+          "mean_abs": 0.0917738825082779,
+          "std": 0.13385654985904694,
+          "min": -0.6875,
+          "max": 0.17134398221969604,
+          "nonzero_fraction": 0.684618353843689
+        },
+        "reachable_capacity": {
+          "mean": -0.009908570908010006,
+          "mean_abs": 0.052894096821546555,
+          "std": 0.08739733695983887,
+          "min": -0.5779076814651489,
+          "max": 0.7007070183753967,
+          "nonzero_fraction": 1.0
+        },
+        "congestion": {
+          "mean": 0.0779455229640007,
+          "mean_abs": 0.09204874187707901,
+          "std": 0.08541252464056015,
+          "min": -0.39991524815559387,
+          "max": 0.45567524433135986,
+          "nonzero_fraction": 1.0
+        },
+        "irreversibility_risk": {
+          "mean": 0.18668246269226074,
+          "mean_abs": 0.18673881888389587,
+          "std": 0.3772030174732208,
+          "min": -0.07269752025604248,
+          "max": 1.0,
+          "nonzero_fraction": 0.24835334718227386
+        }
+      },
+      "per_flow_target_summary": {
+        "goal_fill_flow": {
+          "mean": 0.03283610939979553,
+          "mean_abs": 0.03283610939979553,
+          "std": 0.08444416522979736,
+          "min": 0.0,
+          "max": 0.25,
+          "nonzero_fraction": 0.13134443759918213
+        },
+        "goal_unfill_flow": {
+          "mean": 0.008523828350007534,
+          "mean_abs": 0.008523828350007534,
+          "std": 0.045368507504463196,
+          "min": -0.0,
+          "max": 0.25,
+          "nonzero_fraction": 0.034095313400030136
+        },
+        "assignment_relief_flow": {
+          "mean": 0.0026733821723610163,
+          "mean_abs": 0.0026733821723610163,
+          "std": 0.011409958824515343,
+          "min": 0.0,
+          "max": 0.07874999940395355,
+          "nonzero_fraction": 0.24835334718227386
+        },
+        "assignment_worsening_flow": {
+          "mean": 0.05601172149181366,
+          "mean_abs": 0.05601172149181366,
+          "std": 0.09512744098901749,
+          "min": 0.0,
+          "max": 0.36375001072883606,
+          "nonzero_fraction": 0.4819837212562561
+        },
+        "mobility_loss_flow": {
+          "mean": 0.09555404633283615,
+          "mean_abs": 0.09555404633283615,
+          "std": 0.13786856830120087,
+          "min": -0.0,
+          "max": 0.6875,
+          "nonzero_fraction": 0.4556373357772827
+        },
+        "mobility_recovery_flow": {
+          "mean": 0.01021890714764595,
+          "mean_abs": 0.01021890714764595,
+          "std": 0.03705016151070595,
+          "min": 0.0,
+          "max": 0.4375,
+          "nonzero_fraction": 0.09763657301664352
+        },
+        "reachability_loss_flow": {
+          "mean": 0.03922952339053154,
+          "mean_abs": 0.03922952339053154,
+          "std": 0.1279846876859665,
+          "min": 0.0,
+          "max": 0.7428571581840515,
+          "nonzero_fraction": 0.16001549363136292
+        },
+        "reachability_recovery_flow": {
+          "mean": 0.018075091764330864,
+          "mean_abs": 0.018075091764330864,
+          "std": 0.07226260751485825,
+          "min": 0.0,
+          "max": 0.7894737124443054,
+          "nonzero_fraction": 0.2030220776796341
+        },
+        "congestion_generation_flow": {
+          "mean": 0.09567512571811676,
+          "mean_abs": 0.09567512571811676,
+          "std": 0.11002679914236069,
+          "min": 0.0,
+          "max": 0.75,
+          "nonzero_fraction": 0.5575358271598816
+        },
+        "congestion_release_flow": {
+          "mean": 0.015667377039790154,
+          "mean_abs": 0.015667377039790154,
+          "std": 0.05226391181349754,
+          "min": 0.0,
+          "max": 0.5625,
+          "nonzero_fraction": 0.12049593031406403
+        },
+        "risk_accumulation_flow": {
+          "mean": 0.18674932420253754,
+          "mean_abs": 0.18674932420253754,
+          "std": 0.3897101581096649,
+          "min": 0.0,
+          "max": 1.0,
+          "nonzero_fraction": 0.18674932420253754
+        },
+        "risk_relief_flow": {
+          "mean": 0.0,
+          "mean_abs": 0.0,
+          "std": 0.0,
+          "min": -0.0,
+          "max": -0.0,
+          "nonzero_fraction": 0.0
+        }
+      },
+      "per_flow_pred_summary": {
+        "goal_fill_flow": {
+          "mean": 0.03201792761683464,
+          "mean_abs": 0.03201792761683464,
+          "std": 0.08172771334648132,
+          "min": 0.0,
+          "max": 0.2695627510547638,
+          "nonzero_fraction": 0.17086400091648102
+        },
+        "goal_unfill_flow": {
+          "mean": 0.00935918465256691,
+          "mean_abs": 0.009359185583889484,
+          "std": 0.04444170370697975,
+          "min": 0.0,
+          "max": 0.26356011629104614,
+          "nonzero_fraction": 0.13173188269138336
+        },
+        "assignment_relief_flow": {
+          "mean": 0.0018613138236105442,
+          "mean_abs": 0.0018613138236105442,
+          "std": 0.009613887406885624,
+          "min": 0.0,
+          "max": 0.09697464108467102,
+          "nonzero_fraction": 0.09879891574382782
+        },
+        "assignment_worsening_flow": {
+          "mean": 0.060274090617895126,
+          "mean_abs": 0.060274090617895126,
+          "std": 0.08998647332191467,
+          "min": 0.0,
+          "max": 0.3383593261241913,
+          "nonzero_fraction": 0.6586594581604004
+        },
+        "mobility_loss_flow": {
+          "mean": 0.08596157282590866,
+          "mean_abs": 0.08596156537532806,
+          "std": 0.12859641015529633,
+          "min": 0.0,
+          "max": 0.6875,
+          "nonzero_fraction": 0.5559860467910767
+        },
+        "mobility_recovery_flow": {
+          "mean": 0.0058123148046433926,
+          "mean_abs": 0.00581231527030468,
+          "std": 0.019526086747646332,
+          "min": 0.0,
+          "max": 0.17134396731853485,
+          "nonzero_fraction": 0.1286323070526123
+        },
+        "reachability_loss_flow": {
+          "mean": 0.03140133619308472,
+          "mean_abs": 0.03140133246779442,
+          "std": 0.0582578219473362,
+          "min": 0.0,
+          "max": 0.5779076814651489,
+          "nonzero_fraction": 0.5575358271598816
+        },
+        "reachability_recovery_flow": {
+          "mean": 0.021492764353752136,
+          "mean_abs": 0.021492764353752136,
+          "std": 0.05380072817206383,
+          "min": 0.0,
+          "max": 0.7007070183753967,
+          "nonzero_fraction": 0.4424641728401184
+        },
+        "congestion_generation_flow": {
+          "mean": 0.08501949161291122,
+          "mean_abs": 0.08501949906349182,
+          "std": 0.07279113680124283,
+          "min": 0.0,
+          "max": 0.45567524433135986,
+          "nonzero_fraction": 0.8469585180282593
+        },
+        "congestion_release_flow": {
+          "mean": 0.007051610387861729,
+          "mean_abs": 0.007051610387861729,
+          "std": 0.0283036008477211,
+          "min": 0.0,
+          "max": 0.39991524815559387,
+          "nonzero_fraction": 0.15304145216941833
+        },
+        "risk_accumulation_flow": {
+          "mean": 0.1867106407880783,
+          "mean_abs": 0.1867106556892395,
+          "std": 0.3771863579750061,
+          "min": 0.0,
+          "max": 1.0,
+          "nonzero_fraction": 0.24796590209007263
+        },
+        "risk_relief_flow": {
+          "mean": 2.816641608660575e-05,
+          "mean_abs": 2.816641608660575e-05,
+          "std": 0.0014306765515357256,
+          "min": 0.0,
+          "max": 0.07269752025604248,
+          "nonzero_fraction": 0.0003874467220157385
+        }
+      },
+      "flow_pair_coactivation": {
+        "goal_fill_flow__goal_unfill_flow": {
+          "target_coactive_fraction_gt_1e-6": 0.0,
+          "pred_coactive_fraction_gt_1e-6": 0.0,
+          "pred_mean_min_pair_flow": 0.0,
+          "target_mean_min_pair_flow": 0.0
+        },
+        "assignment_relief_flow__assignment_worsening_flow": {
+          "target_coactive_fraction_gt_1e-6": 0.0,
+          "pred_coactive_fraction_gt_1e-6": 0.0,
+          "pred_mean_min_pair_flow": 0.0,
+          "target_mean_min_pair_flow": 0.0
+        },
+        "mobility_loss_flow__mobility_recovery_flow": {
+          "target_coactive_fraction_gt_1e-6": 0.0,
+          "pred_coactive_fraction_gt_1e-6": 0.0,
+          "pred_mean_min_pair_flow": 0.0,
+          "target_mean_min_pair_flow": 0.0
+        },
+        "reachability_loss_flow__reachability_recovery_flow": {
+          "target_coactive_fraction_gt_1e-6": 0.0,
+          "pred_coactive_fraction_gt_1e-6": 0.0,
+          "pred_mean_min_pair_flow": 0.0,
+          "target_mean_min_pair_flow": 0.0
+        },
+        "congestion_generation_flow__congestion_release_flow": {
+          "target_coactive_fraction_gt_1e-6": 0.0,
+          "pred_coactive_fraction_gt_1e-6": 0.0,
+          "pred_mean_min_pair_flow": 0.0,
+          "target_mean_min_pair_flow": 0.0
+        },
+        "risk_accumulation_flow__risk_relief_flow": {
+          "target_coactive_fraction_gt_1e-6": 0.0,
+          "pred_coactive_fraction_gt_1e-6": 0.0,
+          "pred_mean_min_pair_flow": 0.0,
+          "target_mean_min_pair_flow": 0.0
+        }
+      }
+    },
+    "valid_dimensional": {
+      "per_stock_mae": {
+        "goal_completion": 0.004239798057824373,
+        "unresolved_box_pressure": 0.013122697360813618,
+        "mobility": 0.03361213207244873,
+        "reachable_capacity": 0.11011313647031784,
+        "congestion": 0.1068374365568161,
+        "irreversibility_risk": 0.015391113236546516
+      },
+      "per_stock_delta_mae": {
+        "goal_completion": 0.004239798057824373,
+        "unresolved_box_pressure": 0.013122698292136192,
+        "mobility": 0.03361213579773903,
+        "reachable_capacity": 0.11011313647031784,
+        "congestion": 0.1068374365568161,
+        "irreversibility_risk": 0.015391113236546516
+      },
+      "per_flow_mae": {
+        "goal_fill_flow": 0.0021982735488563776,
+        "goal_unfill_flow": 0.0020415240433067083,
+        "assignment_relief_flow": 0.0032720817252993584,
+        "assignment_worsening_flow": 0.00927137304097414,
+        "mobility_loss_flow": 0.02578970603644848,
+        "mobility_recovery_flow": 0.007822428829967976,
+        "reachability_loss_flow": 0.08514749258756638,
+        "reachability_recovery_flow": 0.02496565319597721,
+        "congestion_generation_flow": 0.0861915871500969,
+        "congestion_release_flow": 0.020645858719944954,
+        "risk_accumulation_flow": 0.014526857063174248,
+        "risk_relief_flow": 0.0008642551256343722
+      },
+      "clip_audit": {
+        "any_stock_clipped_fraction": 0.0,
+        "stock_value_clipped_fraction": 0.0,
+        "mean_abs_clip_correction": 0.0,
+        "max_abs_clip_correction": 0.0,
+        "per_stock_clipped_fraction": {
+          "goal_completion": 0.0,
+          "unresolved_box_pressure": 0.0,
+          "mobility": 0.0,
+          "reachable_capacity": 0.0,
+          "congestion": 0.0,
+          "irreversibility_risk": 0.0
+        },
+        "per_stock_clipped_low_fraction": {
+          "goal_completion": 0.0,
+          "unresolved_box_pressure": 0.0,
+          "mobility": 0.0,
+          "reachable_capacity": 0.0,
+          "congestion": 0.0,
+          "irreversibility_risk": 0.0
+        },
+        "per_stock_clipped_high_fraction": {
+          "goal_completion": 0.0,
+          "unresolved_box_pressure": 0.0,
+          "mobility": 0.0,
+          "reachable_capacity": 0.0,
+          "congestion": 0.0,
+          "irreversibility_risk": 0.0
+        },
+        "per_stock_mean_abs_clip_correction": {
+          "goal_completion": 0.0,
+          "unresolved_box_pressure": 0.0,
+          "mobility": 0.0,
+          "reachable_capacity": 0.0,
+          "congestion": 0.0,
+          "irreversibility_risk": 0.0
+        },
+        "per_stock_max_abs_clip_correction": {
+          "goal_completion": 0.0,
+          "unresolved_box_pressure": 0.0,
+          "mobility": 0.0,
+          "reachable_capacity": 0.0,
+          "congestion": 0.0,
+          "irreversibility_risk": 0.0
+        },
+        "per_stock_raw_next_min": {
+          "goal_completion": 0.0,
+          "unresolved_box_pressure": 0.34853148460388184,
+          "mobility": 0.0,
+          "reachable_capacity": 0.12732091546058655,
+          "congestion": 0.2011387050151825,
+          "irreversibility_risk": 0.0
+        },
+        "per_stock_raw_next_max": {
+          "goal_completion": 0.5312490463256836,
+          "unresolved_box_pressure": 1.0,
+          "mobility": 0.5785111784934998,
+          "reachable_capacity": 0.9966205954551697,
+          "congestion": 0.9598411917686462,
+          "irreversibility_risk": 1.0
+        },
+        "per_stock_raw_next_mean": {
+          "goal_completion": 0.08087436854839325,
+          "unresolved_box_pressure": 0.8713365197181702,
+          "mobility": 0.08393248170614243,
+          "reachable_capacity": 0.7898060083389282,
+          "congestion": 0.6200592517852783,
+          "irreversibility_risk": 0.7059332132339478
+        }
+      },
+      "per_stock_target_delta_summary": {
+        "goal_completion": {
+          "mean": 0.018735362216830254,
+          "mean_abs": 0.048594847321510315,
+          "std": 0.10861720889806747,
+          "min": -0.25,
+          "max": 0.25,
+          "nonzero_fraction": 0.19437938928604126
+        },
+        "unresolved_box_pressure": {
+          "mean": 0.021943794563412666,
+          "mean_abs": 0.06986826658248901,
+          "std": 0.12310118973255157,
+          "min": -0.17875003814697266,
+          "max": 0.4412500262260437,
+          "nonzero_fraction": 0.5316159129142761
+        },
+        "mobility": {
+          "mean": -0.06184133514761925,
+          "mean_abs": 0.07018442451953888,
+          "std": 0.12869440019130707,
+          "min": -0.5,
+          "max": 0.1875,
+          "nonzero_fraction": 0.32786884903907776
+        },
+        "reachable_capacity": {
+          "mean": -0.05917279049754143,
+          "mean_abs": 0.08898372203111649,
+          "std": 0.1840793639421463,
+          "min": -0.6451612710952759,
+          "max": 0.7419354915618896,
+          "nonzero_fraction": 0.3969554901123047
+        },
+        "congestion": {
+          "mean": 0.09645784646272659,
+          "mean_abs": 0.12836651504039764,
+          "std": 0.1402752548456192,
+          "min": -0.5,
+          "max": 0.625,
+          "nonzero_fraction": 0.7482435703277588
+        },
+        "irreversibility_risk": {
+          "mean": 0.13583138585090637,
+          "mean_abs": 0.13583138585090637,
+          "std": 0.3426094353199005,
+          "min": 0.0,
+          "max": 1.0,
+          "nonzero_fraction": 0.13583138585090637
+        }
+      },
+      "per_stock_pred_delta_summary": {
+        "goal_completion": {
+          "mean": 0.01822800189256668,
+          "mean_abs": 0.049409352242946625,
+          "std": 0.10668323189020157,
+          "min": -0.2954656481742859,
+          "max": 0.2766164541244507,
+          "nonzero_fraction": 0.35831382870674133
+        },
+        "unresolved_box_pressure": {
+          "mean": 0.027803201228380203,
+          "mean_abs": 0.07257027924060822,
+          "std": 0.11991193890571594,
+          "min": -0.1904553771018982,
+          "max": 0.4697190821170807,
+          "nonzero_fraction": 0.5866510272026062
+        },
+        "mobility": {
+          "mean": -0.05629000440239906,
+          "mean_abs": 0.06576885282993317,
+          "std": 0.12023737281560898,
+          "min": -0.5,
+          "max": 0.13112753629684448,
+          "nonzero_fraction": 0.43676814436912537
+        },
+        "reachable_capacity": {
+          "mean": -0.018116498365998268,
+          "mean_abs": 0.06396407634019852,
+          "std": 0.09863783419132233,
+          "min": -0.5763694643974304,
+          "max": 0.538617730140686,
+          "nonzero_fraction": 1.0
+        },
+        "congestion": {
+          "mean": 0.09312716871500015,
+          "mean_abs": 0.10802669078111649,
+          "std": 0.09278591722249985,
+          "min": -0.2935069799423218,
+          "max": 0.4532123804092407,
+          "nonzero_fraction": 1.0
+        },
+        "irreversibility_risk": {
+          "mean": 0.14270129799842834,
+          "mean_abs": 0.14442980289459229,
+          "std": 0.34046950936317444,
+          "min": -0.41375070810317993,
+          "max": 1.0,
+          "nonzero_fraction": 0.19203747808933258
+        }
+      },
+      "per_flow_target_summary": {
+        "goal_fill_flow": {
+          "mean": 0.03366510570049286,
+          "mean_abs": 0.03366510570049286,
+          "std": 0.08534012734889984,
+          "min": 0.0,
+          "max": 0.25,
+          "nonzero_fraction": 0.13466042280197144
+        },
+        "goal_unfill_flow": {
+          "mean": 0.01492974255234003,
+          "mean_abs": 0.01492974255234003,
+          "std": 0.05924135819077492,
+          "min": -0.0,
+          "max": 0.25,
+          "nonzero_fraction": 0.05971897020936012
+        },
+        "assignment_relief_flow": {
+          "mean": 0.00447014020755887,
+          "mean_abs": 0.00447014020755887,
+          "std": 0.01657620258629322,
+          "min": 0.0,
+          "max": 0.07874999940395355,
+          "nonzero_fraction": 0.18735362589359283
+        },
+        "assignment_worsening_flow": {
+          "mean": 0.0451492965221405,
+          "mean_abs": 0.0451493002474308,
+          "std": 0.08795321732759476,
+          "min": 0.0,
+          "max": 0.33375000953674316,
+          "nonzero_fraction": 0.3442623019218445
+        },
+        "mobility_loss_flow": {
+          "mean": 0.06601288169622421,
+          "mean_abs": 0.06601288169622421,
+          "std": 0.12476745992898941,
+          "min": 0.0,
+          "max": 0.5,
+          "nonzero_fraction": 0.28103044629096985
+        },
+        "mobility_recovery_flow": {
+          "mean": 0.004171545617282391,
+          "mean_abs": 0.004171545617282391,
+          "std": 0.02108503319323063,
+          "min": 0.0,
+          "max": 0.1875,
+          "nonzero_fraction": 0.04683840647339821
+        },
+        "reachability_loss_flow": {
+          "mean": 0.07407825440168381,
+          "mean_abs": 0.0740782618522644,
+          "std": 0.163914754986763,
+          "min": -0.0,
+          "max": 0.6451612710952759,
+          "nonzero_fraction": 0.2271662801504135
+        },
+        "reachability_recovery_flow": {
+          "mean": 0.01490546204149723,
+          "mean_abs": 0.01490546204149723,
+          "std": 0.06934570521116257,
+          "min": 0.0,
+          "max": 0.7419354915618896,
+          "nonzero_fraction": 0.16978922486305237
+        },
+        "congestion_generation_flow": {
+          "mean": 0.11241217702627182,
+          "mean_abs": 0.11241217702627182,
+          "std": 0.11744121462106705,
+          "min": 0.0,
+          "max": 0.625,
+          "nonzero_fraction": 0.6299765706062317
+        },
+        "congestion_release_flow": {
+          "mean": 0.015954332426190376,
+          "mean_abs": 0.015954332426190376,
+          "std": 0.047935232520103455,
+          "min": 0.0,
+          "max": 0.5,
+          "nonzero_fraction": 0.11826697736978531
+        },
+        "risk_accumulation_flow": {
+          "mean": 0.13583138585090637,
+          "mean_abs": 0.13583138585090637,
+          "std": 0.3426094353199005,
+          "min": 0.0,
+          "max": 1.0,
+          "nonzero_fraction": 0.13583138585090637
+        },
+        "risk_relief_flow": {
+          "mean": 0.0,
+          "mean_abs": 0.0,
+          "std": 0.0,
+          "min": -0.0,
+          "max": -0.0,
+          "nonzero_fraction": 0.0
+        }
+      },
+      "per_flow_pred_summary": {
+        "goal_fill_flow": {
+          "mean": 0.03381868079304695,
+          "mean_abs": 0.03381868079304695,
+          "std": 0.08406610041856766,
+          "min": 0.0,
+          "max": 0.2766164541244507,
+          "nonzero_fraction": 0.21545667946338654
+        },
+        "goal_unfill_flow": {
+          "mean": 0.015590675175189972,
+          "mean_abs": 0.015590677037835121,
+          "std": 0.05709369480609894,
+          "min": 0.0,
+          "max": 0.2954656481742859,
+          "nonzero_fraction": 0.1428571492433548
+        },
+        "assignment_relief_flow": {
+          "mean": 0.004538976587355137,
+          "mean_abs": 0.004538976587355137,
+          "std": 0.017769841477274895,
+          "min": 0.0,
+          "max": 0.11993417143821716,
+          "nonzero_fraction": 0.09836065769195557
+        },
+        "assignment_worsening_flow": {
+          "mean": 0.050570178776979446,
+          "mean_abs": 0.050570182502269745,
+          "std": 0.0861637070775032,
+          "min": 0.0,
+          "max": 0.3328019082546234,
+          "nonzero_fraction": 0.5046838521957397
+        },
+        "mobility_loss_flow": {
+          "mean": 0.061029426753520966,
+          "mean_abs": 0.061029430478811264,
+          "std": 0.1163792535662651,
+          "min": 0.0,
+          "max": 0.5,
+          "nonzero_fraction": 0.34660422801971436
+        },
+        "mobility_recovery_flow": {
+          "mean": 0.004739425145089626,
+          "mean_abs": 0.004739425145089626,
+          "std": 0.01828676648437977,
+          "min": 0.0,
+          "max": 0.1311275213956833,
+          "nonzero_fraction": 0.0901639312505722
+        },
+        "reachability_loss_flow": {
+          "mean": 0.04104028642177582,
+          "mean_abs": 0.04104028642177582,
+          "std": 0.07087025791406631,
+          "min": 0.0,
+          "max": 0.5763694643974304,
+          "nonzero_fraction": 0.5585480332374573
+        },
+        "reachability_recovery_flow": {
+          "mean": 0.022923791781067848,
+          "mean_abs": 0.022923791781067848,
+          "std": 0.0531529076397419,
+          "min": 0.0,
+          "max": 0.5386177897453308,
+          "nonzero_fraction": 0.4414519965648651
+        },
+        "congestion_generation_flow": {
+          "mean": 0.10057692974805832,
+          "mean_abs": 0.10057692974805832,
+          "std": 0.08011706173419952,
+          "min": 0.0,
+          "max": 0.4532123804092407,
+          "nonzero_fraction": 0.8629976511001587
+        },
+        "congestion_release_flow": {
+          "mean": 0.007449765224009752,
+          "mean_abs": 0.007449765224009752,
+          "std": 0.026304639875888824,
+          "min": 0.0,
+          "max": 0.2935069501399994,
+          "nonzero_fraction": 0.1370023488998413
+        },
+        "risk_accumulation_flow": {
+          "mean": 0.14356555044651031,
+          "mean_abs": 0.1435655653476715,
+          "std": 0.33972054719924927,
+          "min": 0.0,
+          "max": 1.0,
+          "nonzero_fraction": 0.18852458894252777
+        },
+        "risk_relief_flow": {
+          "mean": 0.0008642551256343722,
+          "mean_abs": 0.0008642551256343722,
+          "std": 0.016164571046829224,
+          "min": 0.0,
+          "max": 0.41375070810317993,
+          "nonzero_fraction": 0.0035128805320709944
+        }
+      },
+      "flow_pair_coactivation": {
+        "goal_fill_flow__goal_unfill_flow": {
+          "target_coactive_fraction_gt_1e-6": 0.0,
+          "pred_coactive_fraction_gt_1e-6": 0.0,
+          "pred_mean_min_pair_flow": 0.0,
+          "target_mean_min_pair_flow": 0.0
+        },
+        "assignment_relief_flow__assignment_worsening_flow": {
+          "target_coactive_fraction_gt_1e-6": 0.0,
+          "pred_coactive_fraction_gt_1e-6": 0.0,
+          "pred_mean_min_pair_flow": 0.0,
+          "target_mean_min_pair_flow": 0.0
+        },
+        "mobility_loss_flow__mobility_recovery_flow": {
+          "target_coactive_fraction_gt_1e-6": 0.0,
+          "pred_coactive_fraction_gt_1e-6": 0.0,
+          "pred_mean_min_pair_flow": 0.0,
+          "target_mean_min_pair_flow": 0.0
+        },
+        "reachability_loss_flow__reachability_recovery_flow": {
+          "target_coactive_fraction_gt_1e-6": 0.0,
+          "pred_coactive_fraction_gt_1e-6": 0.0,
+          "pred_mean_min_pair_flow": 0.0,
+          "target_mean_min_pair_flow": 0.0
+        },
+        "congestion_generation_flow__congestion_release_flow": {
+          "target_coactive_fraction_gt_1e-6": 0.0,
+          "pred_coactive_fraction_gt_1e-6": 0.0,
+          "pred_mean_min_pair_flow": 0.0,
+          "target_mean_min_pair_flow": 0.0
+        },
+        "risk_accumulation_flow__risk_relief_flow": {
+          "target_coactive_fraction_gt_1e-6": 0.0,
+          "pred_coactive_fraction_gt_1e-6": 0.0,
+          "pred_mean_min_pair_flow": 0.0,
+          "target_mean_min_pair_flow": 0.0
+        }
+      }
+    },
+    "valid_aliasing": {
+      "round_decimals": 2,
+      "top_k": 8,
+      "stock_bucket_aliasing": {
+        "bucket_count": 81,
+        "aliased_bucket_count": 77,
+        "max_next_delta_variance": 0.3904161751270294,
+        "mean_next_delta_variance": 0.17057295586889634,
+        "top_buckets": [
+          {
+            "bucket_key": [
+              0.0,
+              0.7599999904632568,
+              0.11999999731779099,
+              0.12999999523162842,
+              0.8100000023841858,
+              0.0
+            ],
+            "count": 3,
+            "next_delta_variance_sum": 0.3904161751270294,
+            "per_stock_next_delta_variance": {
+              "goal_completion": 0.0138888880610466,
+              "unresolved_box_pressure": 0.03004305809736252,
+              "mobility": 0.00347222201526165,
+              "reachable_capacity": 0.0973522961139679,
+              "congestion": 0.0234375,
+              "irreversibility_risk": 0.2222222089767456
+            },
+            "mean_next_delta": {
+              "goal_completion": 0.0833333358168602,
+              "unresolved_box_pressure": 0.020416637882590294,
+              "mobility": -0.0416666679084301,
+              "reachable_capacity": 0.3010752499103546,
+              "congestion": -0.125,
+              "irreversibility_risk": 0.3333333432674408
+            }
+          },
+          {
+            "bucket_key": [
+              0.25,
+              0.5600000023841858,
+              0.1899999976158142,
+              0.8600000143051147,
+              0.6200000047683716,
+              0.0
+            ],
+            "count": 12,
+            "next_delta_variance_sum": 0.3834511339664459,
+            "per_stock_next_delta_variance": {
+              "goal_completion": 0.0360243059694767,
+              "unresolved_box_pressure": 0.04743058979511261,
+              "mobility": 0.013319226913154125,
+              "reachable_capacity": 0.029434172436594963,
+              "congestion": 0.0072428383864462376,
+              "irreversibility_risk": 0.25
+            },
+            "mean_next_delta": {
+              "goal_completion": -0.02083333395421505,
+              "unresolved_box_pressure": 0.14614583551883698,
+              "mobility": -0.0885416641831398,
+              "reachable_capacity": -0.1101190522313118,
+              "congestion": 0.046875,
+              "irreversibility_risk": 0.5
+            }
+          },
+          {
+            "bucket_key": [
+              0.25,
+              0.5699999928474426,
+              0.11999999731779099,
+              0.8199999928474426,
+              0.6899999976158142,
+              0.0
+            ],
+            "count": 5,
+            "next_delta_variance_sum": 0.3754535913467407,
+            "per_stock_next_delta_variance": {
+              "goal_completion": 0.03500000387430191,
+              "unresolved_box_pressure": 0.06308750808238983,
+              "mobility": 0.0037499996833503246,
+              "reachable_capacity": 0.03142857551574707,
+              "congestion": 0.0021875002421438694,
+              "irreversibility_risk": 0.23999997973442078
+            },
+            "mean_next_delta": {
+              "goal_completion": 0.05000000074505806,
+              "unresolved_box_pressure": 0.1187499612569809,
+              "mobility": -0.07500000298023224,
+              "reachable_capacity": -0.12142858654260635,
+              "congestion": 0.05000000074505806,
+              "irreversibility_risk": 0.6000000238418579
+            }
+          },
+          {
+            "bucket_key": [
+              0.0,
+              0.7400000095367432,
+              0.1899999976158142,
+              0.8600000143051147,
+              0.6200000047683716,
+              0.0
+            ],
+            "count": 18,
+            "next_delta_variance_sum": 0.3706575036048889,
+            "per_stock_next_delta_variance": {
+              "goal_completion": 0.015625,
+              "unresolved_box_pressure": 0.0478515625,
+              "mobility": 0.01877170242369175,
+              "reachable_capacity": 0.029620187357068062,
+              "congestion": 0.0087890625,
+              "irreversibility_risk": 0.25
+            },
+            "mean_next_delta": {
+              "goal_completion": 0.125,
+              "unresolved_box_pressure": 0.04000002145767212,
+              "mobility": -0.0729166641831398,
+              "reachable_capacity": -0.119047611951828,
+              "congestion": 0.03125,
+              "irreversibility_risk": 0.5
+            }
+          },
+          {
+            "bucket_key": [
+              0.0,
+              0.75,
+              0.11999999731779099,
+              0.23000000417232513,
+              0.6899999976158142,
+              0.0
+            ],
+            "count": 5,
+            "next_delta_variance_sum": 0.36839908361434937,
+            "per_stock_next_delta_variance": {
+              "goal_completion": 0.010000000707805157,
+              "unresolved_box_pressure": 0.030602872371673584,
+              "mobility": 0.0024999999441206455,
+              "reachable_capacity": 0.05560874193906784,
+              "congestion": 0.02968749962747097,
+              "irreversibility_risk": 0.23999997973442078
+            },
+            "mean_next_delta": {
+              "goal_completion": 0.05000000074505806,
+              "unresolved_box_pressure": 0.1120000034570694,
+              "mobility": -0.08749999850988388,
+              "reachable_capacity": 0.14193549752235413,
+              "congestion": 0.0625,
+              "irreversibility_risk": 0.6000000238418579
+            }
+          },
+          {
+            "bucket_key": [
+              0.0,
+              0.7300000190734863,
+              0.4399999976158142,
+              0.8600000143051147,
+              0.25,
+              0.0
+            ],
+            "count": 12,
+            "next_delta_variance_sum": 0.36635616421699524,
+            "per_stock_next_delta_variance": {
+              "goal_completion": 0.004774304106831551,
+              "unresolved_box_pressure": 0.022862324491143227,
+              "mobility": 0.041748046875,
+              "reachable_capacity": 0.027006173506379128,
+              "congestion": 0.02690972201526165,
+              "irreversibility_risk": 0.2430555820465088
+            },
+            "mean_next_delta": {
+              "goal_completion": 0.02083333395421505,
+              "unresolved_box_pressure": 0.09666669368743896,
+              "mobility": -0.234375,
+              "reachable_capacity": -0.0555555522441864,
+              "congestion": 0.1666666716337204,
+              "irreversibility_risk": 0.4166666567325592
+            }
+          },
+          {
+            "bucket_key": [
+              0.0,
+              0.7400000095367432,
+              0.3100000023841858,
+              0.8600000143051147,
+              0.5,
+              0.0
+            ],
+            "count": 8,
+            "next_delta_variance_sum": 0.3638153672218323,
+            "per_stock_next_delta_variance": {
+              "goal_completion": 0.0146484375,
+              "unresolved_box_pressure": 0.03613506257534027,
+              "mobility": 0.020263671875,
+              "reachable_capacity": 0.0340401828289032,
+              "congestion": 0.02435302734375,
+              "irreversibility_risk": 0.234375
+            },
+            "mean_next_delta": {
+              "goal_completion": 0.09375,
+              "unresolved_box_pressure": 0.030937522649765015,
+              "mobility": -0.171875,
+              "reachable_capacity": -0.133928582072258,
+              "congestion": 0.1484375,
+              "irreversibility_risk": 0.375
+            }
+          },
+          {
+            "bucket_key": [
+              0.0,
+              0.7300000190734863,
+              0.3799999952316284,
+              0.8600000143051147,
+              0.3799999952316284,
+              0.0
+            ],
+            "count": 10,
+            "next_delta_variance_sum": 0.36336731910705566,
+            "per_stock_next_delta_variance": {
+              "goal_completion": 0.0,
+              "unresolved_box_pressure": 0.01702181063592434,
+              "mobility": 0.02988281287252903,
+              "reachable_capacity": 0.041736114770174026,
+              "congestion": 0.03472656384110451,
+              "irreversibility_risk": 0.24000000953674316
+            },
+            "mean_next_delta": {
+              "goal_completion": 0.0,
+              "unresolved_box_pressure": 0.10650002956390381,
+              "mobility": -0.21875,
+              "reachable_capacity": -0.10833332687616348,
+              "congestion": 0.18125000596046448,
+              "irreversibility_risk": 0.4000000059604645
+            }
+          }
+        ]
+      },
+      "stock_action_bucket_aliasing": {
+        "bucket_count": 597,
+        "aliased_bucket_count": 154,
+        "max_next_delta_variance": 0.09125160425901413,
+        "mean_next_delta_variance": 0.004856667916313908,
+        "top_buckets": [
+          {
+            "bucket_key": [
+              0.0,
+              0.7400000095367432,
+              0.25,
+              0.8899999856948853,
+              0.75,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.75
+            ],
+            "count": 2,
+            "next_delta_variance_sum": 0.09125160425901413,
+            "per_stock_next_delta_variance": {
+              "goal_completion": 0.0,
+              "unresolved_box_pressure": 8.881784197001252e-16,
+              "mobility": 0.0087890625,
+              "reachable_capacity": 0.07367347925901413,
+              "congestion": 0.0087890625,
+              "irreversibility_risk": 0.0
+            },
+            "mean_next_delta": {
+              "goal_completion": 0.0,
+              "unresolved_box_pressure": -0.0037499964237213135,
+              "mobility": -0.09375,
+              "reachable_capacity": -0.27142858505249023,
+              "congestion": 0.09375,
+              "irreversibility_risk": 0.0
+            }
+          },
+          {
+            "bucket_key": [
+              0.0,
+              0.75,
+              0.25,
+              0.8899999856948853,
+              0.75,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.75
+            ],
+            "count": 2,
+            "next_delta_variance_sum": 0.09125160425901413,
+            "per_stock_next_delta_variance": {
+              "goal_completion": 0.0,
+              "unresolved_box_pressure": 8.881784197001252e-16,
+              "mobility": 0.0087890625,
+              "reachable_capacity": 0.07367347925901413,
+              "congestion": 0.0087890625,
+              "irreversibility_risk": 0.0
+            },
+            "mean_next_delta": {
+              "goal_completion": 0.0,
+              "unresolved_box_pressure": -0.0037499964237213135,
+              "mobility": -0.09375,
+              "reachable_capacity": -0.27142858505249023,
+              "congestion": 0.09375,
+              "irreversibility_risk": 0.0
+            }
+          },
+          {
+            "bucket_key": [
+              0.0,
+              1.0,
+              0.0,
+              0.8899999856948853,
+              0.6200000047683716,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.75
+            ],
+            "count": 3,
+            "next_delta_variance_sum": 0.08718892931938171,
+            "per_stock_next_delta_variance": {
+              "goal_completion": 0.0,
+              "unresolved_box_pressure": 0.0,
+              "mobility": 0.0,
+              "reachable_capacity": 0.06548754125833511,
+              "congestion": 0.02170138992369175,
+              "irreversibility_risk": 0.0
+            },
+            "mean_next_delta": {
+              "goal_completion": 0.0,
+              "unresolved_box_pressure": 0.0,
+              "mobility": 0.0,
+              "reachable_capacity": -0.18095238506793976,
+              "congestion": 0.1041666641831398,
+              "irreversibility_risk": 0.0
+            }
+          },
+          {
+            "bucket_key": [
+              0.0,
+              1.0,
+              0.0,
+              0.8600000143051147,
+              0.6200000047683716,
+              1.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.5
+            ],
+            "count": 2,
+            "next_delta_variance_sum": 0.0712890625,
+            "per_stock_next_delta_variance": {
+              "goal_completion": 0.0,
+              "unresolved_box_pressure": 0.0,
+              "mobility": 0.0,
+              "reachable_capacity": 0.0625,
+              "congestion": 0.0087890625,
+              "irreversibility_risk": 0.0
+            },
+            "mean_next_delta": {
+              "goal_completion": 0.0,
+              "unresolved_box_pressure": 0.0,
+              "mobility": 0.0,
+              "reachable_capacity": -0.25,
+              "congestion": -0.03125,
+              "irreversibility_risk": 0.0
+            }
+          },
+          {
+            "bucket_key": [
+              0.0,
+              1.0,
+              0.0,
+              0.8600000143051147,
+              0.6200000047683716,
+              1.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.75
+            ],
+            "count": 2,
+            "next_delta_variance_sum": 0.0712890625,
+            "per_stock_next_delta_variance": {
+              "goal_completion": 0.0,
+              "unresolved_box_pressure": 0.0,
+              "mobility": 0.0,
+              "reachable_capacity": 0.0625,
+              "congestion": 0.0087890625,
+              "irreversibility_risk": 0.0
+            },
+            "mean_next_delta": {
+              "goal_completion": 0.25,
+              "unresolved_box_pressure": -0.17500001192092896,
+              "mobility": 0.0,
+              "reachable_capacity": -0.25,
+              "congestion": -0.03125,
+              "irreversibility_risk": 0.0
+            }
+          },
+          {
+            "bucket_key": [
+              0.0,
+              1.0,
+              0.0,
+              0.8700000047683716,
+              0.5,
+              1.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0,
+              0.75
+            ],
+            "count": 6,
+            "next_delta_variance_sum": 0.043971844017505646,
+            "per_stock_next_delta_variance": {
+              "goal_completion": 0.0,
+              "unresolved_box_pressure": 0.0,
+              "mobility": 0.0,
+              "reachable_capacity": 0.00924962293356657,
+              "congestion": 0.0347222201526165,
+              "irreversibility_risk": 0.0
+            },
+            "mean_next_delta": {
+              "goal_completion": 0.0,
+              "unresolved_box_pressure": 0.0,
+              "mobility": 0.0,
+              "reachable_capacity": -0.04301075264811516,
+              "congestion": -0.0416666679084301,
+              "irreversibility_risk": 0.0
+            }
+          },
+          {
+            "bucket_key": [
+              0.25,
+              0.8199999928474426,
+              0.0,
+              0.3700000047683716,
+              0.75,
+              1.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.5
+            ],
+            "count": 2,
+            "next_delta_variance_sum": 0.02875433675944805,
+            "per_stock_next_delta_variance": {
+              "goal_completion": 0.0,
+              "unresolved_box_pressure": 0.0,
+              "mobility": 0.0,
+              "reachable_capacity": 0.02777777425944805,
+              "congestion": 0.0009765625,
+              "irreversibility_risk": 0.0
+            },
+            "mean_next_delta": {
+              "goal_completion": -0.25,
+              "unresolved_box_pressure": 0.17500001192092896,
+              "mobility": 0.0,
+              "reachable_capacity": 0.3333333432674408,
+              "congestion": -0.03125,
+              "irreversibility_risk": 0.0
+            }
+          },
+          {
+            "bucket_key": [
+              0.25,
+              0.8199999928474426,
+              0.0,
+              0.3700000047683716,
+              0.75,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              1.0,
+              1.0,
+              0.0,
+              0.0,
+              0.0,
+              0.5
+            ],
+            "count": 2,
+            "next_delta_variance_sum": 0.02875433675944805,
+            "per_stock_next_delta_variance": {
+              "goal_completion": 0.0,
+              "unresolved_box_pressure": 0.0,
+              "mobility": 0.0,
+              "reachable_capacity": 0.02777777425944805,
+              "congestion": 0.0009765625,
+              "irreversibility_risk": 0.0
+            },
+            "mean_next_delta": {
+              "goal_completion": -0.25,
+              "unresolved_box_pressure": 0.17500001192092896,
+              "mobility": 0.0,
+              "reachable_capacity": 0.23333331942558289,
+              "congestion": -0.03125,
+              "irreversibility_risk": 0.0
+            }
+          }
+        ]
+      }
+    },
+    "provider_audit": {
+      "state_encoder": "diagnostic_stock_proxy_encoder",
+      "transition_label_provider": "exact_single_push_diagnostic_provider",
+      "rollout_transition_provider": "exact_single_push_diagnostic_provider_for_labels",
+      "learned_transition_provider_used_for_sdmcts": false
+    }
+  },
+  "checkpoint": {
+    "saved": true,
+    "path": "results/sokoban_sd_world_model/stage2_provider_checkpoint_seed0.pt",
+    "provider_id": "learned_stock_flow_checkpoint_v1"
+  }
+}

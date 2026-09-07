@@ -1,0 +1,19 @@
+{
+  "checkpoint": "results/hopper_sd_supervised/run_20260428_smoke_contactfix5_resid4_featctx_cpu/hopper_sd_supervised.pt",
+  "metrics": {
+    "one_step_struct_rmse": 0.7191764712333679,
+    "rollout_1_rmse": 0.6757564330473542,
+    "rollout_3_rmse": 1.1864258695859462,
+    "rollout_5_rmse": 1.4534458110574633,
+    "rollout_10_rmse": 1.731131330714561,
+    "rollout_20_rmse": 1.6761122823227197,
+    "height_mae": 0.005407592747360468,
+    "vx_mae": 0.08705385029315948,
+    "vz_mae": 0.15467098355293274,
+    "pitch_mae": 0.031230848282575607,
+    "pitch_rate_mae": 0.7453515529632568,
+    "support_contact_mae": 0.22855325043201447,
+    "full_foot_support_mae": 0.051266398280858994,
+    "body_contact_z_mae": 0.007831818424165249
+  }
+}

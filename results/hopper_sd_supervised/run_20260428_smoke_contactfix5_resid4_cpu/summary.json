@@ -1,0 +1,112 @@
+{
+  "args": {
+    "seed": 0,
+    "episodes": 12,
+    "max_steps": 250,
+    "epochs": 30,
+    "batch_size": 256,
+    "lr": 0.001,
+    "val_fraction": 0.1,
+    "rollout_horizon": 5,
+    "rollout_weight": 0.25,
+    "rollout_batch_size": 64,
+    "use_transition_residual": true,
+    "transition_residual_scale": 4.0,
+    "device": "cpu",
+    "out_dir": "results/hopper_sd_supervised/run_20260428_smoke_contactfix5_resid4_cpu"
+  },
+  "train_size": 2750,
+  "val_size": 250,
+  "metrics": {
+    "one_step_struct_rmse": 0.7239475846290588,
+    "rollout_1_rmse": 0.6836881516501307,
+    "rollout_5_rmse": 1.4708387912251055,
+    "rollout_10_rmse": 1.7281192543450743,
+    "rollout_20_rmse": 1.6498315578792244,
+    "height_mae": 0.005511528346687555,
+    "vx_mae": 0.13341973721981049,
+    "vz_mae": 0.17875175178050995,
+    "pitch_mae": 0.02947724424302578,
+    "pitch_rate_mae": 0.7784610986709595,
+    "support_contact_mae": 0.23615801334381104,
+    "full_foot_support_mae": 0.0511949360370636,
+    "body_contact_z_mae": 0.007737194653600454
+  },
+  "learned_params": {
+    "dt": 0.02,
+    "hop_speed": 2.0,
+    "mass": 1.0,
+    "inertia": 1.0,
+    "rest_leg_length": 0.8199999928474426,
+    "activation_w": [
+      0.07458332180976868,
+      0.24967455863952637,
+      0.21403510868549347,
+      0.15944498777389526
+    ],
+    "activation_b": -0.2504284381866455,
+    "activation_tau": 0.0972282737493515,
+    "leg_stiffness": 5.755421161651611,
+    "leg_damping": 0.7493908405303955,
+    "leg_force_max": 2.7809712886810303,
+    "contact_k": 10.037553787231445,
+    "contact_tau": 0.4052754342556,
+    "linear_damping": [
+      0.12096907198429108,
+      0.19522540271282196
+    ],
+    "angular_damping": 0.12608051300048828,
+    "balance_theta": 1.3900418281555176,
+    "balance_omega": 0.36577165126800537,
+    "joint_action_scale": [
+      1.1956567764282227,
+      1.5060784816741943,
+      1.689292073249817,
+      1.2229723930358887
+    ],
+    "joint_rate_damping": [
+      1.078389286994934,
+      1.1765046119689941,
+      1.2920544147491455,
+      0.954683780670166
+    ],
+    "joint_centering": [
+      0.21133121848106384,
+      0.2512769103050232,
+      0.3930218517780304,
+      0.257545530796051
+    ],
+    "use_transition_residual": true,
+    "transition_residual_scale": 4.0,
+    "transition_residual_base_scale": [
+      0.10000000149011612,
+      0.18000000715255737,
+      0.30000001192092896
+    ],
+    "action_prior_enabled": false,
+    "dense_pose_delta_weight": 0.0,
+    "dense_pose_abs_weight": 0.0,
+    "dense_pose_milestone_scale": 0.0,
+    "dense_pose_gamma": 0.99,
+    "recover_penalty_scale": 0.0,
+    "latent_layout": [
+      "H",
+      "vx",
+      "vz",
+      "theta",
+      "omega",
+      "A",
+      "waist",
+      "hip",
+      "knee",
+      "ankle",
+      "waist_dot",
+      "hip_dot",
+      "knee_dot",
+      "ankle_dot",
+      "touch_toe",
+      "touch_heel",
+      "z_min"
+    ]
+  }
+}

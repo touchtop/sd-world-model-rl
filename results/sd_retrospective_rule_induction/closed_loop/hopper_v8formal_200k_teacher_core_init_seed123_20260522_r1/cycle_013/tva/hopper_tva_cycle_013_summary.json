@@ -1,0 +1,25 @@
+{
+  "batch_size": 256,
+  "checkpoint": "results/sd_retrospective_rule_induction/closed_loop/hopper_v8formal_200k_teacher_core_init_seed123_20260522_r1/cycle_013/tva/hopper_tva_cycle_013.pt",
+  "epochs": 10,
+  "eval_mse": 51.543800354003906,
+  "eval_smooth_l1": 4.10756778717041,
+  "gamma": 0.99,
+  "hidden": 128,
+  "init_checkpoint": "results/sd_retrospective_rule_induction/closed_loop/hopper_v8formal_200k_teacher_core_init_seed123_20260522_r1/cycle_012/tva/hopper_tva_cycle_012.pt",
+  "init_loaded_tensors": 6,
+  "lr": 0.001,
+  "num_transitions": 5000,
+  "sd_checkpoint": "results/sd_retrospective_rule_induction/closed_loop/hopper_v8formal_200k_teacher_core_init_seed123_20260522_r1/cycle_013/sd_explainers/sd_explainer_cycle_013.pt",
+  "seed": 20260520,
+  "selection": "results/sd_retrospective_rule_induction/closed_loop/hopper_v8formal_200k_teacher_core_init_seed123_20260522_r1/cycle_013/manifests/selected_trajectories.json",
+  "shaped_coef": 1.0,
+  "target_stats": {
+    "max": 0.03172440826892853,
+    "mean": -43.162132263183594,
+    "min": -59.161678314208984,
+    "std": 9.192468643188477
+  },
+  "train_loss": 4.123823976516723,
+  "true_coef": 1.0
+}

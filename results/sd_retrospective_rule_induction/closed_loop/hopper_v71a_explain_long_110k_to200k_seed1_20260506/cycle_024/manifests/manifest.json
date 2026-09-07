@@ -1,0 +1,53 @@
+{
+  "created_at_utc": "2026-05-06T11:03:44.812902+00:00",
+  "repo_root": "/home/data/round/code/sd_world_model_rl",
+  "log_root": "logs/hopper-hop",
+  "run_globs": [
+    "tdmpc2_v71a_explain_long_5k_seed1_20260506_cycle022_target110021",
+    "tdmpc2_v71a_explain_long_5k_seed1_20260506_cycle023_target115022",
+    "tdmpc2_v71a_explain_long_5k_seed1_20260506_cycle024_target120023"
+  ],
+  "write_policy": "results_only",
+  "runs": [
+    {
+      "seed": 1,
+      "run_name": "tdmpc2_v71a_explain_long_5k_seed1_20260506_cycle023_target115022",
+      "run_dir": "logs/hopper-hop/1/tdmpc2_v71a_explain_long_5k_seed1_20260506_cycle023_target115022",
+      "eval_csv": "logs/hopper-hop/1/tdmpc2_v71a_explain_long_5k_seed1_20260506_cycle023_target115022/eval.csv",
+      "eval_full_csv": "logs/hopper-hop/1/tdmpc2_v71a_explain_long_5k_seed1_20260506_cycle023_target115022/eval_full.csv",
+      "train_csv": "logs/hopper-hop/1/tdmpc2_v71a_explain_long_5k_seed1_20260506_cycle023_target115022/train.csv",
+      "eval_rows": [
+        {
+          "step": 115022,
+          "episode_reward": 0.0
+        }
+      ],
+      "official_eval_summaries": [
+        {
+          "step_dir": "step_0115022",
+          "summary_csv": "logs/hopper-hop/1/tdmpc2_v71a_explain_long_5k_seed1_20260506_cycle023_target115022/official_eval/step_0115022/eval_episode_summary.csv"
+        }
+      ]
+    },
+    {
+      "seed": 1,
+      "run_name": "tdmpc2_v71a_explain_long_5k_seed1_20260506_cycle024_target120023",
+      "run_dir": "logs/hopper-hop/1/tdmpc2_v71a_explain_long_5k_seed1_20260506_cycle024_target120023",
+      "eval_csv": "logs/hopper-hop/1/tdmpc2_v71a_explain_long_5k_seed1_20260506_cycle024_target120023/eval.csv",
+      "eval_full_csv": "logs/hopper-hop/1/tdmpc2_v71a_explain_long_5k_seed1_20260506_cycle024_target120023/eval_full.csv",
+      "train_csv": "logs/hopper-hop/1/tdmpc2_v71a_explain_long_5k_seed1_20260506_cycle024_target120023/train.csv",
+      "eval_rows": [
+        {
+          "step": 120023,
+          "episode_reward": 0.0
+        }
+      ],
+      "official_eval_summaries": [
+        {
+          "step_dir": "step_0120023",
+          "summary_csv": "logs/hopper-hop/1/tdmpc2_v71a_explain_long_5k_seed1_20260506_cycle024_target120023/official_eval/step_0120023/eval_episode_summary.csv"
+        }
+      ]
+    }
+  ]
+}

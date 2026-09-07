@@ -1,0 +1,51 @@
+{
+  "checkpoint": "results/sd_retrospective_rule_induction/closed_loop/hopper_v8formal_200k_counterfactual_teacher_retain8_prevcur_protect_stochgate0900995_rngiso_seed123_20260528_r2/cycle_015/sd_explainers/sd_explainer_cycle_015.pt",
+  "epochs": 3,
+  "history_tail": [
+    {
+      "best_val_loss": 0.5299052000045776,
+      "epoch": 1.0,
+      "train_loss": 0.6385565115646883,
+      "val_loss": 0.5299052000045776
+    },
+    {
+      "best_val_loss": 0.5294969081878662,
+      "epoch": 2.0,
+      "train_loss": 0.6394364027814432,
+      "val_loss": 0.5294969081878662
+    },
+    {
+      "best_val_loss": 0.5293139815330505,
+      "epoch": 3.0,
+      "train_loss": 0.6389884894544428,
+      "val_loss": 0.5293139815330505
+    }
+  ],
+  "init_checkpoint": "results/sd_retrospective_rule_induction/closed_loop/hopper_v8formal_200k_counterfactual_teacher_retain8_prevcur_protect_stochgate0900995_rngiso_seed123_20260528_r2/cycle_014/sd_explainers/sd_explainer_cycle_014.pt",
+  "init_loaded_tensors": 30,
+  "metrics": {
+    "body_contact_z_mae": 0.00897336658090353,
+    "full_foot_support_mae": 0.13484913110733032,
+    "height_mae": 0.008081142790615559,
+    "one_step_struct_rmse": 1.374466896057129,
+    "pitch_mae": 0.03388450667262077,
+    "pitch_rate_mae": 1.476346492767334,
+    "rollout_10_rmse": 1.629379782360047,
+    "rollout_1_rmse": 1.119502457906492,
+    "rollout_20_rmse": 1.6035462715663016,
+    "rollout_3_rmse": 1.5640055160038173,
+    "rollout_5_rmse": 1.6143667434807867,
+    "support_contact_mae": 0.3947599232196808,
+    "vx_mae": 0.15031351149082184,
+    "vz_mae": 0.2617805302143097
+  },
+  "model_config": {
+    "transition_residual_scale": 1.0,
+    "use_transition_residual": true
+  },
+  "num_transitions": 50000,
+  "seed": 20260522,
+  "selection": "results/sd_retrospective_rule_induction/closed_loop/hopper_v8formal_200k_counterfactual_teacher_retain8_prevcur_protect_stochgate0900995_rngiso_seed123_20260528_r2/cycle_015/manifests/selected_trajectories.json",
+  "train_size": 45010,
+  "val_size": 4990
+}

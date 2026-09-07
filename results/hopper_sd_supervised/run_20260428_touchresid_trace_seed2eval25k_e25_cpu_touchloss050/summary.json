@@ -1,0 +1,125 @@
+{
+  "args": {
+    "seed": 0,
+    "episodes": 32,
+    "max_steps": 500,
+    "trace_dir": "/home/data/round/code/sd_world_model_rl/logs/hopper-hop/2/sd_hopper_100k_pureenv_sdinit_seed2_20260428_run1/official_eval/step_0025000/episode_csv",
+    "epochs": 25,
+    "batch_size": 256,
+    "lr": 0.0003,
+    "val_fraction": 0.1,
+    "rollout_horizon": 5,
+    "rollout_weight": 0.25,
+    "rollout_batch_size": 64,
+    "short_rollout_horizons": [
+      3,
+      5
+    ],
+    "short_rollout_weight": 0.1,
+    "touch_loss_weight": 0.5,
+    "use_transition_residual": true,
+    "transition_residual_scale": 4.0,
+    "init_checkpoint": "/home/data/round/code/sd_world_model_rl/results/hopper_sd_supervised/run_20260428_smoke_contactfix5_resid4_featctx_shortloss010_cpu/hopper_sd_supervised.pt",
+    "device": "cpu",
+    "out_dir": "/home/data/round/code/sd_world_model_rl/results/hopper_sd_supervised/run_20260428_touchresid_trace_seed2eval25k_e25_cpu_touchloss050"
+  },
+  "train_size": 4491,
+  "val_size": 499,
+  "metrics": {
+    "one_step_struct_rmse": 0.9232394695281982,
+    "rollout_1_rmse": 0.9634552985080518,
+    "rollout_3_rmse": 1.1637864095391706,
+    "rollout_5_rmse": 1.1189250985626131,
+    "rollout_10_rmse": 1.0548837423557416,
+    "rollout_20_rmse": 0.9392803318332881,
+    "height_mae": 0.004850146826356649,
+    "vx_mae": 0.06815072149038315,
+    "vz_mae": 0.1574442833662033,
+    "pitch_mae": 0.01847231388092041,
+    "pitch_rate_mae": 0.7101674675941467,
+    "support_contact_mae": 0.09975060075521469,
+    "full_foot_support_mae": 0.028809545561671257,
+    "body_contact_z_mae": 0.004961193073540926
+  },
+  "learned_params": {
+    "dt": 0.02,
+    "hop_speed": 2.0,
+    "mass": 1.0,
+    "inertia": 1.0,
+    "rest_leg_length": 0.8199999928474426,
+    "activation_w": [
+      0.20769180357456207,
+      0.2315889149904251,
+      0.20119157433509827,
+      0.14526233077049255
+    ],
+    "activation_b": -0.14748510718345642,
+    "activation_tau": 0.0870044082403183,
+    "leg_stiffness": 5.895815372467041,
+    "leg_damping": 0.7564943432807922,
+    "leg_force_max": 2.936417818069458,
+    "contact_k": 9.887454986572266,
+    "contact_tau": 0.40188899636268616,
+    "linear_damping": [
+      0.1230149045586586,
+      0.206338569521904
+    ],
+    "angular_damping": 0.13734647631645203,
+    "balance_theta": 1.3638633489608765,
+    "balance_omega": 0.39447417855262756,
+    "joint_action_scale": [
+      1.2621209621429443,
+      1.4786299467086792,
+      1.627120852470398,
+      1.265854835510254
+    ],
+    "joint_rate_damping": [
+      1.1281356811523438,
+      1.254569411277771,
+      1.341436743736267,
+      1.0294957160949707
+    ],
+    "joint_centering": [
+      0.23143534362316132,
+      0.25578099489212036,
+      0.40549466013908386,
+      0.26731014251708984
+    ],
+    "use_transition_residual": true,
+    "transition_residual_scale": 4.0,
+    "transition_residual_base_scale": [
+      0.10000000149011612,
+      0.18000000715255737,
+      0.30000001192092896
+    ],
+    "touch_transition_residual_base_scale": [
+      0.05000000074505806,
+      0.07000000029802322
+    ],
+    "action_prior_enabled": false,
+    "dense_pose_delta_weight": 0.0,
+    "dense_pose_abs_weight": 0.0,
+    "dense_pose_milestone_scale": 0.0,
+    "dense_pose_gamma": 0.99,
+    "recover_penalty_scale": 0.0,
+    "latent_layout": [
+      "H",
+      "vx",
+      "vz",
+      "theta",
+      "omega",
+      "A",
+      "waist",
+      "hip",
+      "knee",
+      "ankle",
+      "waist_dot",
+      "hip_dot",
+      "knee_dot",
+      "ankle_dot",
+      "touch_toe",
+      "touch_heel",
+      "z_min"
+    ]
+  }
+}

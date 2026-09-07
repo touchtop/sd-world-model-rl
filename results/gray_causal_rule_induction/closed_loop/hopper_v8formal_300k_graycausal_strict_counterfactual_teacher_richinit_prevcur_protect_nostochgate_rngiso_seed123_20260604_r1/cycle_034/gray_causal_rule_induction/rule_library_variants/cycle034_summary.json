@@ -1,0 +1,122 @@
+{
+  "certificate_report": "results/gray_causal_rule_induction/closed_loop/hopper_v8formal_300k_graycausal_strict_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_20260604_r1/cycle_034/gray_causal_rule_induction/cycle034_gray_rule_certificates.json",
+  "prefix": "cycle034",
+  "source_rule_library": "results/gray_causal_rule_induction/closed_loop/hopper_v8formal_300k_graycausal_strict_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_20260604_r1/cycle_034/rules/library_closed_loop_cycle_034_confidence.json",
+  "variants": [
+    {
+      "demoted_active": 7,
+      "input_certificate_counts": {
+        "reject_or_retire": 22,
+        "shadow_only": 42,
+        "strict_action_certificate": 106,
+        "value_certificate": 1
+      },
+      "kept_active": 79,
+      "num_rules": 171,
+      "path": "results/gray_causal_rule_induction/closed_loop/hopper_v8formal_300k_graycausal_strict_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_20260604_r1/cycle_034/gray_causal_rule_induction/rule_library_variants/cycle034_drop_reject_active.json",
+      "source_counts": {
+        "sd_tva_counterfactual_teacher_rich_init_v1": 30,
+        "v4_substate": 129,
+        "v8_transition_replay_safety": 12
+      },
+      "status_counts": {
+        "confidence_active": 79,
+        "confidence_observing": 37,
+        "confidence_retired": 55
+      },
+      "variant": "drop_reject_active"
+    },
+    {
+      "demoted_active": 7,
+      "input_certificate_counts": {
+        "reject_or_retire": 22,
+        "shadow_only": 42,
+        "strict_action_certificate": 106,
+        "value_certificate": 1
+      },
+      "kept_active": 79,
+      "num_rules": 171,
+      "path": "results/gray_causal_rule_induction/closed_loop/hopper_v8formal_300k_graycausal_strict_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_20260604_r1/cycle_034/gray_causal_rule_induction/rule_library_variants/cycle034_certified_active.json",
+      "source_counts": {
+        "sd_tva_counterfactual_teacher_rich_init_v1": 30,
+        "v4_substate": 129,
+        "v8_transition_replay_safety": 12
+      },
+      "status_counts": {
+        "confidence_active": 79,
+        "confidence_observing": 37,
+        "confidence_retired": 55
+      },
+      "variant": "certified_active"
+    },
+    {
+      "demoted_active": 7,
+      "input_certificate_counts": {
+        "reject_or_retire": 22,
+        "shadow_only": 42,
+        "strict_action_certificate": 106,
+        "value_certificate": 1
+      },
+      "kept_active": 79,
+      "num_rules": 171,
+      "path": "results/gray_causal_rule_induction/closed_loop/hopper_v8formal_300k_graycausal_strict_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_20260604_r1/cycle_034/gray_causal_rule_induction/rule_library_variants/cycle034_strict_active.json",
+      "source_counts": {
+        "sd_tva_counterfactual_teacher_rich_init_v1": 30,
+        "v4_substate": 129,
+        "v8_transition_replay_safety": 12
+      },
+      "status_counts": {
+        "confidence_active": 79,
+        "confidence_observing": 37,
+        "confidence_retired": 55
+      },
+      "variant": "strict_active"
+    },
+    {
+      "demoted_active": 55,
+      "input_certificate_counts": {
+        "reject_or_retire": 22,
+        "shadow_only": 42,
+        "strict_action_certificate": 106,
+        "value_certificate": 1
+      },
+      "kept_active": 31,
+      "num_rules": 171,
+      "path": "results/gray_causal_rule_induction/closed_loop/hopper_v8formal_300k_graycausal_strict_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_20260604_r1/cycle_034/gray_causal_rule_induction/rule_library_variants/cycle034_teacher_v8_active.json",
+      "source_counts": {
+        "sd_tva_counterfactual_teacher_rich_init_v1": 30,
+        "v4_substate": 129,
+        "v8_transition_replay_safety": 12
+      },
+      "status_counts": {
+        "confidence_active": 31,
+        "confidence_observing": 37,
+        "confidence_retired": 103
+      },
+      "variant": "teacher_v8_active"
+    },
+    {
+      "demoted_active": 60,
+      "input_certificate_counts": {
+        "reject_or_retire": 22,
+        "shadow_only": 42,
+        "strict_action_certificate": 106,
+        "value_certificate": 1
+      },
+      "kept_active": 26,
+      "num_rules": 171,
+      "path": "results/gray_causal_rule_induction/closed_loop/hopper_v8formal_300k_graycausal_strict_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_20260604_r1/cycle_034/gray_causal_rule_induction/rule_library_variants/cycle034_teacher_v8_certified_active.json",
+      "source_counts": {
+        "sd_tva_counterfactual_teacher_rich_init_v1": 30,
+        "v4_substate": 129,
+        "v8_transition_replay_safety": 12
+      },
+      "status_counts": {
+        "confidence_active": 26,
+        "confidence_observing": 37,
+        "confidence_retired": 108
+      },
+      "variant": "teacher_v8_certified_active"
+    }
+  ]
+}

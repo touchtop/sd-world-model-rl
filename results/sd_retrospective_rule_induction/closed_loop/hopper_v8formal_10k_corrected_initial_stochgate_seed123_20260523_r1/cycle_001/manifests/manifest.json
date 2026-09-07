@@ -1,0 +1,92 @@
+{
+  "created_at_utc": "2026-05-23T15:23:38.076990+00:00",
+  "repo_root": "/home/data/round/code/sd_world_model_rl",
+  "log_root": "logs/hopper-hop",
+  "run_globs": [
+    "tdmpc2_v8formal_10k_corrected_initial_stochgate_seed123_20260523_r1_cycle001_target5000"
+  ],
+  "write_policy": "results_only",
+  "runs": [
+    {
+      "seed": 1,
+      "run_name": "tdmpc2_v8formal_10k_corrected_initial_stochgate_seed123_20260523_r1_cycle001_target5000",
+      "run_dir": "logs/hopper-hop/1/tdmpc2_v8formal_10k_corrected_initial_stochgate_seed123_20260523_r1_cycle001_target5000",
+      "eval_csv": "logs/hopper-hop/1/tdmpc2_v8formal_10k_corrected_initial_stochgate_seed123_20260523_r1_cycle001_target5000/eval.csv",
+      "eval_full_csv": "logs/hopper-hop/1/tdmpc2_v8formal_10k_corrected_initial_stochgate_seed123_20260523_r1_cycle001_target5000/eval_full.csv",
+      "train_csv": "logs/hopper-hop/1/tdmpc2_v8formal_10k_corrected_initial_stochgate_seed123_20260523_r1_cycle001_target5000/train.csv",
+      "eval_rows": [
+        {
+          "step": 5000,
+          "episode_reward": 0.0
+        }
+      ],
+      "official_eval_summaries": [
+        {
+          "step_dir": "step_0005000",
+          "summary_csv": "logs/hopper-hop/1/tdmpc2_v8formal_10k_corrected_initial_stochgate_seed123_20260523_r1_cycle001_target5000/official_eval/step_0005000/eval_episode_summary.csv"
+        }
+      ],
+      "train_replay_summaries": [
+        {
+          "step_dir": "step_0005001",
+          "summary_csv": "logs/hopper-hop/1/tdmpc2_v8formal_10k_corrected_initial_stochgate_seed123_20260523_r1_cycle001_target5000/retrospective_train_traces/step_0005001/eval_episode_summary.csv",
+          "source": "train_replay"
+        }
+      ]
+    },
+    {
+      "seed": 2,
+      "run_name": "tdmpc2_v8formal_10k_corrected_initial_stochgate_seed123_20260523_r1_cycle001_target5000",
+      "run_dir": "logs/hopper-hop/2/tdmpc2_v8formal_10k_corrected_initial_stochgate_seed123_20260523_r1_cycle001_target5000",
+      "eval_csv": "logs/hopper-hop/2/tdmpc2_v8formal_10k_corrected_initial_stochgate_seed123_20260523_r1_cycle001_target5000/eval.csv",
+      "eval_full_csv": "logs/hopper-hop/2/tdmpc2_v8formal_10k_corrected_initial_stochgate_seed123_20260523_r1_cycle001_target5000/eval_full.csv",
+      "train_csv": "logs/hopper-hop/2/tdmpc2_v8formal_10k_corrected_initial_stochgate_seed123_20260523_r1_cycle001_target5000/train.csv",
+      "eval_rows": [
+        {
+          "step": 5000,
+          "episode_reward": 0.01568420907424297
+        }
+      ],
+      "official_eval_summaries": [
+        {
+          "step_dir": "step_0005000",
+          "summary_csv": "logs/hopper-hop/2/tdmpc2_v8formal_10k_corrected_initial_stochgate_seed123_20260523_r1_cycle001_target5000/official_eval/step_0005000/eval_episode_summary.csv"
+        }
+      ],
+      "train_replay_summaries": [
+        {
+          "step_dir": "step_0005001",
+          "summary_csv": "logs/hopper-hop/2/tdmpc2_v8formal_10k_corrected_initial_stochgate_seed123_20260523_r1_cycle001_target5000/retrospective_train_traces/step_0005001/eval_episode_summary.csv",
+          "source": "train_replay"
+        }
+      ]
+    },
+    {
+      "seed": 3,
+      "run_name": "tdmpc2_v8formal_10k_corrected_initial_stochgate_seed123_20260523_r1_cycle001_target5000",
+      "run_dir": "logs/hopper-hop/3/tdmpc2_v8formal_10k_corrected_initial_stochgate_seed123_20260523_r1_cycle001_target5000",
+      "eval_csv": "logs/hopper-hop/3/tdmpc2_v8formal_10k_corrected_initial_stochgate_seed123_20260523_r1_cycle001_target5000/eval.csv",
+      "eval_full_csv": "logs/hopper-hop/3/tdmpc2_v8formal_10k_corrected_initial_stochgate_seed123_20260523_r1_cycle001_target5000/eval_full.csv",
+      "train_csv": "logs/hopper-hop/3/tdmpc2_v8formal_10k_corrected_initial_stochgate_seed123_20260523_r1_cycle001_target5000/train.csv",
+      "eval_rows": [
+        {
+          "step": 5000,
+          "episode_reward": 0.0
+        }
+      ],
+      "official_eval_summaries": [
+        {
+          "step_dir": "step_0005000",
+          "summary_csv": "logs/hopper-hop/3/tdmpc2_v8formal_10k_corrected_initial_stochgate_seed123_20260523_r1_cycle001_target5000/official_eval/step_0005000/eval_episode_summary.csv"
+        }
+      ],
+      "train_replay_summaries": [
+        {
+          "step_dir": "step_0005001",
+          "summary_csv": "logs/hopper-hop/3/tdmpc2_v8formal_10k_corrected_initial_stochgate_seed123_20260523_r1_cycle001_target5000/retrospective_train_traces/step_0005001/eval_episode_summary.csv",
+          "source": "train_replay"
+        }
+      ]
+    }
+  ]
+}

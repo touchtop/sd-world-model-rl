@@ -1,0 +1,50 @@
+{
+  "agent_checkpoint": "/home/data/round/code/sd_world_model_rl/logs/hopper-hop/2/sd_hopper_100k_pureenv_sdinit_seed2_20260428_run1/models/25000.pt",
+  "trace_paths": [
+    "/home/data/round/code/sd_world_model_rl/logs/hopper-hop/2/sd_hopper_100k_pureenv_sdinit_seed2_20260428_run1/official_eval/step_0025000/episode_csv/episode_00.csv",
+    "/home/data/round/code/sd_world_model_rl/logs/hopper-hop/2/sd_hopper_100k_pureenv_sdinit_seed2_20260428_run1/official_eval/step_0025000/episode_csv/episode_01.csv",
+    "/home/data/round/code/sd_world_model_rl/logs/hopper-hop/2/sd_hopper_100k_pureenv_sdinit_seed2_20260428_run1/official_eval/step_0025000/episode_csv/episode_02.csv",
+    "/home/data/round/code/sd_world_model_rl/logs/hopper-hop/2/sd_hopper_100k_pureenv_sdinit_seed2_20260428_run1/official_eval/step_0025000/episode_csv/episode_03.csv",
+    "/home/data/round/code/sd_world_model_rl/logs/hopper-hop/2/sd_hopper_100k_pureenv_sdinit_seed2_20260428_run1/official_eval/step_0025000/episode_csv/episode_04.csv",
+    "/home/data/round/code/sd_world_model_rl/logs/hopper-hop/2/sd_hopper_100k_pureenv_sdinit_seed2_20260428_run1/official_eval/step_0025000/episode_csv/episode_05.csv",
+    "/home/data/round/code/sd_world_model_rl/logs/hopper-hop/2/sd_hopper_100k_pureenv_sdinit_seed2_20260428_run1/official_eval/step_0025000/episode_csv/episode_06.csv",
+    "/home/data/round/code/sd_world_model_rl/logs/hopper-hop/2/sd_hopper_100k_pureenv_sdinit_seed2_20260428_run1/official_eval/step_0025000/episode_csv/episode_07.csv",
+    "/home/data/round/code/sd_world_model_rl/logs/hopper-hop/2/sd_hopper_100k_pureenv_sdinit_seed2_20260428_run1/official_eval/step_0025000/episode_csv/episode_08.csv",
+    "/home/data/round/code/sd_world_model_rl/logs/hopper-hop/2/sd_hopper_100k_pureenv_sdinit_seed2_20260428_run1/official_eval/step_0025000/episode_csv/episode_09.csv"
+  ],
+  "num_samples": 10,
+  "num_candidates_per_state": 14,
+  "horizon": 3,
+  "discount": 0.99,
+  "detail_csv": "/home/data/round/code/sd_world_model_rl/results/hopper_sd_action_ranking/seed2_25k_falling/action_ranking_details.csv",
+  "per_state_csv": "/home/data/round/code/sd_world_model_rl/results/hopper_sd_action_ranking/seed2_25k_falling/action_ranking_per_state.csv",
+  "aggregate": {
+    "informative_state_count": 7,
+    "spearman_pred_vs_true_boot_mean": -0.14532662814149813,
+    "spearman_pred_vs_true_env_mean": -0.41538461538461546,
+    "top1_hit_mean": 0.1,
+    "top3_contains_true_top1_mean": 0.1,
+    "pred_best_true_boot_mean": 0.007437579057023025,
+    "true_best_true_boot_mean": 0.04946524843772157,
+    "policy_true_boot_mean": 0.007761727882157066,
+    "pred_best_true_env_mean": 0.007398164963021969,
+    "true_best_true_env_mean": 0.049121562164778546,
+    "any_nonzero_env_reward_frac": 0.2,
+    "informative_spearman_pred_vs_true_boot_mean": -0.08830026244689078,
+    "informative_spearman_pred_vs_true_env_mean": -0.41538461538461546,
+    "informative_top1_hit_mean": 0.0,
+    "informative_top3_contains_true_top1_mean": 0.0,
+    "informative_pred_best_true_boot_mean": 0.01062479898082798,
+    "informative_true_best_true_boot_mean": 0.07066388877906266
+  },
+  "by_base_state": {
+    "falling_air": {
+      "count": 10,
+      "spearman_pred_vs_true_boot_mean": -0.1453266281414981,
+      "top1_hit_mean": 0.1,
+      "top3_contains_true_top1_mean": 0.1,
+      "pred_best_true_boot_mean": 0.007437579057023025,
+      "true_best_true_boot_mean": 0.04946524843772157
+    }
+  }
+}

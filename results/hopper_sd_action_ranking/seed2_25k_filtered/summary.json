@@ -1,0 +1,74 @@
+{
+  "agent_checkpoint": "/home/data/round/code/sd_world_model_rl/logs/hopper-hop/2/sd_hopper_100k_pureenv_sdinit_seed2_20260428_run1/models/25000.pt",
+  "trace_paths": [
+    "/home/data/round/code/sd_world_model_rl/logs/hopper-hop/2/sd_hopper_100k_pureenv_sdinit_seed2_20260428_run1/official_eval/step_0025000/episode_csv/episode_00.csv",
+    "/home/data/round/code/sd_world_model_rl/logs/hopper-hop/2/sd_hopper_100k_pureenv_sdinit_seed2_20260428_run1/official_eval/step_0025000/episode_csv/episode_01.csv",
+    "/home/data/round/code/sd_world_model_rl/logs/hopper-hop/2/sd_hopper_100k_pureenv_sdinit_seed2_20260428_run1/official_eval/step_0025000/episode_csv/episode_02.csv",
+    "/home/data/round/code/sd_world_model_rl/logs/hopper-hop/2/sd_hopper_100k_pureenv_sdinit_seed2_20260428_run1/official_eval/step_0025000/episode_csv/episode_03.csv",
+    "/home/data/round/code/sd_world_model_rl/logs/hopper-hop/2/sd_hopper_100k_pureenv_sdinit_seed2_20260428_run1/official_eval/step_0025000/episode_csv/episode_04.csv",
+    "/home/data/round/code/sd_world_model_rl/logs/hopper-hop/2/sd_hopper_100k_pureenv_sdinit_seed2_20260428_run1/official_eval/step_0025000/episode_csv/episode_05.csv",
+    "/home/data/round/code/sd_world_model_rl/logs/hopper-hop/2/sd_hopper_100k_pureenv_sdinit_seed2_20260428_run1/official_eval/step_0025000/episode_csv/episode_06.csv",
+    "/home/data/round/code/sd_world_model_rl/logs/hopper-hop/2/sd_hopper_100k_pureenv_sdinit_seed2_20260428_run1/official_eval/step_0025000/episode_csv/episode_07.csv",
+    "/home/data/round/code/sd_world_model_rl/logs/hopper-hop/2/sd_hopper_100k_pureenv_sdinit_seed2_20260428_run1/official_eval/step_0025000/episode_csv/episode_08.csv",
+    "/home/data/round/code/sd_world_model_rl/logs/hopper-hop/2/sd_hopper_100k_pureenv_sdinit_seed2_20260428_run1/official_eval/step_0025000/episode_csv/episode_09.csv"
+  ],
+  "num_samples": 30,
+  "num_candidates_per_state": 14,
+  "horizon": 3,
+  "discount": 0.99,
+  "detail_csv": "/home/data/round/code/sd_world_model_rl/results/hopper_sd_action_ranking/seed2_25k_filtered/action_ranking_details.csv",
+  "per_state_csv": "/home/data/round/code/sd_world_model_rl/results/hopper_sd_action_ranking/seed2_25k_filtered/action_ranking_per_state.csv",
+  "aggregate": {
+    "informative_state_count": 1,
+    "spearman_pred_vs_true_boot_mean": -0.16260511041152448,
+    "spearman_pred_vs_true_env_mean": -0.15164835164835166,
+    "top1_hit_mean": 0.8666666666666667,
+    "top3_contains_true_top1_mean": 0.8666666666666667,
+    "pred_best_true_boot_mean": 0.04524123490676323,
+    "true_best_true_boot_mean": 0.06706343211306871,
+    "policy_true_boot_mean": 0.05861638064588748,
+    "pred_best_true_env_mean": 0.04507846019279996,
+    "true_best_true_env_mean": 0.0657925208445782,
+    "any_nonzero_env_reward_frac": 0.03333333333333333,
+    "informative_spearman_pred_vs_true_boot_mean": -0.15164835164835166,
+    "informative_spearman_pred_vs_true_env_mean": -0.15164835164835166,
+    "informative_top1_hit_mean": 0.0,
+    "informative_top3_contains_true_top1_mean": 0.0,
+    "informative_pred_best_true_boot_mean": 1.3572404015938757,
+    "informative_true_best_true_boot_mean": 2.0119062599487143
+  },
+  "by_base_state": {
+    "falling_air": {
+      "count": 3,
+      "spearman_pred_vs_true_boot_mean": NaN,
+      "top1_hit_mean": 0.3333333333333333,
+      "top3_contains_true_top1_mean": 0.3333333333333333,
+      "pred_best_true_boot_mean": -1.1566865444183349e-07,
+      "true_best_true_boot_mean": -1.1566865444183349e-07
+    },
+    "grounded_rear": {
+      "count": 8,
+      "spearman_pred_vs_true_boot_mean": NaN,
+      "top1_hit_mean": 1.0,
+      "top3_contains_true_top1_mean": 1.0,
+      "pred_best_true_boot_mean": -1.1566865444183349e-07,
+      "true_best_true_boot_mean": -1.1566865444183349e-07
+    },
+    "grounded_prone": {
+      "count": 18,
+      "spearman_pred_vs_true_boot_mean": -0.17356186917469732,
+      "top1_hit_mean": 0.9444444444444444,
+      "top3_contains_true_top1_mean": 0.9444444444444444,
+      "pred_best_true_boot_mean": -1.1566865444183349e-07,
+      "true_best_true_boot_mean": -1.1245563626289367e-07
+    },
+    "grounded_upright": {
+      "count": 1,
+      "spearman_pred_vs_true_boot_mean": -0.15164835164835166,
+      "top1_hit_mean": 0.0,
+      "top3_contains_true_top1_mean": 0.0,
+      "pred_best_true_boot_mean": 1.3572404015938757,
+      "true_best_true_boot_mean": 2.0119062599487143
+    }
+  }
+}

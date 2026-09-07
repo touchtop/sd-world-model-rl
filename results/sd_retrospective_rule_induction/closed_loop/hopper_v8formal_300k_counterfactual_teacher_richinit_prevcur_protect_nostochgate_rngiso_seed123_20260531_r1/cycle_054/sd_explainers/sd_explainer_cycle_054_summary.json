@@ -1,0 +1,51 @@
+{
+  "checkpoint": "results/sd_retrospective_rule_induction/closed_loop/hopper_v8formal_300k_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_20260531_r1/cycle_054/sd_explainers/sd_explainer_cycle_054.pt",
+  "epochs": 3,
+  "history_tail": [
+    {
+      "best_val_loss": 0.6957659721374512,
+      "epoch": 1.0,
+      "train_loss": 1.0102192122827878,
+      "val_loss": 0.6957659721374512
+    },
+    {
+      "best_val_loss": 0.6953979730606079,
+      "epoch": 2.0,
+      "train_loss": 1.008557635952126,
+      "val_loss": 0.6953979730606079
+    },
+    {
+      "best_val_loss": 0.6951217651367188,
+      "epoch": 3.0,
+      "train_loss": 1.010607890107415,
+      "val_loss": 0.6951217651367188
+    }
+  ],
+  "init_checkpoint": "results/sd_retrospective_rule_induction/closed_loop/hopper_v8formal_300k_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_20260531_r1/cycle_053/sd_explainers/sd_explainer_cycle_053.pt",
+  "init_loaded_tensors": 30,
+  "metrics": {
+    "body_contact_z_mae": 0.011974751949310303,
+    "full_foot_support_mae": 0.21161331236362457,
+    "height_mae": 0.01002318225800991,
+    "one_step_struct_rmse": 1.6951985359191895,
+    "pitch_mae": 0.047921549528837204,
+    "pitch_rate_mae": 1.9769729375839233,
+    "rollout_10_rmse": 3.075649590231478,
+    "rollout_1_rmse": 1.803432310698554,
+    "rollout_20_rmse": 2.706270453054458,
+    "rollout_3_rmse": 2.967970470432192,
+    "rollout_5_rmse": 3.2268748488277197,
+    "support_contact_mae": 0.3401218354701996,
+    "vx_mae": 0.17187756299972534,
+    "vz_mae": 0.3505334258079529
+  },
+  "model_config": {
+    "transition_residual_scale": 1.0,
+    "use_transition_residual": true
+  },
+  "num_transitions": 50000,
+  "seed": 20260561,
+  "selection": "results/sd_retrospective_rule_induction/closed_loop/hopper_v8formal_300k_counterfactual_teacher_richinit_prevcur_protect_nostochgate_rngiso_seed123_20260531_r1/cycle_054/manifests/selected_trajectories.json",
+  "train_size": 45010,
+  "val_size": 4990
+}
