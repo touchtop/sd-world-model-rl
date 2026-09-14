@@ -1,0 +1,187 @@
+{
+ "topology": "T1",
+ "arm": "sd",
+ "budget": 1000,
+ "seed": 0,
+ "simulations": 100,
+ "leaf": "rollout",
+ "state_dim": 24,
+ "tag": "",
+ "allocation": "backlog_proportional",
+ "prior_step_offset": 0.0,
+ "node_demand": {
+  "Retailer": 8.0,
+  "Wholesaler": 8.0,
+  "Distributor": 8.0,
+  "Factory": 8.0
+ },
+ "theta_dim": 3,
+ "model_params": 3,
+ "theta_final": {
+  "demand_low": 4.1830949783325195,
+  "demand_high": 8.103585243225098,
+  "demand_step_time": 4.998809337615967,
+  "true_step_time": 5.0,
+  "theta_dim": 3,
+  "graph_id": "T1",
+  "shared_demand": true
+ },
+ "resume": {
+  "checkpoint": "results/iclr_beergame_topology_main_20260913/T1_sd_b1000_s0.pt",
+  "source_job": "T1_sd_b1000_s0",
+  "training_history_available": false
+ },
+ "train": {
+  "resumed_from_checkpoint": "results/iclr_beergame_topology_main_20260913/T1_sd_b1000_s0.pt",
+  "history_available": false
+ },
+ "eval": {
+  "returns": [
+   -512.0,
+   -508.0,
+   -768.0,
+   -670.0,
+   -643.0,
+   -392.0,
+   -527.0,
+   -614.0,
+   -887.0,
+   -611.0
+  ],
+  "mean_return": -613.2,
+  "episodes": [
+   {
+    "return": -512.0,
+    "order_var": [
+     13.765434265136719,
+     10.108025550842285,
+     11.543209075927734,
+     16.111108779907227
+    ],
+    "final_backlog": 0.0
+   },
+   {
+    "return": -508.0,
+    "order_var": [
+     13.950614929199219,
+     13.88580322265625,
+     12.527777671813965,
+     16.555557250976562
+    ],
+    "final_backlog": 0.0
+   },
+   {
+    "return": -768.0,
+    "order_var": [
+     16.404315948486328,
+     12.913579940795898,
+     16.469133377075195,
+     18.617286682128906
+    ],
+    "final_backlog": 4.0
+   },
+   {
+    "return": -670.0,
+    "order_var": [
+     14.182099342346191,
+     19.73764991760254,
+     21.77777862548828,
+     21.0
+    ],
+    "final_backlog": 4.0
+   },
+   {
+    "return": -643.0,
+    "order_var": [
+     18.839509963989258,
+     11.506171226501465,
+     19.32099151611328,
+     14.305557250976562
+    ],
+    "final_backlog": 0.0
+   },
+   {
+    "return": -392.0,
+    "order_var": [
+     14.333333015441895,
+     14.333333015441895,
+     22.922840118408203,
+     18.802467346191406
+    ],
+    "final_backlog": 4.0
+   },
+   {
+    "return": -527.0,
+    "order_var": [
+     16.55246925354004,
+     10.552469253540039,
+     12.0,
+     13.7283935546875
+    ],
+    "final_backlog": 2.0
+   },
+   {
+    "return": -614.0,
+    "order_var": [
+     29.987648010253906,
+     16.700618743896484,
+     17.061729431152344,
+     16.52777862548828
+    ],
+    "final_backlog": 2.0
+   },
+   {
+    "return": -887.0,
+    "order_var": [
+     13.777776718139648,
+     16.543212890625,
+     22.987651824951172,
+     18.083335876464844
+    ],
+    "final_backlog": 4.0
+   },
+   {
+    "return": -611.0,
+    "order_var": [
+     17.24691390991211,
+     12.182098388671875,
+     23.2932071685791,
+     19.41666603088379
+    ],
+    "final_backlog": 0.0
+   }
+  ],
+  "rollout_rmse": {
+   "1": 0.0,
+   "2": 0.024619621969759465,
+   "3": 0.04867270514369011,
+   "4": 0.072127053886652,
+   "5": 0.09491443112492562,
+   "6": 0.11695549637079239,
+   "7": 0.13907749056816102,
+   "8": 0.16125311106443405
+  },
+  "imagined_violation": {
+   "total": 2448000,
+   "rate": 0.0
+  },
+  "model_calls": 144000
+ },
+ "eval_seconds": 463.55759716033936,
+ "provenance": {
+  "git_commit": "7074686f946d5a13d71a0f1dcc6aa3899dfda873",
+  "source_sha256": {
+   "/home/round/code/sd-world-model-rl/experiments/beer_game_graph/run_arm.py": "2d33e21a039ed831ac00e7ad4756fb7ded1149aaa13d5d80213e2532a058168e",
+   "experiments/beer_game_graph/common.py": "4ed30f5826608c0132a1f511a7bf829badb9fdab8135ec4a9de91849d72e1d39",
+   "src/env/graph_beer_game.py": "7291679c9c3071b6adb57fb77e9cc6d67d33daafc0e4640c28ebd17808d91eed",
+   "src/world_model/graph_beer_game_sd_model.py": "c88a784c71d869f114c5af3e725c8eb60a70e0aa77a01e4c4556abd5ecce5dc2",
+   "src/planning/period_aware_mcts.py": "5eb9477220bf789bd808517d97e2bdbe6ae4128560826237dc2057557ff6a60f",
+   "src/planning/mcts.py": "c2baf1c1867a1aa4c5bf050ec88ba2c9a7e5e7ac82ad7035644bbe36afb1b967"
+  },
+  "versions": {
+   "torch": "2.1.2+cu118",
+   "numpy": "1.26.4"
+  }
+ },
+ "seconds": 463.5801968574524
+}

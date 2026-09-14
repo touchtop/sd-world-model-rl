@@ -1,0 +1,22 @@
+id: T3
+nodes:
+  - {id: src, kind: source, holding: 0.5}
+  - {id: w0, kind: warehouse, holding: 0.5}
+  - {id: w1, kind: warehouse, holding: 0.5}
+  - {id: r0, kind: retail, holding: 0.5}
+  - {id: r1, kind: retail, holding: 0.5}
+  - {id: r2, kind: retail, holding: 0.5}
+  - {id: r3, kind: retail, holding: 0.5}
+edges:
+  - {u: src, v: w0, L: 2, tau: 2, backlog_cost: 1.0}
+  - {u: src, v: w1, L: 2, tau: 2, backlog_cost: 1.0}
+  - {u: w0, v: r0, L: 2, tau: 2, backlog_cost: 1.0}
+  - {u: w0, v: r1, L: 2, tau: 2, backlog_cost: 1.0}
+  - {u: w1, v: r2, L: 2, tau: 2, backlog_cost: 1.0}
+  - {u: w1, v: r3, L: 2, tau: 2, backlog_cost: 1.0}
+meta:
+  demand_low: 4
+  demand_high: 8
+  demand_step_time: 5
+  T: 36
+  shared_demand: true

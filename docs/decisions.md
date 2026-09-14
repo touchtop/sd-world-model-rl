@@ -1,15 +1,115 @@
 # Decisions
 
+## 决策 20
+
+**决策**
+SEIHR 闭环预演方向不稳定，不进入 10 种子正式主表。本预演作为实现与协议诊断保留，不通过调参改写 H1。
+
+**背景**
+决策 19 允许 2–3 种子、52/104 周、臂 A2 / A1′ / A4 / A5-fixed。24 组结果见 [epidemic_closedloop_preview_report.md](iclr/epidemic_closedloop_preview_report.md)。A2 点估计接近真值，且与 A4 回报接近；但 A2 未稳定优于 A1′，104 周 A5 三种子全部压过 A2。
+
+**结论**
+* 辨识门槛在闭环预演中仍然成立；
+* 当前缺口在短预算规划行为（A2/A4 评估期更常选高等级干预）和四臂评估口径不完全对齐，不在结构核算错；
+* 正式网格仍封锁。若再预演，必须先对齐评估 episode、A5 规划段长度，并单列干预等级分布。
+
+**影响**
+H1–H4 仍未在正式协议下检验。本预演不得写入主表或摘要。
+
+## 决策 19
+
+**决策**
+G1 与 G2a/G2d 通过后，只进入 2–3 种子、52/104 周闭环预演；10 种子正式主表仍封锁。G2c 失败按策略覆盖解释，不视为结构核错误。
+
+**背景**
+520 周确定性审计见 [epidemic_g1_g2_audit_report.md](iclr/epidemic_g1_g2_audit_report.md)。G2a/G2d 将命名参数收到 ±10%；G2c 仅动作 4，\(\beta_0\) 误差 14.4%，组合 \(\beta_0(1-\varepsilon_4)\) 误差 0.05%。
+
+**结论**
+* 结构核在充分激励数据上可辨识，满足进入预演的最低条件；
+* 可辨识集合由策略覆盖决定，预演必须报告动作直方图；
+* 预演臂限定 A2 / A1′ / A4 / A5-fixed；方向稳定后再开正式网格。
+
+**影响**
+H1–H4 仍未检验。预演若显示 A5 稳定压过 A2，主表主张改为在线辨识实现不足的负结果，不调参改写。
+
+## 决策 18
+
+**决策**
+补充实验实现层按设计文档阶段 1–5 落地：周期感知 MCTS wrapper、SEIHR A1–A5、专用 MPC/估计器、图通用 Beer Game；旧 MCTS 与已发表 Beer Game 结果冻结。
+
+**背景**
+设计文档要求不修改 `mcts.py` 既有折扣语义，流行病基线不得复用任务分配 MPC/RLS 动力学，T1 必须与四级串行 Beer Game 逐步位一致。
+
+**结论**
+* 子步折扣由 `period_aware_mcts_search` 包装实现；
+* 流行病代码放在 `src/epidemic/` 与 `experiments/epidemic/`；
+* 拓扑扩展放在 `src/env/graph_beer_game.py` 与 `experiments/beer_game_graph/`，旧 `BeerGameEnv` 入口不变；
+* 16 周冒烟与门槛通过不构成正式性能主张，G-BT3 全表复现仍待冻结预算实验。
+
+**影响**
+后续正式结果必须使用规格 YAML、报告种子/预算/模型调用与 CI；未达 G1–G4 / H1–H4 的结果按负结果报告。
+
+## XSokoban 证据复核后的验收决策
+
+修正版闭环实验作为负结果报告：TVA未满足held-out改善或非劣门槛，遵循重构方案§7，不扩展first-40，不继续调参改写主张。所有新行为由独立入口与子类实现，保留既有结果。撤回用起点距离推算任意状态剩余距离的oracle上界解释，以及共享死锁规则teacher构成独立拓扑验证的解释。当前依据见 [验收报告](iclr/xsokoban_final_negative_result_report.md) 与 [证据更正](iclr/xsokoban_evidence_corrections.md)。经验证的可行轨迹后缀仅作为teacher诊断，不能替代尚待完成的精确最优值证据。
+
+## 决策 17
+
+**决策**
+补充实验主选流行病干预控制，Beer Game 拓扑扩展为次要方向；停止 XSokoban 扩展与 DeepCubeA 基线。
+
+**背景**
+用户于 2026-09-11 从第一性原理指出：若朴素机理对决策影响不大，或问题以搜索性规划为核心，SD 世界模型的意义不大。XSokoban 转移精确且零参数，瓶颈在死锁与组合搜索，与 DeepCubeA 比较会退化为学习启发式的竞赛，偏离论文主张。
+
+**结论**
+* 流行病环境满足机理已知、参数未知、发散动力学、自然 OOD、离散动作五条判据，且综述显示基于模型的规划在该领域几乎空白；
+* Beer Game 拓扑扩展直接回应审稿人对大拓扑可扩展性的质疑，θ 维度不随节点数增长是关键量化事实；
+* 设计文档为 [supplementary_epidemic_beergame_topology_design.md](iclr/supplementary_epidemic_beergame_topology_design.md)，实施遵循决策 16 的 OO 扩展原则。
+
+**影响**
+重构方案 §5 新增第 5 项；XSokoban 结果按 §8 进入审计附录；是否赶 ICLR 2027 由用户决定。
+
+## 决策 16
+
+**决策**
+XSokoban 新主线以 OO 继承扩展方式而非就地修改方式实现：建立 `experiments/sokoban_sd_world_model/iclr_grid/` 子包，引入 `CachedGridStockFlowModel`、`ReusableGridSDMCTSPlanner` 子类与独立的 `teacher_cache` / `run_arms` 入口；冻结 `evaluate_sokoban_grid_sdmcts.py` / `SokobanGridStockFlowModel` 与所有旧 `results/sokoban_sd_world_model/` 下的 Room-GFT/legacy flow 结果。
+
+**背景**
+用户要求"不要覆盖已有成果，如需用到已有代码并在其基础上修订，可考虑采用 OO 继承重载方案"。research_log 已多次记录 Room-GFT A1–A48 与六存量 learned-flow 的诊断性失败，避免重复触线；新 ICLR 主线 (`XSokoban`) 的四臂对照与可中断 teacher cache 需要在不破坏既有 planner numerics 的前提下扩展能力。
+
+**结论**
+* 所有新功能由子类在 `iclr_grid/` 中实现，父类 `super()` 调用保持原 numerics 链路；
+* `--verify_equivalence` 选项为新 fast path 提供抽样回放核对（Boxoban 上 3 903 次抽样全部通过）；
+* 每次 arm run 写到新 `results/iclr_xsokoban_main_20260909/arms/<时间戳>_<tag>/summary.json`，与 `results/iclr_xsokoban_audit_20260909/` 与 `results/sokoban_sd_world_model/` 完全分离；
+* teacher cache 与 oracle 距离表分别落到 `results/iclr_xsokoban_main_20260909/teacher_cache/` 与 `results/iclr_xsokoban_main_20260909/oracle_tables/`。
+
+**影响**
+plan §5.3 / §6 在不损失 ICLR audit 链路可重放性的前提下进入实验态；新增闭环机制结论应能以"扩展包版本 + 父类入口 + 数据集切分 + 种子"四元组可复现。
+
+## 决策 15
+
+**决策**
+建立独立的 ICLR 实验重构方案文档，统一记录各环境实验角色及执行门槛。
+
+**背景**
+此前重构结论分散在方法文档和研究日志中，不利于按论文主张审查实验完整性。
+
+**结论**
+采用 [iclr_experiment_reconstruction_plan.md](iclr/iclr_experiment_reconstruction_plan.md) 作为总方案；Beer Game、Cartpole 为完整 SD-MCTS 主实验，Hopper 为 SD-TD-MPC2 兼容性扩展，XSokoban 为 exact-grid 专用规划器增强实验。
+
+**影响**
+后续新增或修订实验必须注明其对应主张、数据划分、预算、统计重复和验收门槛。
+
 ## 决策 1
 
-**决策**  
+**决策**
 将 Hopper 当前主线的研究目标正式拆分为 `model fidelity` 与 `planning usefulness` 两条线。
 
-**背景**  
+**背景**
 当前 `SD transition core` 的监督指标、在线 `consistency_loss`、policy replay 误差与闭环行为形态已经显示：动力学拟合更准确，并不自动意味着规划质量同步提升；反之，闭环 return 改善也不自动意味着 `SD` 已被良好拟合。
 
-**选项**  
-1. 继续把 `SD` 拟合质量与规划质量视为同一问题。  
+**选项**
+1. 继续把 `SD` 拟合质量与规划质量视为同一问题。
 2. 在分析与验证口径上显式拆分二者。
 
 **结论**
@@ -29,15 +129,15 @@
 **背景**
 当前在线 RL 联合损失会把 world model 拉向“对当前策略有用”的近似，而不会自动维护 `SD` 在所有关键相位上的短视界精度。单靠继续拉长 RL 预算，未能保证 `consistency_loss` 与关键相位误差持续改善。
 
-**选项**  
-1. 保持现有纯联合损失，不额外约束 `SD`。  
-2. 构造两个独立 dynamics 头，一个服务监督拟合，一个服务规划。  
+**选项**
+1. 保持现有纯联合损失，不额外约束 `SD`。
+2. 构造两个独立 dynamics 头，一个服务监督拟合，一个服务规划。
 3. 保持单一共享 dynamics core，并增加独立的在线 `SD` 监督更新路径。
 
-**结论**  
+**结论**
 采用选项 3。
 
-**影响**  
+**影响**
 后续若落地实现：
 
 1. planner 与 world model 接口仍保持唯一；
@@ -46,20 +146,20 @@
 
 ## 决策 3
 
-**决策**  
+**决策**
 后续 Hopper 线不再把“继续加长 RL 步数”作为改善 `SD` 精度的首选手段。
 
-**背景**  
+**背景**
 当前 `seed3` 接续实验中，`consistency_loss` 在中期后反弹；`50k -> 75k` 的 replay 误差没有表现出稳定持续改善；而闭环行为改善主要表现为“后仰 -> 前倾推进”的恢复，而非 `hop` 形成。
 
-**选项**  
-1. 继续主要依赖更长 RL 训练预算。  
+**选项**
+1. 继续主要依赖更长 RL 训练预算。
 2. 优先修改训练目标与诊断策略，再决定是否加长预算。
 
-**结论**  
+**结论**
 采用选项 2。
 
-**影响**  
+**影响**
 下一阶段重点应放在：
 
 1. 在线 `SD` 监督支路设计，
@@ -70,21 +170,21 @@
 
 ## 决策 4
 
-**决策**  
+**决策**
 第一版在线 `SD` 监督支路先采用“单一共享 transition core + 独立优化器 + 1-step 与当前视界 rollout 监督”的最小实现。
 
-**背景**  
+**背景**
 方法论上已经确定，不应引入两个相互竞争的 dynamics 头；但若一次性同时改 replay 接口、长视界监督和 planner 接线，变量会过多，难以判断训练异常究竟来自目标设计还是工程实现。
 
-**选项**  
-1. 直接实现长视界、多采样路径的完整在线监督版本。  
-2. 先保持当前 replay 采样接口不变，仅在共享 `SD transition core` 上追加独立在线监督更新。  
+**选项**
+1. 直接实现长视界、多采样路径的完整在线监督版本。
+2. 先保持当前 replay 采样接口不变，仅在共享 `SD transition core` 上追加独立在线监督更新。
 3. 改为双 dynamics 头，分别服务 RL 与监督拟合。
 
-**结论**  
+**结论**
 采用选项 2。
 
-**影响**  
+**影响**
 当前实现具有以下边界：
 
 1. 监督视界先限制为 `1-step + 3-step`；
@@ -93,40 +193,40 @@
 
 ## 决策 5
 
-**决策**  
+**决策**
 Hopper 主线保留 `sd_latent_dim=512`，并将 TD-MPC2 主 `consistency_loss` 拆成结构态块与 learned residual latent 块，默认按块等权合成。
 
-**背景**  
+**背景**
 显式 17 维 `SD` 结构态不应被要求完整覆盖 Hopper 的所有复杂动力机制，因此需要保留 learned residual latent 作为补偿子空间。但如果继续对完整 512 维 latent 直接做统一均方误差，495 维 residual 块会因维度数量远大于 17 维结构态而主导一致性损失。
 
-**选项**  
-1. 将 `sd_latent_dim` 固定为 `17`，完全关闭外层 residual latent。  
-2. 保留 `sd_latent_dim=512`，但仍按完整 latent 维度直接做统一均方误差。  
+**选项**
+1. 将 `sd_latent_dim` 固定为 `17`，完全关闭外层 residual latent。
+2. 保留 `sd_latent_dim=512`，但仍按完整 latent 维度直接做统一均方误差。
 3. 保留 `sd_latent_dim=512`，将结构态块和 residual 块分开计损失，并用显式块级权重合成。
 
-**结论**  
+**结论**
 采用选项 3。默认设置为 `sd_latent_consistency_struct_weight=1.0` 与 `sd_latent_consistency_resid_weight=1.0`。
 
-**影响**  
+**影响**
 该决策保留 residual latent 对未建模动力机制的补偿能力，同时避免高维 residual 因维度数量自然压过显式结构态。结构态块内部不使用人工固定通道系数，而是通过 `sd_struct_loss_scale_mode=batch_std` 依据 replay batch 目标结构态的逐通道标准差归一化；`sd_struct_loss_scale_floor=0.1` 仅作为数值稳定下限。
 
 ## 决策 6
 
-**决策**  
+**决策**
 下一版本先实现默认关闭的 planning-aware `SD` 样本权重入口，而不是直接把 `SD` 训练目标改为完整动作排序一致性损失。
 
-**背景**  
+**背景**
 当前 `pureenv_sdinit_online_sup` 与上一组 `pureenv_sdinit` 对比显示，平均结构态预测监督未必能提升强 seed 的闭环收益，说明 `SD` 保真目标与 planner 动作排序目标之间仍存在错配。但完整动作排序一致性损失需要额外构造动作 bank、真实短 rollout 标签或离线动作优劣诊断，工程变量较多。
 
-**选项**  
-1. 继续只优化平均结构态预测误差。  
-2. 先根据 TD 目标或奖励目标对在线 `SD` 监督样本进行均值归一化重加权。  
+**选项**
+1. 继续只优化平均结构态预测误差。
+2. 先根据 TD 目标或奖励目标对在线 `SD` 监督样本进行均值归一化重加权。
 3. 立即实现完整 action-ranking consistency loss。
 
-**结论**  
+**结论**
 采用选项 2。该入口默认关闭，仅在显式实验脚本中启用；启用后，权重按 batch 内 planning signal 均值归一化，并用 `sd_online_planning_weight_max` 截断。
 
-**影响**  
+**影响**
 该决策提供了低风险的第一步验证：若 planning-weighted `SD` 监督改善样本效率，则说明目标错配至少部分来自样本重要性；若无明显改善，则后续应转向完整动作排序一致性目标，而不是继续提高 `sd_online_supervision_lr`。
 
 ## 决策 7

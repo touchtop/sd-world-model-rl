@@ -1,5 +1,7 @@
 # Methods
 
+> XSokoban 修正版方法与证据优先参见 [验收报告](iclr/xsokoban_final_negative_result_report.md) 和 [证据更正](iclr/xsokoban_evidence_corrections.md)。本文件历史段落中“完美 oracle”“9/9 独立预测”“两种策略失败即可确定价值不足”的解释已撤回；teacher 起点距离不是剩余距离，拓扑验证现采用不使用死锁剪枝的独立 BFS。当前入口为 `iclr_grid/run_counted_arms.py`，终态规则优先于叶值 override，所有新增计数通过子类实现。
+
 ## Hopper：SD 拟合与规划验证的当前方法口径
 
 ### 目标
@@ -1992,3 +1994,91 @@ A48 soft 80-push 同参复核输出 [room_gft_xsokoban_a48_assignment_conflict_a
 关键证据是：A48 在 step `31` 和 step `41` 都构造出 assignment-conflict obligation。两次义务均显示 assigned box `[2,6]`、assigned slot `[2,1]`、required stand `[2,6]`、target blocker `[3,6]`，assigned box 到 slot 的 pull-distance 为 `9.0`，assigned box 初始合法 push 数为 `0`，朝 slot 的合法 push 数也为 `0`。两次 assignment-conflict search 均达到 `expanded_nodes=320` 上限，合计评估 `640` 个 option；最佳 option 仍为 tier `2`，没有 assigned box mobility opened、没有 assigned box toward-slot opened、没有 pull-distance 改善、没有 conflict done。因此 `assignment_conflict_agenda_triggered_count=0`、`assignment_conflict_agenda_committed_push_count=0`，原因分布为 `{'source_not_target_prerequisite_failure': 45, 'no_assignment_conflict_done_option': 2}`。
 
 因此，A48 的结论是“assignment/prerequisite 冲突可见但短程不可解除”。它进一步排除了“只要识别 assigned box 与 prerequisite 的冲突即可推进”的解释：冲突关系、assigned box 移动性和朝 slot 方向的距离都已读出，但当前局部 option 空间仍不能打开该 assigned box。后续应转向更高层的 agenda-node/option-node/push-node 拓扑、阶段性 milestone、或可复用 agenda-distance/value 表达，特别是需要表达和复用“先释放 assigned box 的移动性，再清空 prerequisite stand，再释放 target blocker”的多阶段经验。
+# XSokoban 新主线：格点级 SD-MCTS
+
+XSokoban 采用精确格点 stock-flow 状态作为结构化 SD 核心，箱子 push 为 one-hot 流量，TVA 仅作为有限视界叶节点价值。MCTS transposition key 包含根内深度，以避免不同剩余视界的 backup 相互污染。旧 Room-GFT A1--A48 与六存量 learned-flow 结果保留为诊断材料，不作为新主线模型。
+
+## ICLR 主线非破坏性扩展包（`experiments/sokoban_sd_world_model/iclr_grid/`）
+
+为在不修改 `evaluate_sokoban_grid_sdmcts.py` / `SokobanGridStockFlowModel` / `SokobanGoalDirectedSDModel` 的前提下完成 plan §5.3 / §6 要求的四臂对照与 teacher 价值标签，建立如下继承层。所有扩展均通过子类对父类做 `super()` 调用 + 同语义重写/旁路实现，父类与已有结果文件不被触动。
+
+* `fast_model.py::CachedGridStockFlowModel(SokobanGridStockFlowModel)`：对 `legal_pushes` / `reachable_cells` / `is_deadlocked` / `is_tier_a_deadlocked` 增加确定性不可见缓存（按 `SokobanState` 哈希），并把 `step_grid_flow` 的合法性重算从全集枚举退化为 O(1) 集合查询。带 `verify_equivalence=True` 时在 Boxoban 11x11 关卡完成 3 903 次抽样的回放等价性核对。
+
+* `teacher_cache.py`：可恢复、可中断的 teacher solution/trace cache。状态机严格区分 `solved` / `already_solved` / `proven_dead_end` / `unknown`，预算未解状态只记 `unknown`、不当作负标签。A* heuristic 仅取 `matching_lower_bound`（Boxoban 上同等合法，XSokoban 显著加速）。可选 `--dump-oracle-table` 导出 `canonical_key → g` 距离表，序列化键 `canonical_key_string`，用作 teacher-value upper-bound 的离线价值标签；trace 字段仅在 `solved` 时记录，JSONL 不会因距离表而膨胀。
+
+* `planner_ext.py::ReusableGridSDMCTSPlanner(GridSDMCTSPlanner)`：在每个闭循环 step 之后 `_reroot_to(target_state)`：把被选 child 升为新根，对整棵子树按 `(canonical_state, new_depth)` 重新键值，使累计的 visits/value_sum 在跨 step 复用。`leaf_value` 提供可注入 `leaf_override` 钩子，闭包形式注入 trace / oracle / TVA / sd_heuristic 而不改变父类语义。配套 `trace_oracle_from_cache(trace, fallback=...)` 与 `ArmTrace` 指标容器（root_value / root_visits / child_counts / goals_on / matching_lower_bound / deadlock_events / plan_seconds）。
+
+* `run_arms.py`：plan §5.3 完整四臂 `planner_zero` / `planner_sd_heur` / `teacher_trace_ub` / `teacher_oracle_ub`，可附 `planner_tva`；统一选择器、价值约定、UCR 参数、闭循环步数、多随机种子，按 episode 计算的 bootstrap 95% 置信区间，聚合 `success_rate_ci` / `pushes_to_solve_ci` / `final_goals_when_unsolved_ci` / `deadlock_prunes_ci`。每次运行写到 `results/iclr_xsokoban_main_20260909/arms/<时间戳>_<tag>/summary.json`，不覆盖 `results/iclr_xsokoban_audit_20260909/` 与 `results/sokoban_sd_world_model/` 下任何旧结果。
+
+
+* `diagnose_value_policy.py`：把“价值质量”与“搜索形态”在实验上分开。对每个叶值源（zero / sd_heur / tva / teacher_oracle）跑纯贪心单步 lookahead（Tier-A 子态剪枝 + Tier-A 执行门），再与同一叶值的 MCTS 闭环对照。贪心成功而 MTS 失败 ⇒ 价值够、搜索形态是瓶颈；两者都失败 ⇒ 价值本身不足。终态显式区分 `no_legal_pushes`（互锁）/ `all_actions_tier_a_dead` / `deadlocked` / `max_steps`，支撑 plan §5.2 的“失败类型”报告。
+
+* `topology_intervention.py`（plan §5.4）：四类由 floor-graph 连通性（而非坐标规则）定义的受控干预——`seal_articulation`（floor 关节点→墙）、`open_wall_gap`（两侧通路的墙→地）、`seal_goal_adjacent`（封一格贴目标）、`seal_non_critical`（封非关节点的多余地）。对每个变体记录 SD 结构读数（`matching_lower_bound` / `dead_squares` / `tier_a_deadlocked` / `matching_deadlock`）与离线 teacher 判定，并计算 (a) 模型风险旗标 vs teacher 可解性的 precision/recall/accuracy，(b) Δlb / Δ可达域 vs Δteacher_pushes 的相关性。teacher 判定经过可复用 cache（`--teacher-cache` 读入 + `--topology-cache-out` 追加），变体 `level_id` 由 `基础关|字符@行,列` 编码，重跑天然续跑。
+
+## 流行病补充实验 v2 实现状态
+
+流行病实验规格冻结于 [spec_v1.yaml](/home/round/code/sd-world-model-rl/experiments/epidemic/spec_v1.yaml)。`SEIHREnv` 与共享概率化日核在 `src/epidemic/`：确定性取核期望，随机用二项/多项式抽样；守恒、非负和概率越界为失败条件，SD 臂不做投影。规划状态为 `(S,E,I,H,R,inf_week,Hmax_week,t,a_prev)`。
+
+周期感知 MCTS 在 `src/planning/period_aware_mcts.py`：`period_length==1` 委托 `mcts_search`，子步模式下只在周期边界乘 γ，不改 `mcts.py`。`SequentialDecisionWorldModel` 把联合动作模型抬到逐节点决策。
+
+SEIHR 结构模型 `SEIHRSDModel` 学习 `β0, ε_k, h`（A2-full-θ 另学 `σ,γ,ρ`），oracle/冻结臂使用精确真值。黑盒臂 `EpidemicBlackBoxModel` 只对规划做单纯形投影，并报告投影前后违反率。估计器、专用 MPC、自适应 MPC 与 PPO 在 `experiments/epidemic/{estimator,mpc,baselines}.py`，不复用任务分配 RLS/MPC 动力学。A1–A5 入口为 `experiments/epidemic/run_arms.py`。
+
+Beer Game 图通用环境 `src/env/graph_beer_game.py`：T1 串行四级与 `BeerGameEnv` 逐步位一致；T2–T5 YAML 在 `experiments/beer_game_graph/topologies/`。串行 SD 模型继承 `BeerGameSDModel`（G-BT2）；共享参数设定下 θ 维度恒为 3。门槛脚本 `experiments/beer_game_graph/run_topology_gates.py`。16 周冒烟可运行全部臂，不构成正式性能主张。矩阵 launcher 默认最多并发 4 个子进程；每个子进程固定 PyTorch、OpenMP 和 MKL 单线程，并以较低调度优先级运行，以限制共享服务器上的 CPU 占用。
+
+G1/G2 审计入口为 `experiments/epidemic/run_identifiability_audit.py`。520 周确定性全状态下，G2a 与 G2d 将 \(\beta_0,h,\varepsilon_{1:4}\) 收到真值 \(\pm 10\%\)；G2c 固定最高干预时仅组合 \(\beta_0(1-\varepsilon_4)\) 可辨识。门槛报告见 [epidemic_g1_g2_audit_report.md](/home/round/code/sd-world-model-rl/docs/iclr/epidemic_g1_g2_audit_report.md)。闭环预演入口 `experiments/epidemic/run_preview.py`，结果见 [epidemic_closedloop_preview_report.md](/home/round/code/sd-world-model-rl/docs/iclr/epidemic_closedloop_preview_report.md)。预演方向不稳定，不允许 10 种子主表。
+### 流行病任务校准
+
+在闭环臂重跑前，使用真参数 SEIHR 模型对外源暴露、感染损失权重、医院容量和初始感染规模进行 81 组合校准。筛选条件为 oracle MPC 必须超过最佳固定动作，且动作序列应呈现状态依赖切换而非恒定最高干预。当前候选为外源暴露 3000/日、医院容量 1000；其 oracle 增益约 10--11，动作 0 与动作 4 均被使用。校准结果保存在 `results/iclr_epidemic_preview_20260911_fixed/oracle_calibration_v2.json`。
+### Planner-only 审计
+
+在候选场景上固定真参数，仅比较 MCTS 预算与叶值处理。审计脚本为 `experiments/epidemic/audit_planner.py`，输出目录为 `results/iclr_epidemic_planner_audit_20260911_v2/`。叶值网络使用“最佳固定动作延续值”作受限监督目标，不代表最优价值函数。结果显示零叶 512 模拟优于该价值网络，因此 A2 闭环结果暂不解读为结构化模型优势；需先修订叶值目标与训练分布。
+叶值审计新增 `experiments/epidemic/audit_planner.py` 的 exact-fixed-tail 对照，并在 `run_arms.py` 提供 `--leaf-mode learned|rollout`。正式比较中建议将四步随机 rollout 作为规划诊断默认，同时单列学习价值结果；学习价值网络不能在未经校准前作为 A2 唯一叶值。
+rollout 叶值三 seed 预演结果已保存于 `results/iclr_epidemic_rollout_preview_20260911/results.json`。A2 平均回报为 -36.93，略优于 A5-fixed 的 -37.46 与 A5-receding 的 -37.30；A2-full-θ 为 -37.02。由于 A1′ 为 -48.96，正式实验前须检查其 imagined-state 干预特征闭包和黑盒模型误差，避免将实现缺陷解释为结构化模型收益。
+
+
+### 传播率突变在线适应预演（2026-09-11）
+
+采用 52 周训练后分支到 52 周在线评估的协议；第 8 周施加 β 增幅 0、0.3、0.6，类型与时间可见、幅度隐藏。A1′、A2、A5-fixed、A5-receding 使用相同 64 次模拟和四步随机 rollout。每个种子、每个臂的三个场景复制相同训练模型并重置规划随机种子；评估期间除 A5-fixed 外允许更新。保持原有全历史拟合及更新频率，不引入滑动窗口或变化点重置。此次不训练未使用的叶值网络，故与此前冻结评估表属于不同协议，不能直接相减。记录全程与突变后回报、逐周预测误差和参数轨迹。本轮为三种子适应性预演，不是零样本 OOD 主表。
+
+### 容量冲击在线适应
+
+`run_shift --scenario capacity` 使用第 8 周容量减半、公布后已知幅度的协议，所有臂规划奖励以当前公开容量为准，黑盒使用相应已知幅度特征。训练/在线评估各 52 周，10 种子，64 次模拟，四步随机 rollout。保持无变化配对控制；与未知幅度传播率实验按信息等级分列。其他待执行要求见独立执行清单。
+容量冲击正式结果（10 seeds）均值为 A1′=-63.77、A2=-54.20、A5-fixed=-54.48、A5-receding=-54.63。A2 与 A5 的差距很小，故该臂用于稳定性与失配压力测试，不作为单独的显著性主张。
+受限两切换策略类参照已完成全枚举（159,375 条），最优未折扣回报为 -35.339，真实环境复核一致。结果位于 `results/iclr_epidemic_two_switch_reference_20260912/`；此参照不被称为全局最优。
+
+## 流行病预算网格统计（2026-09-12）
+
+正式预算网格覆盖 8 个信息/辨识臂、52/104/260/520/1040 周预算和 10 个固定种子。汇总从原子结果按 manifest 重建；均值与标准差按种子计算，臂间比较采用同一种子配对差值，使用 NumPy 默认生成器 seed=0 的 10000 次 bootstrap，报告 2.5% 与 97.5% 分位数区间。
+
+### 冻结 OOD 修正规则（2026-09-12）
+
+训练 52 周后克隆代理，评估 52 周期间不收集辨识数据、不执行拟合。整个模型 state_dict 与训练计步、缓冲长度在评估前后进行精确相等断言；每个种子一条评估轨迹，非主表的 20 次冻结评估协议。免疫逃逸 omega=0/0.05/0.10 每日，从评估第 0 周开始；传播率和容量冲击从第 8 周开始。当前动力学幅度未知、名义结构不编辑；容量公开，单独标注，已知幅度结构编辑变体仍待补。
+
+### 冻结零样本 OOD 统计
+
+冻结评估结果按训练种子配对，以 10,000 次 bootstrap（seed=0）报告均值、标准差和百分位区间。统计脚本从逐周轨迹重算全程回报、变化后回报、感染量、住院峰值及超容量周数，并核验四臂与场景预期组合完整覆盖。
+
+capacity 冻结 OOD 采用公开容量信息、隐藏冲击幅度的两条件协议（容量保持与减半），不将其解释为容量参数辨识实验。
+
+报告观测变体当前仅完成信息边界审计，审计发现规划向量仍暴露全状态，故不纳入性能结论，待 report-conditioned planner 完成后再运行。
+
+视界实验入口使用 `planning.rollout_depth` 控制 rollout 叶值深度，H=2、4、8 与历史 H=4 配置可直接比较。
+
+视界/叶值对照固定 H、种子、模拟预算，仅在 `planning.leaf_mode` 的 `rollout` 与 `learned` 间切换，以分离视界长度与叶值估计器影响。
+
+先验失配实验将 σ 或 γ 乘以 0.7/1.3，固定 A2、52 周、16 simulations 和 3 个种子；其余协议保持不变。
+
+A2-full-θ 允许估计临床参数 σ、γ、ρ，其余结构化模型与 A2 相同，用于检验先验信息量而非作为独立最优方法。
+
+A3 冻结先验臂在评估阶段禁止参数更新，用于隔离在线辨识贡献；协议与 A2-full-θ 保持一致。
+
+A4 使用 oracle 参数的结构化模型并保持相同 MCTS 预算，报告为 oracle-parameter reference，不解释为全知最优策略上界。
+
+外部 MPC 参照沿用统一环境与种子，分别记录 oracle-parameter MPC 和 adaptive MPC；结果用于参照，不与 MCTS 臂混合排序。
+
+A2-known-init 将初始化参数设为已知，仅保留在线传播参数辨识，用于分离初始化先验与持续辨识贡献。
+
+结构缺边接口为 `structure.omit_R_to_S`，默认 false。仅当真实环境 omega>0 且模型缺失 R→S 时才构成有意义的结构失配；默认 omega=0 的试跑只作接口验证。
+
+结构失配正式实验固定真实环境 omega=0.05，模型条件为完整 R→S 与 omit_R_to_S=True，均采用 52 周、64 simulations、3 seeds；环境始终保留真实 R→S 流。
+报告观测实验在正式运行前执行信息边界审计：环境观测为报告量，规划向量仍包含完整状态，仅可用于独立评估，禁止用于模型拟合。

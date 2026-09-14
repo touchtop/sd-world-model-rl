@@ -1,0 +1,187 @@
+{
+ "topology": "T1",
+ "arm": "sd_oracle",
+ "budget": 1000,
+ "seed": 1,
+ "simulations": 100,
+ "leaf": "rollout",
+ "state_dim": 24,
+ "tag": "",
+ "allocation": "backlog_proportional",
+ "prior_step_offset": 0.0,
+ "node_demand": {
+  "Retailer": 8.0,
+  "Wholesaler": 8.0,
+  "Distributor": 8.0,
+  "Factory": 8.0
+ },
+ "theta_dim": 3,
+ "model_params": 0,
+ "theta_final": {
+  "demand_low": 4.0,
+  "demand_high": 8.0,
+  "demand_step_time": 5.0,
+  "true_step_time": 5.0,
+  "theta_dim": 3,
+  "graph_id": "T1",
+  "shared_demand": true
+ },
+ "resume": {
+  "checkpoint": "results/iclr_beergame_topology_main_20260913/T1_sd_oracle_b1000_s1.pt",
+  "source_job": "T1_sd_oracle_b1000_s1",
+  "training_history_available": false
+ },
+ "train": {
+  "resumed_from_checkpoint": "results/iclr_beergame_topology_main_20260913/T1_sd_oracle_b1000_s1.pt",
+  "history_available": false
+ },
+ "eval": {
+  "returns": [
+   -586.0,
+   -448.0,
+   -523.0,
+   -557.0,
+   -511.0,
+   -520.0,
+   -432.0,
+   -522.0,
+   -629.0,
+   -610.0
+  ],
+  "mean_return": -533.8,
+  "episodes": [
+   {
+    "return": -586.0,
+    "order_var": [
+     16.83950424194336,
+     19.81172752380371,
+     12.777779579162598,
+     11.777777671813965
+    ],
+    "final_backlog": 0.0
+   },
+   {
+    "return": -448.0,
+    "order_var": [
+     14.478395462036133,
+     14.358025550842285,
+     11.811729431152344,
+     17.219135284423828
+    ],
+    "final_backlog": 0.0
+   },
+   {
+    "return": -523.0,
+    "order_var": [
+     16.478395462036133,
+     14.432098388671875,
+     13.811728477478027,
+     15.777777671813965
+    ],
+    "final_backlog": 0.0
+   },
+   {
+    "return": -557.0,
+    "order_var": [
+     19.293210983276367,
+     17.19444465637207,
+     12.626544952392578,
+     17.555559158325195
+    ],
+    "final_backlog": 0.0
+   },
+   {
+    "return": -511.0,
+    "order_var": [
+     20.330242156982422,
+     9.777777671813965,
+     10.330246925354004,
+     13.959877014160156
+    ],
+    "final_backlog": 0.0
+   },
+   {
+    "return": -520.0,
+    "order_var": [
+     24.083330154418945,
+     12.222222328186035,
+     16.839502334594727,
+     19.44135856628418
+    ],
+    "final_backlog": 0.0
+   },
+   {
+    "return": -432.0,
+    "order_var": [
+     23.543210983276367,
+     16.17283821105957,
+     19.41666603088379,
+     25.86111068725586
+    ],
+    "final_backlog": 0.0
+   },
+   {
+    "return": -522.0,
+    "order_var": [
+     25.765432357788086,
+     17.86111068725586,
+     17.861106872558594,
+     12.024691581726074
+    ],
+    "final_backlog": 2.0
+   },
+   {
+    "return": -629.0,
+    "order_var": [
+     17.32099151611328,
+     11.728392601013184,
+     18.87654685974121,
+     22.083330154418945
+    ],
+    "final_backlog": 0.0
+   },
+   {
+    "return": -610.0,
+    "order_var": [
+     15.987651824951172,
+     13.194443702697754,
+     13.987654685974121,
+     15.416666984558105
+    ],
+    "final_backlog": 0.0
+   }
+  ],
+  "rollout_rmse": {
+   "1": 0.0,
+   "2": 0.0,
+   "3": 0.0,
+   "4": 0.0,
+   "5": 0.0,
+   "6": 0.0,
+   "7": 0.0,
+   "8": 0.0
+  },
+  "imagined_violation": {
+   "total": 2448000,
+   "rate": 0.0
+  },
+  "model_calls": 144000
+ },
+ "eval_seconds": 456.97531485557556,
+ "provenance": {
+  "git_commit": "7074686f946d5a13d71a0f1dcc6aa3899dfda873",
+  "source_sha256": {
+   "/home/round/code/sd-world-model-rl/experiments/beer_game_graph/run_arm.py": "2d33e21a039ed831ac00e7ad4756fb7ded1149aaa13d5d80213e2532a058168e",
+   "experiments/beer_game_graph/common.py": "4ed30f5826608c0132a1f511a7bf829badb9fdab8135ec4a9de91849d72e1d39",
+   "src/env/graph_beer_game.py": "7291679c9c3071b6adb57fb77e9cc6d67d33daafc0e4640c28ebd17808d91eed",
+   "src/world_model/graph_beer_game_sd_model.py": "c88a784c71d869f114c5af3e725c8eb60a70e0aa77a01e4c4556abd5ecce5dc2",
+   "src/planning/period_aware_mcts.py": "5eb9477220bf789bd808517d97e2bdbe6ae4128560826237dc2057557ff6a60f",
+   "src/planning/mcts.py": "c2baf1c1867a1aa4c5bf050ec88ba2c9a7e5e7ac82ad7035644bbe36afb1b967"
+  },
+  "versions": {
+   "torch": "2.1.2+cu118",
+   "numpy": "1.26.4"
+  }
+ },
+ "seconds": 457.0275001525879
+}

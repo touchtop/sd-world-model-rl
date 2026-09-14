@@ -1,5 +1,69 @@
 # Reproducibility
 
+> XSokoban 当前复现口径：使用 `experiments/sokoban_sd_world_model/iclr_grid/run_counted_arms.py`，显式指定 `planner_zero,planner_sd_heur,planner_tva,teacher_suffix`。`--oracle-dir` 在该版本接收经回放验证的后缀 JSON 文件（不是目录）；文件为 `results/iclr_xsokoban_main_20260909/review/verified_teacher_suffixes_v1.json`。基础参数：`--horizon 8 --budget 256 --seeds 0,1,2 --gamma 0.99 --goal-value 1 --push-cost 1 --deadend-value -1000`，TVA检查点为 `results/iclr_xsokoban_main_20260909/grid_tva_pushunit_residual_checkpoint.json`。XSokoban index 0 使用200步上限，Boxoban valid/000.txt indices 0..4 使用60步上限。数据、报告路径及统计方法见 [验收报告](iclr/xsokoban_final_negative_result_report.md)。历史 `teacher_oracle_ub` 不再作为有效价值上界；旧命令和JSON仅供追溯。为新运行使用新输出目录，避免覆盖结果。
+
+## ICLR 补充实验实现层（流行病 / 拓扑）
+
+解释器：`/home/round/.conda/envs/sd-mcts/bin/python`。不覆盖 `results/beer_game*` 旧文件。
+
+规格与守恒门槛：
+
+```
+python experiments/epidemic/validate_spec.py
+```
+
+单元测试：
+
+```
+python -m pytest tests/test_period_aware_mcts.py tests/test_epidemic_seihr.py tests/test_graph_beer_game.py tests/test_beer_game_sequential_consistency.py
+```
+
+拓扑门槛 G-BT0–G-BT2 与 G-BT3 冒烟、θ 维度规模审计：
+
+```
+python experiments/beer_game_graph/run_topology_gates.py
+```
+
+Beer Game 图拓扑矩阵的低占用启动方式（默认 `--workers 4`，接续已有 checkpoint 时加 `--resume-checkpoints`）：
+
+```bash
+python -m experiments.beer_game_graph.launch \
+  --out results/iclr_beergame_topology_main_20260913 \
+  --budgets 1000 --seeds 0 1 2 3 4 --workers 4 --resume-checkpoints
+```
+
+launcher 为每个子进程设置 `OMP_NUM_THREADS=1`、`MKL_NUM_THREADS=1`，任务内部调用 `torch.set_num_threads(1)`，并设置 `nice(10)`；省略 `--workers` 时仍采用 4 个并发子进程。
+
+A1–A5 接口冒烟（16 周，非正式结果）：
+
+```
+python experiments/epidemic/run_arms.py \
+  --arms A1,A1p,A2,A2_full_theta,A3,A4,A5_passive_fixed,A5_passive_receding \
+  --weeks 16 --sims 4 --eval-episodes 1 --include-mpc --include-ppo
+```
+
+G1/G2 审计（新目录，非正式主表）：
+
+```
+python experiments/epidemic/run_identifiability_audit.py \
+  --weeks 520 --fit-steps 400 --layers G2a,G2d,G2c \
+  --out results/iclr_epidemic_audit_20260911/g2_520w.json
+```
+
+报告：[epidemic_g1_g2_audit_report.md](iclr/epidemic_g1_g2_audit_report.md)。G2a/G2d 通过后只允许小规模闭环预演，正式预算网格 `{52,104,260,520,1040}` 与 10 种子主结果尚未跑。输出必须写入新目录。
+
+闭环预演（决策 19/20，非正式）：
+
+```
+python experiments/epidemic/run_preview.py \
+  --arms A2,A1p,A4,A5_passive_fixed \
+  --seeds 0,1,2 --weeks 52,104 \
+  --sims 16 --eval-episodes 2 \
+  --out-dir results/iclr_epidemic_preview_20260911
+```
+
+已有 24 组 JSON 与 [epidemic_closedloop_preview_report.md](iclr/epidemic_closedloop_preview_report.md)。方向不稳定，不进入正式主表。重跑须写新目录，不得覆盖本预演。
+
 ## 当前 Hopper 主线环境
 
 ### 运行环境
@@ -10114,3 +10178,104 @@ A47/A48 soft 80-push first_decision_difference_step = None
 ```
 
 复现时应检查 `contract.analysis=room_gft_xsokoban_a48_assignment_conflict_agenda_v1`、`contract.agenda_gft_alignment=E3_E6_E11_E14_assignment_conflict_agenda`、`contract.teacher_actions_used_online=false`、`contract.mainline_mutation=false`、`contract.learned_sd_consumer_root_override=false`。
+
+## ICLR XSokoban 主线复现（2026-09-10）
+
+新增 `experiments/sokoban_sd_world_model/iclr_grid/` 非破坏性扩展包。所有命令在 `sd-world-model-rl` 根目录运行，python 解释器为当前 shell 环境。所有输出落在新 `results/iclr_xsokoban_main_20260909/` 目录，不覆盖任何旧结果。
+
+1. 建 teacher cache + oracle 表（XSokoban 前 N 关）：
+
+```bash
+python experiments/sokoban_sd_world_model/iclr_grid/teacher_cache.py \
+  --levels datasets/sokoban_xsokoban/xsokoban_first40_boxoban_format.txt \
+  --level-indices 0,1,2 --max-expansions 400000 --max-seconds-per-level 1200 \
+  --weight 2.0 --dump-oracle-table \
+  --cache results/iclr_xsokoban_main_20260909/teacher_cache/xsokoban_lidx{N}.jsonl \
+  --oracle-dir results/iclr_xsokoban_main_20260909/oracle_tables
+```
+
+2. 四臂对照（planner_zero / planner_sd_heur / teacher_trace_ub / teacher_oracle_ub）：
+
+```bash
+python experiments/sokoban_sd_world_model/iclr_grid/run_arms.py \
+  --levels datasets/sokoban_xsokoban/xsokoban_first40_boxoban_format.txt \
+  --level-indices 0 --arms all --horizon 8 --budget 256 --max-steps 200 \
+  --seeds 0,1,2 --gamma 0.99 --goal-value 1.0 --push-cost 1.0 --deadend-value -1000.0 \
+  --teacher-cache results/iclr_xsokoban_main_20260909/teacher_cache \
+  --oracle-dir results/iclr_xsokoban_main_20260909/oracle_tables \
+  --out-dir results/iclr_xsokoban_main_20260909/arms --tag pushunit_l0
+```
+
+3. 价值 vs 搜索形态诊断：
+
+```bash
+python experiments/sokoban_sd_world_model/iclr_grid/diagnose_value_policy.py \
+  --levels datasets/sokoban_xsokoban/xsokoban_first40_boxoban_format.txt \
+  --level-indices 0 --leaves zero,sd_heur,teacher_oracle --max-steps 400 \
+  --out results/iclr_xsokoban_main_20260909/value_policy/xsok_l0.json
+```
+
+4. 拓扑干预实验：
+
+```bash
+python experiments/sokoban_sd_world_model/iclr_grid/topology_intervention.py \
+  --levels datasets/sokoban_xsokoban/xsokoban_first40_boxoban_format.txt \
+  --level-indices 0 --per-family 6 --teacher-max-expansions 80000 \
+  --teacher-max-seconds 30 \
+  --teacher-cache results/iclr_xsokoban_main_20260909/teacher_cache \
+  --out results/iclr_xsokoban_main_20260909/topology/topology_l0.json
+```
+
+5. 门槛：
+
+```bash
+# G1 转移守恒（冻结脚本，直接复跑）
+python experiments/sokoban_sd_world_model/validate_sokoban_grid_stock_flow_design.py \
+  --levels datasets/sokoban_xsokoban/xsokoban_first40_boxoban_format.txt \
+  --max-levels 5 --max-depth 2 --max-states-per-level 40 \
+  --out results/iclr_xsokoban_main_20260909/gates/g1_transition_conservation_xsokoban.json
+
+# G2 深度转置（新包 gates.py）
+python experiments/sokoban_sd_world_model/iclr_grid/gates.py \
+  --levels datasets/sokoban_xsokoban/xsokoban_first40_boxoban_format.txt \
+  --level-indices 0,1 --horizon 8 --budget 256 --max-steps 30
+```
+
+关键编号：xsokoban_001 离线 teacher `solved, pushes=103`；oracle 距离表 55 369 项；四臂对照 xsokoban_001 全部 0/3；H×B 敏感性 H=16 解锁 oracle（lb 95→75，1 goal）；拓扑风险预测 9/9 precision=recall=accuracy=1.0；Boxoban 正控 zero / teacher_oracle 各 1/15。
+流行病规划审计使用 `sd-mcts` 环境运行：`python -m experiments.epidemic.audit_planner --out results/iclr_epidemic_planner_audit_20260911_v3 --seeds 0 1 2`。A2 叶值模式通过 `--leaf-mode rollout` 或 `--leaf-mode learned` 指定；审计候选场景为每日外源暴露 3000、医院容量 1000、感染权重 10。
+
+
+### 传播率突变在线适应预演
+
+入口：`conda run --no-capture-output -n sd-mcts python -m experiments.epidemic.run_shift`。训练种子 0、1、2，评估规划种子加 1000，确定性环境，PyTorch 单线程。结果目录 `results/iclr_epidemic_shift_pilot_20260911`，每完成一个场景原子更新 `partial.json`，全部完成后生成 `results.json`；每臂、每种子的训练仅一次，再复制到三个场景。
+
+容量实验运行：`conda run --no-capture-output -n sd-mcts python -m experiments.epidemic.run_shift --scenario capacity --out results/iclr_epidemic_capacity_formal_20260912`。默认种子 0–9，评估种子加 1000；配置和信息合同随 JSON 保存，全部完成标志为 `results.json` 中 `complete=true`。
+
+### 完整预算网格（2026-09-12）
+
+`conda run --no-capture-output -n sd-mcts python -m experiments.epidemic.run_budget_grid --out results/iclr_epidemic_budget_grid_formal_20260912 --workers 8`。
+
+8 臂 × 5 预算（52、104、260、520、1040）× 10 种子，共 400 个训练任务；每任务冻结评估 20 episodes，64 次模拟、四步随机 rollout。各进程 PyTorch 单线程，互不共享随机状态。`manifest.json` 保存完整规格、参数与源码 SHA256；断点续跑须一致，否则要求新输出目录。子任务结果原子写入，汇总仅在全部结果存在后生成。不复用早先仅 3 次评估的主表以冒充 20 次评估。双进程 A2/A4 的 8 周/2 模拟 smoke 已完成，仅验证执行器。
+
+PPO 正式结果：`results/iclr_epidemic_ppo_formal_20260912/results.json`，配置见同目录 `manifest.json`；SB3 2.3.2，输入为归一化九维规划向量，评估策略冻结且确定性执行。
+
+## 2026-09-12（网格恢复）
+
+运行环境仍为 sd-mcts，64 次模拟、20 次冻结评估及全部预算与种子不变。臂子集仅用于调度；最终完成状态以原始 manifest 的全体任务为准。
+
+## 2026-09-12 流行病预算网格
+
+运行环境为 conda `sd-mcts`。结果目录为 `results/iclr_epidemic_budget_grid_formal_20260912`，共 400 个原子 JSON（8 臂、5 预算、10 种子），正式汇总为 `results.json`，统计为 `statistics.json`。bootstrap 重采样固定 seed=0、次数 10000。
+
+### 冻结 OOD 失效结果及修正版（2026-09-12）
+
+原 `iclr_epidemic_frozen_ood_escape_smoke_20260912` 与 `iclr_epidemic_frozen_ood_escape_formal_20260912` 因评估仍训练而无效，详见各目录 INVALID_FOR_FROZEN_OOD.json。修正版入口 run_frozen_ood.py 增加 state_dict 与计数断言，核验输出为 iclr_epidemic_frozen_ood_escape_freezecheck_20260912；使用 sd-mcts，seed=0、simulations=4，仅核验。正式修正版计划使用 seeds=0–9、simulations=64，独立 corrected 目录。
+
+### 冻结 OOD 统计复现
+
+使用 `conda run -n sd-mcts python -m experiments.epidemic.summarize_frozen_ood <结果目录>`。输入结果文件的 SHA-256、场景、信息合同和 bootstrap seed 均写入 `statistics.json`；escape、beta 结果目录分别为 `results/iclr_epidemic_frozen_ood_escape_corrected_20260912` 与 `results/iclr_epidemic_frozen_ood_beta_corrected_20260912`。
+
+capacity 冻结 OOD 结果与统计位于 `results/iclr_epidemic_frozen_ood_capacity_corrected_20260912`。
+## 2026-09-12 多区域实现
+
+多区域 SEIHR 内核与环境使用 `sd-mcts` 环境验证；回归测试命令为 `PYTHONPATH=. conda run -n sd-mcts python -m pytest -q tests`，结果 28 项通过。接触矩阵为行随机矩阵，旅行禁令后按行重新归一化。

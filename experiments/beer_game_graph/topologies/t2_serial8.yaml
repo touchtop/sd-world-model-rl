@@ -1,0 +1,28 @@
+id: T2
+nodes:
+  - {id: n0, kind: retail, holding: 0.5}
+  - {id: n1, kind: warehouse, holding: 0.5}
+  - {id: n2, kind: warehouse, holding: 0.5}
+  - {id: n3, kind: warehouse, holding: 0.5}
+  - {id: n4, kind: warehouse, holding: 0.5}
+  - {id: n5, kind: warehouse, holding: 0.5}
+  - {id: n6, kind: warehouse, holding: 0.5}
+  - {id: n7, kind: source, holding: 0.5}
+edges:
+  - {u: n1, v: n0, L: 2, tau: 2, backlog_cost: 1.0}
+  - {u: n2, v: n1, L: 2, tau: 2, backlog_cost: 1.0}
+  - {u: n3, v: n2, L: 2, tau: 2, backlog_cost: 1.0}
+  - {u: n4, v: n3, L: 2, tau: 2, backlog_cost: 1.0}
+  - {u: n5, v: n4, L: 2, tau: 2, backlog_cost: 1.0}
+  - {u: n6, v: n5, L: 2, tau: 2, backlog_cost: 1.0}
+  - {u: n7, v: n6, L: 2, tau: 2, backlog_cost: 1.0}
+meta:
+  demand_low: 4
+  demand_high: 8
+  demand_step_time: 5
+  T: 36
+  initial_inventory: 12
+  initial_pipeline: 4
+  O_max: 16
+  order_levels: 9
+  shared_demand: true

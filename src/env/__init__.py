@@ -1,3 +1,4 @@
 from .task_allocation_env import TaskAllocationEnv, TaskAllocationEnvWithFatigue
 from .delayed_collapse_env import DelayedCollapseEnv, MultiSurgeEnv
 from .beer_game_env import BeerGameEnv, BeerGameEnvFlat, BeerGameEnvSequential
+from .graph_beer_game import GraphBeerGameEnv, GraphBeerGameEnvSequential

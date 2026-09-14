@@ -1,0 +1,45 @@
+{
+ "topology": "T1",
+ "arm": "ppo",
+ "budget": 10000,
+ "seed": 3,
+ "leaf": "rollout",
+ "state_dim": 24,
+ "sb3_version": "2.3.2",
+ "ppo": {
+  "n_steps": 360,
+  "batch_size": 36,
+  "n_epochs": 10,
+  "lr": 0.0003,
+  "gamma": 0.99
+ },
+ "train_seconds": 36.22607469558716,
+ "model_params": 13925,
+ "eval": {
+  "returns": [
+   -775.0,
+   -775.0,
+   -775.0,
+   -775.0,
+   -775.0,
+   -775.0,
+   -775.0,
+   -775.0,
+   -775.0,
+   -775.0
+  ],
+  "mean_return": -775.0
+ },
+ "provenance": {
+  "git_commit": "7074686f946d5a13d71a0f1dcc6aa3899dfda873",
+  "source_sha256": {
+   "/home/round/code/sd-world-model-rl/experiments/beer_game_graph/baselines.py": "352cf8968114e591c34410510b2e07456298b325f34d040ca6e0d9136aa550e4",
+   "src/env/graph_beer_game.py": "2d5335584a8ec04bedbb5034ed1a9c4e10675bf35b3c6c9fc4ad66e4d91a3ac3"
+  },
+  "versions": {
+   "torch": "2.1.2+cu118",
+   "numpy": "1.26.4"
+  }
+ },
+ "seconds": 36.62450456619263
+}

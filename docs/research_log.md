@@ -1,5 +1,7 @@
 # Research Log
 
+> XSokoban 结果复核更正：本日志保留历史探索过程；其中“完美 oracle 排除价值误差”和“9/9 完美独立拓扑预测”的结论已撤回。请以 [修正版验收报告](iclr/xsokoban_final_negative_result_report.md)、[证据更正](iclr/xsokoban_evidence_corrections.md)、[独立拓扑结果](iclr/xsokoban_independent_topology_results.md) 为当前口径。修正版主对照与预算敏感性共84条轨迹通过父模型回放；72条计数版与未计数版动作及结果一致。TVA未达到held-out改善或非劣门槛，first-40扩展不执行。精确最优teacher值仍需单独证据，不能以解轨迹后缀冒充。
+
 ## 2026-04-29
 
 Hopper `pureenv_sdinit_online_sup` 三种子 `50k` 正式对照 `run3` 已全部结束，并据此启动接续至 `100k` 的三种子训练。`50k run3` 的恢复源为：
@@ -2797,3 +2799,261 @@ python scripts/analyze_room_gft_xsokoban_a48_assignment_conflict_agenda.py \
 关键观察：A48 在 step `31` 和 step `41` 均构造出 `ResolveAssignedBoxPrerequisiteConflict` 义务。两次义务都显示 assigned box `[2,6]` 既是 parent residual 分配给 slot `[2,1]` 的箱子，也是 target blocker push 所需 stand `[2,6]` 的占用者。该 assigned box 的 pull-distance 为 `9.0`，初始合法 push 数为 `0`，朝 slot 的合法 push 数为 `0`。A48 在这两点合计评估 `640` 个 assignment-conflict option，单点达到 `expanded_nodes=320` 上限，但最佳进展仍为 tier `2`，没有打开 assigned box mobility、没有朝 slot 方向推进、没有解除 conflict。
 
 本轮结论是：A48 排除了“只要把 A47 前提阻塞解释为 assignment conflict 即可推进”的单一解释。assignment/prerequisite 冲突、assigned box 移动性和到 slot 的距离都已显式读出，但短程局部 option 仍不可完成。下一步应继续考虑更高层 agenda-node/option-node/push-node 拓扑、阶段里程碑或可复用 agenda-distance/value，用更一般的机制表达多阶段解锁，而不是继续追加坐标或局部规则。
+## 2026-09-09
+
+新增独立文档 [iclr_experiment_reconstruction_plan.md]，集中记录 ICLR 实验重构方案：论文主张、Beer Game/Cartpole/Hopper/XSokoban 的角色分工、已有实验的保留与修订、新增实验、数据与代码合同、执行顺序及验收门槛。该文档将 XSokoban 定位为结构模型增强专用规划器的互补实验，并明确 Hopper 使用 SD-TD-MPC2 而非完整 SD-MCTS。
+
+基于 XSokoban 全线审计，建立格点级 SD-MCTS 新主线。该主线采用精确箱子/玩家格点存量与 one-hot push flow，避免不可闭合的低维六存量 rollout；TVA 仅承担有限视界叶节点价值补偿。审计发现原 exact-grid planner 的 transposition key 未包含搜索深度，已修正为 `(canonical_state, depth_from_root)`，因为有限视界价值随深度变化。`sd-mcts` 环境复跑 `H=4,budget=64,Tier-A,TVA-off` 的 XSokoban 前两关结果为 `0/2`，作为新主线起点记录。
+
+同日完成 `H={2,4,8} × budget={64,256,1024}` 的 zero-leaf 前两关矩阵，所有配置均为 `0/2`。将 TVA 特征改为尺寸无关的 14 维结构统计后，在 Boxoban 训练切片上独立审计 gate 为 PASS，但 valid MAE `3.70`、corr `0.557`，非正值 bias `+5.37`；在 XSokoban 上的 `H=4,budget=64,max_steps=40` TVA smoke 仍为 `0/2`。为降低计算成本，`matching_lower_bound` 和 `abstract_features` 已加入确定性缓存。当前结果支持“TVA 是必要候选但尚未校准”的判断，不支持性能提升结论。
+
+缓存等价性审计完成：相同 `H=4,budget=64,max_steps=40` 配置下，两关 uncached/cached trace、终态和 deadlock prune 完全一致；单次运行 wall-time 加速分别为 `3.33x` 与 `13.77x`。同一审计中的结构 TVA 与 zero-leaf 首步分别在第 4 步和第 1 步出现分歧，但两者均未在 40 push 内解出。结果见 `results/iclr_xsokoban_audit_20260909/cache_equivalence/summary.json`。
+
+缓存后完成 `max_steps=120,H=4,budget=64` 对照。zero-leaf 两关均为 `max_steps`，最终 goals 分别为 `3,2`；结构 TVA 两关均为 `max_steps`，最终 goals 均为 `0`，因此该跨尺寸 Boxoban 训练 TVA 在当前 XSokoban 闭环中出现明显负迁移，不进入后续正式结果。
+
+## 2026-09-10
+
+建立 ICLR XSokoban 主线的非破坏性扩展包 `experiments/sokoban_sd_world_model/iclr_grid/`，全部以 OO 继承方式叠加在原有 `GridSDMCTSPlanner` / `SokobanGridStockFlowModel` 之上，不修改任何已有方法或既有结果文件：
+
+* `fast_model.py`：`CachedGridStockFlowModel` 通过对 `legal_pushes` / `reachable_cells` / `is_deadlocked` / `is_tier_a_deadlocked` 加不可见缓存并旁路 `step_grid_flow` 的冗余合法性重算实现同语义加速；带 `verify_equivalence` 选项在 Boxoban 11x11 关卡上完成 3903 次抽样回放等价性核对。计划§6 “可中断、可恢复的 teacher solution/trace cache” 落地为 `teacher_cache.py`：可恢复 JSONL + 命令行指定 weight / 预算 / 时间，`unknown` 状态严格区别于 `proven_dead_end`；可额外 `--dump-oracle-table` 输出 A* 探索的 `canonical_key → g` 距离表（用作 teacher-value upper-bound 的离线价值标签）。
+
+* `planner_ext.py`：`ReusableGridSDMCTSPlanner` 在 `plan` 之间做子树复用（`_reroot_to`），把被选 child 升为新根并对整棵子树按 `(canonical_state, new_depth)` 重新键值；保留 TVA 深度对比含义。`leaf_value` 钩子允许外部 override 作为闭包注入而不影响父类语义。
+
+* `run_arms.py`：plan§5.3 完整四臂对照 `planner_zero` / `planner_sd_heur` / `teacher_trace_ub` / `teacher_oracle_ub`，可附 `planner_tva` 接入既有/重训 TVA 检查点；统一选择器、评估参数、多随机种子、按 episode 的 bootstrap 95% 区间，聚合 `success_rate_ci` / `pushes_to_solve_ci` / `final_goals_when_unsolved_ci` / `deadlock_prunes_ci`。每个 run 写入 `results/iclr_xsokoban_main_20260909/arms/<时间戳>_<tag>/summary.json`，不触碰旧结果。
+
+并行在 128 核上跑 `xsokoban_001..009` 的离线 teacher（weight=2.0, 400k expansions, 1200s/关）。`xsokoban_001` 在 99 523 次扩展、38.7s 内解得 `solution_pushes=103`，同步生成 55 369 项 oracle 距离表（2.0 MB JSON）。其余关卡仍在搜索中，结果写入 `results/iclr_xsokoban_main_20260909/teacher_cache/xsokoban_lidx{n}.jsonl` 与 `oracle_tables/...json`。
+
+基于 `xsokoban_001` 与已完成 oracle 表，run `push-unit` 价值约定（`gamma=0.99, goal_value=1, push_cost=1, deadend=-1000, H=8, budget=256, max_steps=200, seeds=0,1,2`）四臂对照，三次重复结论一致：
+
+| 臂 | 成功率 (3 seeds) | final_goals (mean) | final_lb (mean) | 死锁剪枝 (mean) |
+|---|---|---|---|---|
+| `planner_zero` | 0/3 | 0.0 | 92.3 | 650 |
+| `planner_sd_heur` | 0/3 | 0.33 | 83.0 | 885 |
+| `teacher_trace_ub` (offline trace) | 0/3 | 0.0 | 85.0 | 477 |
+| `teacher_oracle_ub` (55k offline 距离表) | 0/3 | 0.0 | 91.0 | 234 |
+
+关键机制结论：即使给予 push-unit 价值约定 + 子树复用 + 55 369 项完美 oracle 价值（覆盖 A* 已探索空间），`xsokoban_001` 仍 0 成功 0 进盒。`teacher_oracle_ub` 在 `lb=91↔92` 之间的两态振荡持续 200 步，证伪 “价值质量是 XSokoban 失败主因”。结合 `planner_sd_heur` 反而将 `final_lb` 推进到 77（最深的局部进展），可读为：当前 `budget=256, H=8, ucb1, most-visits 选择` 这一搜索形态的探索噪声压倒了 leaf 价值梯度；这一结论与研究日志早先“搜索形态是主损失源”的判定方向一致，区别于“为调价值标定而继续改写主张”。所有命令、JSON 与日志均落在新 `results/iclr_xsokoban_main_20260909/` 下，不覆盖 `results/iclr_xsokoban_audit_20260909/` 与任何旧 `results/sokoban_sd_world_model/` 文件。
+
+下一步：(a) 在其它已解出关卡上跑同一四臂对照验证上述机制结论的可复现性；(b) 跑 `budget ∈ {256,1024,4096}` × `H ∈ {4,8,16}` 预算敏感性，确认搜索形态瓶颈随预算变化的拐点；(c) 在 `gamma=0.95, goal=10, push_cost=0.05` 旧约定下重新接 `planner_tva` 检查点验证 TVA 校准差距是否由价值量纲造成；(d) `xsokoban_001` 上加 `--select-by q` / `--revisit-penalty>0` 排查振荡与 UCB1 选择偏差。
+
+
+## 2026-09-10（ICLR XSokoban 主线实验，第一轮闭环）
+
+### 机制诊断分解（diagnose_value_policy.py）
+
+新增贪心价值诊断脚本，直接对比“单步 lookahead 贪心策略”与“MCTS 闭环”，回答失败来自价值还是搜索形态。
+
+XSokoban_001（push-unit 约定，max_steps=400）：zero / sd_heur / teacher_oracle 三个叶值都死于同一失败类型 `no_legal_pushes`（第 5 push 后 6 箱全部互锁，`legal_flows=0`）。Tier-A（死格 + 角冻 + 匹配）都未预警——该“箱子互锁”是一类 Tier-A 结构性盲区，与价值质量、搜索深度无关。
+
+Boxoban 正控（valid/000 前 5 关，max_steps=60）：
+- level 0：zero/sd_heur 贪心 20 push 解出（teacher 18 push），teacher_oracle 早死（deadlocked, lb=inf）；oracle 表仅 54–183 项太稀疏，离 trace 状态 fallback 至 lb，反而把箱推进死角。
+- level 1–4：greedy 死于 `all_actions_tier_a_dead` / `max_steps`，和 MCTS 表现一致，证实 Tier-A 正确但在“自锁路径”上没有预警能力。
+
+### 失败类型分类（plan §5.2 可靠性实验）
+
+在闭循环 + 贪心两个通道上，失败显式归为：`no_legal_pushes`（互锁）/ `all_actions_tier_a_dead`（所有合法子态 Tier-A 死）/ `deadlocked`（执行态匹配死锁 lb=inf）/ `max_steps`（振荡/停滞）。这为论文的“结构模型可靠性实验”提供了报告失败类型而非仅 return 的证据。
+
+### 搜索形态预算敏感性（H×B）
+
+在 `xsokoban_001`，`gamma=0.99, goal=1, push_cost=1, seed=0, max_steps=200` 网格：
+
+| H | budget | zero lb→final | sd_heur lb→final | oracle lb→final | oracle goals |
+|---|--------|---------------|------------------|-----------------|--------------|
+| 8 | 256 | 95→92.3 | 95→83.0 | 95→91.0 | 0 |
+| 8 | 1024 | 95→95.0 | 95→85.0 | 95→91.0 | 0 |
+| 8 | 4096 | 95→97.0 | 95→85.0 | 95→91.0 | 0 |
+| 16 | 1024 | 95→99.0 | 95→95.0 | 95→67.0 | 1 |
+| 16 | 4096 | 95→97.0 | 95→81.0 | 95→75.0 | 1 |
+
+清晰拐点：只有 H=16 时 oracle 才被解锁（lb 95→75, 首个 goal）；同预算下 zero 反而退化（95→97）。这证实“value 的增益需要足够深的搜索才可兑现”，是搜索形态（H、budget、选择规则）而非 value 质量主导 XSokoban 的可解性。`select_by=q`、`revisit_penalty=1` 都无法打破振荡（planner_zero undo_rate 高达 0.95）。
+
+### 拓扑干预实验（plan §5.4）
+
+新增 `topology_intervention.py`，四类图形学干预：seal_articulation / open_wall_gap / seal_goal_adjacent / seal_non_critical，全部用 floor-graph 的连通性而非坐标规则定义。teacher 使用可复用 cache（`--teacher-cache` + `--topology-cache-out` 追加 JSONL）。
+
+`xsokoban_001`（per_family=6, teacher 80k/30s, w=2.0）：
+- base teacher 复用 cache：`solved, pushes=103`。
+- 9 个可用变体全部 teacher=`proven_dead_end`，模型风险旗标全部命中 → precision=recall=accuracy=1.0。`seal_non_critical@[7,8]`/`@[7,15]` 不是 floor-graph 的 articulation 点，但模型仍正确预警（dead-square/matching 失效），优于朴素连通性启发。
+- 难度相关性 (`Δlb` vs `Δteacher_pushes`) 因“可用变体全部 unsolvable”而为空（n=0），需要在可解变体族上扩大 teacher 预算补做。
+
+### 门槛（gates）状态
+
+| 门 | 状态 | 证据 |
+|---|---|---|
+| G1 转移守恒 | PASS（XSokoban 上 5 关, 729 transitions, 0 违例） | `results/iclr_xsokoban_main_20260909/gates/g1_transition_conservation_xsokoban.json` |
+| G2 深度转置 | PASS（registry 不变量、首步等价、reroot 记账、确定性） | `results/iclr_xsokoban_main_20260909/gates/g2_depth_transposition.json` |
+| G3 TVA 校准 | 待在新 push-unit 约定下重训与重审 | — |
+| G4 四臂对照 | 已跑（xsokoban_001 + Boxoban 正控），见下 | `results/iclr_xsokoban_main_20260909/arms/`, `positive_control/` |
+
+### 四臂对照结果（push-unit 约定）
+
+`xsokoban_001`（H=8,b=256,3 seeds）全部 0/3；Boxoban 正控（5 关×3 seeds）只有 zero 与 teacher_oracle 各 1/15。全部写入 `results/iclr_xsokoban_main_20260909/`；文件、子类、开关均加在 OO 扩展层，不改父类，不覆盖任何旧结果。
+
+### 下一步
+
+(a) 以 push-unit 约定重训 + 重审 TVA（G3）；
+(b) 用更大 teacher 预算补全 open_wall_gap / seal_non_critical 变体的难度相关性；
+(c) 提升 XSokoban 覆盖率：试 w=10 贪心 teacher 解更多关卡；
+(d) 对互锁失败引入 Tier-B 结构性预警（互锁检测）并在 arm 对照中隔离其贡献；
+(e) 把 Boxoban 正控扩展为多难度层，给出跨关卡泛化数字。
+
+### 计算可扩展性墙：matching_lower_bound 的指数 DP
+
+`teacher_cache` 在 `xsokoban_004`（20 箱）上 1200s 内仅扩展 31 个状态；在 `xsokoban_002`（10 箱）上 400k 扩展 / 7.2 分钟。`matching_lower_bound` 用最小代价匹配 DP，其状态数为 `C(n_boxes, n_goals)`，随箱数指数增长（20 箱 = 2^20 ≈ 1.0M masks / 次）。因此离线 teacher 与 Tier-A 匹配死锁在 14–20 箱的 XSokoban 高难段不可用；下一轮考虑用每个箱到其最近目标的 pull-distance 之和（同样可采纳但 O(n_boxes × n_goals)）替换，或在 teacher 侧 `w=10` 贪心地限制匹配 DP 的掩码数。当前可用 teacher 覆盖的 XSokoban 求解子集：`{0: solved(103)}`；`{1,2,4,5,6,7,8}` 全部 budget-unsolved，作为 `unknown` 记录，不作为负标签。
+
+## 2026-09-11
+
+从第一性原理重新审视补充实验方向：SD 世界模型的收益前提是决策瓶颈在于已知机理、未知参数的动力学映射；XSokoban 转移精确、零参数、瓶颈在组合搜索，不满足前提。据此停止 XSokoban 扩展与 DeepCubeA 基线，已有负结果转为适用边界附录。经文献与基准检索，补充实验主选流行病隔室模型 + 非药物干预，Beer Game 拓扑扩展为次要方向。环境 stock-flow 规格、四臂对照、门槛与预注册假设、拓扑扩展方案及参考文献见 [supplementary_epidemic_beergame_topology_design.md](iclr/supplementary_epidemic_beergame_topology_design.md)。该文档同时把 NeurIPS 23587 三位审稿人的核心质疑逐条映射到具体实验臂。
+
+同日外部专家评审 v1 后达成一致，文档升为 v2。主要修订：SEIHR 早期增长率改为含 E 隔室的线性化主特征值，默认参数下 r ≈ 0.148 d⁻¹、倍增约 4.7 天；日转移改为概率化多项式流量，守恒与非负由构造保证，SD 臂不再需要投影，投影诊断只对黑盒臂报告；可辨识性写成由策略覆盖的干预等级决定；新增各臂信息合同表、A2-full-θ 正式臂、A5 两个版本、两级干预信息等级；oracle 改称 oracle-parameter reference；G1、G2 分层；H4 放宽为允许 A5 占优的负结果；Beer Game 拓扑区分共享与节点特定参数设定，T4 补拓扑统计量，新增 18 节点 T5 只做规模审计。核实 experiments/baselines/ 下 MPC 与 RLS 为任务分配环境专用，流行病基线另建 experiments/epidemic/。修复 BeerGameEnvSequential 的 observation_space 属性导致的实例化错误，该类未被任何已发表结果使用。A6 Thompson 采样暂缓；报告观测变体固定 h、学习 r_obs。
+
+## 2026-09-11（流行病/拓扑规格实施准备）
+
+完成前五项实施准备：修正文档中的概率化日核线性化增长率表达，删除重复预测指标；建立 `experiments/epidemic/spec_v1.yaml`、`src/epidemic/transition.py` 与最小 `SEIHREnv`，确定性/随机核共用转移定义并通过守恒、非负和奖励可运行性校验；在 `sd-mcts` 环境安装缺失的 `gymnasium`、`pyyaml`、`pytest`；修复 `BeerGameEnvSequential` 的 observation-space 初始化错误，并以 `tests/test_beer_game_sequential_consistency.py` 验证四子步与联合动作逐状态一致。当前完成规格和最小环境层，A1--A5、SEIHR 专用 MPC/估计器、周期感知 MCTS 和图通用 Beer Game 尚未实现，不能据此报告正式性能结果。
+
+## 2026-09-11（流行病 A1–A5、MPC/估计器、周期 MCTS、图通用 Beer Game）
+
+按决策 16 的非破坏性扩展完成补充实验实现层，不改 `mcts.py` 与已发表 Beer Game 入口：
+
+* 周期感知 MCTS：`src/planning/period_aware_mcts.py`。`period_length=1` 与 `mcts_search` 同种子同结果；中间子步 γ=1，周期末才折扣。
+* SEIHR：规划向量、结构/黑盒世界模型、在线估计器、oracle/自适应 MPC、PPO 槽位，以及 `run_arms.py` 的 A1 / A1' / A2 / A2-full-θ / A3 / A4 / A5-fixed / A5-receding。SD 日核以 float64 对齐环境；oracle 臂使用精确真值而非 softplus。黑盒臂报告投影前守恒违反与 L1 修正量。
+* 图通用 Beer Game：`GraphBeerGameEnv` 在 T1 上对固定动作序列与 `BeerGameEnv` 逐步位一致；`GraphBeerGameSDModel` 前向与 `BeerGameSDModel` 一致。YAML T1–T5 就位。共享 θ 维度在 T1–T5 均为 3，节点特定设定随零售节点数增长（T5=27）。
+* 门槛：G-BT0/G-BT1/G-BT2 通过；G-BT3 仅做 sequential MCTS 可运行冒烟，不是 Table 1/2 复现。规格校验 PASS。新增测试 `tests/test_{period_aware_mcts,epidemic_seihr,graph_beer_game}.py` 共 18 项通过。
+* 16 周 / 4 sims 冒烟可跑通全部臂与 oracle/adaptive MPC、PPO 训练槽，数值仅证明接口可运行，不能作为正式对照或预注册假设证据。冻结预算网格 {52,104,260,520,1040} 与 10 种子主结果仍未执行。
+
+## 2026-09-11（SEIHR 闭环预演）
+
+按决策 19 跑完 3 种子 × {52,104} 周 × {A2, A1p, A4, A5_passive_fixed}，共 24 组，写入 `results/iclr_epidemic_preview_20260911/`，不覆盖审计目录与旧结果。入口 `experiments/epidemic/run_preview.py`；`run_arms.py` 补了训练/评估动作直方图。MCTS 16 simulations、评估 2 episode、CPU。报告见 [epidemic_closedloop_preview_report.md](iclr/epidemic_closedloop_preview_report.md)。
+
+评估回报均值：52 周 A1′ −10.26、A2 −12.52、A4 −12.31、A5 −13.99；104 周 A1′ −11.04、A2 −13.93、A4 −13.87、A5 −10.11。A2 参数点估计在真值 ±4% 内，守恒无违反。A1′ 投影前守恒违反率 1.0。104 周 A5 三种子全胜 A2；两个预算上 A2 均未稳定优于 A1′。评估期 A2/A4 更常选动作 3–4，A1′ 更常选 0–1。
+
+判定：方向不稳定，正式主表仍封锁（决策 20）。本预演是规划协议诊断，不是 H1 通过或失败的正式检验。A5 与另三臂的评估口径未完全对齐，后续若再预演须先对齐。
+
+## 2026-09-11（G1/G2 辨识审计）
+
+新增 `experiments/epidemic/run_identifiability_audit.py`，在 `results/iclr_epidemic_audit_20260911/` 写入 52 周冒烟与 520 周正式审计，不覆盖旧结果。G1 三层数据守恒通过。G2a（真参数 MPC 轨迹）与 G2d（均匀随机）命名参数均进入 ±10%；G2c 只使用动作 4，\(\beta_0\) 相对误差 14.4%，\(\beta_0(1-\varepsilon_4)\) 误差 0.05%，符合策略覆盖决定可辨识集合。黑盒投影前守恒违反率 1.0。决定：允许 2–3 种子、52/104 周闭环预演；10 种子主表仍封锁。报告见 [epidemic_g1_g2_audit_report.md](iclr/epidemic_g1_g2_audit_report.md)。
+
+## 2026-09-11（SEIHR 预演审计与第一轮修复）
+
+审计预演发现 A2 未超过 A1′/A5 的主要解释不能归结为结构辨识失败：A2 参数点估计接近真值，且 A4 真参数 MCTS 与 A2 接近、同样偏向高等级干预。对当前单次初始疫情环境的固定策略校准显示，0 级干预累计回报约 `-7.89`，而 3/4 级分别约 `-13.39/-20.80`；任务没有持续外源感染时，长期低干预接近最优，H1 因而缺乏有效压力测试。新增可配置 `external_exposure_per_day` 与 `calibrate_oracle.py`，但低外源暴露仍不足以改变动作排序；后续需联合校准暴露强度、感染损失权重和医院容量，并以 oracle 自适应策略确认任务确实需要状态依赖干预。
+
+修复了四项实现问题：统一 run arm 的 Python/NumPy/Torch 随机种子；价值网络对隔室和周统计量做无量纲归一化，并对非终止轨迹使用 bootstrap 目标；黑盒模型对周感染/住院峰值元数据提供监督且固定日历/上一动作；A1′ 干预特征支持从 MCTS imagined state 的时间索引计算，避免根节点上下文泄漏；A5 训练阶段和评估阶段改为完整总预算口径并训练价值网络。`SEIHREstimator.identifiability_report` 改用样本级残差 Jacobian 的 `JᵀJ`，不再使用秩一外积伪 Fisher。
+
+新建 `results/iclr_epidemic_preview_20260911_fixed/` 作为修复后冒烟目录；16 周、4 simulations 的 A2/A1′/A5 接口冒烟成功，但 A2 与 A1′ 恰好同轨迹，仍不构成排序证据。`sd-mcts` 环境 `tests/test_epidemic_seihr.py` 7 项测试通过。正式主表继续封锁，直到任务校准和 planner-only 价值审计通过。
+## 2026-09-11
+
+完成 SEIHR oracle 场景校准网格（外源暴露、感染权重、医院容量与初始感染规模共 81 个组合）。结果显示，外源暴露为 3000/日、医院容量 1000 时，oracle MPC 相对最佳固定动作获得约 10--11 的回报增益，并在 52 周内于动作 0 与动作 4 之间切换（约 25--27 周低干预、17--26 周高干预），满足状态依赖控制任务的初筛条件。该场景将作为后续 planner-only 审计和 A1′/A2/A5 对照的候选；正式主表暂不解锁，仍需先完成规划器动作排序审计。
+## 2026-09-11
+
+完成 oracle-only planner 审计。新增终止状态处理：MCTS 在终止节点不再扩展或调用价值网络，MPC 搜索深度按剩余周数截断；新增 10 项回归测试全部通过。候选流行病场景下，零叶 MCTS 的闭环回报（64/512 simulations）分别约为 -36.31/-35.48，而使用受限最佳固定动作延续值的价值网络反而为 -41.79/-40.42。动作排序审计中，零叶 512 的平均受限参考遗憾约 0.039，价值 512 约 0.187。该结果表明当前价值网络监督目标与 MCTS 规划存在偏差，不能直接解锁 A2；后续应优先修订叶值定义/训练分布，并保留零叶 oracle 规划器作为诊断基线。
+## 2026-09-11
+
+完成第二轮叶值审计并加入 `--leaf-mode learned|rollout` 配置。回报结果为：零叶 512 约 -35.48，四步随机 rollout 64 约 -37.82；当前学习价值 512 约 -40.42。快照动作排序的受限参考遗憾分别为零叶 512=0.039、rollout4 64=0.054、学习价值 512=0.187。新增精确固定动作延续值诊断后，确认其本身也不是最优价值函数，不能据此替代 oracle MPC。A2 正式重跑前应采用 rollout 叶值作为稳健默认，并将 learned value 作为单独消融。
+## 2026-09-11
+
+在校准候选场景上完成 rollout 叶值预演（52 周、64 simulations、3 seeds）。A1′ 平均回报 -48.96，A2 -36.93，A2-full-θ -37.02，A5-fixed -37.46，A5-receding -37.30。A2 在该规划配置下暂时优于 A5 与 A2-full-θ；A1′ 显著较差。该结果仅为三 seed 预演，不能替代正式主表，也不能排除 A1′ 的黑盒训练/干预特征实现问题。后续应先审计 A1′ 的 imagined-state `extra_fn` 闭包与模型 OOD 误差，再进行正式预算网格。
+
+
+## 2026-09-11
+
+在完成稳定环境十种子结果后，进入传播率突变在线适应预演。新增独立入口 `experiments/epidemic/run_shift.py`，区分冻结零样本评估与持续更新评估，避免使用旧冻结评估入口检验适应能力。沿用既有参数变化幅度 30%、60%，加入无变化配对对照。暂不修改估计器更新机制，以保留对既有方法在变化环境中是否有效的直接检验。
+
+## 2026-09-12
+
+继续执行流行病全部剩余实验目标，建立 `docs/iclr/epidemic_remaining_execution_plan.md`，区分已完成的 52 周/传播率结果与完整预算、冻结 OOD、随机/报告观测和多区域缺项。医院容量减半正式在线适应实验已启动；各臂在公布后共享容量及奖励定义，保存逐周感染和住院峰值。5 项相关回归测试通过。未将先前无置信区间的均值排序提升为因果或统计优越性结论。
+
+## 2026-09-12
+
+纠正此前对资源的判断：`nproc=128`、系统负载约 1，单核占满并不意味着不能启动独立种子。容量实验保持原进程不重启，同时新增 8 个单线程进程执行完整 400 任务预算网格。该举措改变吞吐而不降低模拟预算、种子数或评估次数。执行器双进程 smoke 完成，正式结果逐任务保存并保留源代码摘要以避免混版续跑。
+## 2026-09-12
+
+容量冲击正式实验继续运行（当前以 `partial.json` 为准）；同时 G2 机制审计已启动 5 个种子、520 周、G2a/G2b/G2c/G2d。seed 0 已完成，G2a/G2b/G2d 均通过，G2c 的全高干预轨迹按预期不能辨识全部命名参数。该结果支持保留“策略覆盖决定可辨识集合”的负结果表述。
+## 2026-09-12
+
+医院容量冲击正式实验完成（4 臂 × 10 seed × 无冲击/第 8 周容量减半），结果写入 `results/iclr_epidemic_capacity_formal_20260912/results.json`，并生成 `statistics.json`/`statistics.md`。全程回报均值：A1′ -63.77、A2 -54.20、A5-fixed -54.48、A5-receding -54.63；A2 仅略高于 A5，作为稳定性证据而非显著优越性证据。
+
+复核 G2 采集逻辑后发现旧版本 G2b 在采集后才追加记录，未实现真正在线更新。已修复为每条转移即时加入 estimator、每 8 条拟合，并新增回归测试；旧结果保留，使用 `iclr_epidemic_g2_mechanism_corrected_20260912` 重跑，不混用旧结果。
+## 2026-09-12
+
+G2 修正版 5 个种子全部完成：G2a、G2b、G2d 均在全部种子上通过命名参数与任务组合检查；G2c 全部未通过。结果保存在 `results/iclr_epidemic_g2_mechanism_corrected_20260912/`，替代旧版 G2b 随机采集结果。随机动力学变体已启动，单独保存 A2/A5-fixed/A5-receding 三臂 × 3 seeds，仍使用 rollout 叶值和 64 次模拟。
+## 2026-09-12
+
+完成受限策略类参照枚举：对 52 周至多两次切换的分段常数策略全部枚举 159,375 条，真实环境复核通过。最优未折扣回报 -35.339，策略为 `[t1=1,t2=23,a1=0,a2=4,a3=0]`；该值仅是受限策略类参照，不是全局最优。结果见 `results/iclr_epidemic_two_switch_reference_20260912/results.json`。
+## 2026-09-12
+
+预算网格与随机动力学变体继续运行，当前无失败子任务文件；预算网格已完成 55 个原子任务，随机变体已完成 7 个场景。执行器按 manifest 的源码哈希和配置校验断点续跑，未将部分结果汇总为正式结论。
+## 2026-09-12
+
+随机动力学变体 9 个场景全部完成（A2、A5-fixed、A5-receding × 3 seeds），结果见 `results/iclr_epidemic_stochastic_formal_20260912/results.json`。平均评估回报分别为 A2 -37.30、A5-fixed -37.16、A5-receding -37.32；A5-fixed 略高，作为负结果报告，不调整方法以追求 A2 优势。完整预算网格仍在运行（59 个原子任务已落盘）。
+## 2026-09-12
+
+补齐外部 PPO 基线入口 `experiments/epidemic/run_ppo.py`：使用 stable-baselines3 2.3.2，`n_steps=52`、batch=26、10 epochs，预算严格限制为 52/104/260/520/1040 周，评估 20 episodes 且策略冻结。52 周 smoke 已通过；正式 5 预算 × 10 seeds 已启动，结果目录为 `results/iclr_epidemic_ppo_formal_20260912`。
+
+## 2026-09-12
+
+PPO 正式预算网格完成（5 预算 × 10 seeds，评估 20 episodes），结果见 `results/iclr_epidemic_ppo_formal_20260912/results.json`。各预算均严格验证实际交互数等于目标预算；PPO smoke 与正式入口均在 `sd-mcts` 环境通过。
+## 2026-09-12
+
+报告观测合同审计完成，结果见 `results/iclr_epidemic_report_observation_audit_20260912/results.json`。发现 `reset()` 返回 4 维报告观测，但现有 `vector()` 仍暴露 9 维全状态规划向量；因此当前入口会泄露隔室状态。报告观测实验未执行，明确标记为待实现的 report-conditioned 模型/规划器，不将接口冒烟当作该实验结果。
+
+## 2026-09-12
+
+纠正运行状态解释：worker 累计存活时间不能代表当前子任务耗时。独立 104 周/64 simulations/单次评估 A2 诊断已完成；正式网格最近 A2-full-θ 子任务约 667–675 秒，最新输出间隔约 35 秒，并非此前所述连续 1–2 小时无进展。新增 `grid_status.py` 直接读取每任务 `seconds` 与最新文件相对当前时间的年龄，后续状态报告以这些量为准。该诊断不替代正式 20 次评估结果。
+
+## 2026-09-12（预算网格调度修正）
+
+A2 的 260 周任务已完成三个种子，单种子约需 11 分钟。此前将结果文件年龄与进程或单任务运行时间混淆，并据几分钟无新文件而终止计算，缺乏充分依据；该操作造成未完成计算重复，后续不再据此重启。保留现有 A2 进程，其他臂采用互不重叠的任务集合恢复。调度器新增原始 manifest 覆盖检查，禁止将单臂完成标为完整网格完成；临时目录验证已覆盖部分完成不发布及全部完成发布两种情况。现有 A2 进程加载的是旧版聚合逻辑，退出时须重新按原始 manifest 核验并纠正其汇总文件；原子结果继续保留。
+
+## 2026-09-12
+
+预算网格 8 臂 × 5 预算 × 10 种子共 400 个原子任务完成。审计发现并发调度器曾将仅含 A2 的中间汇总写入 `results.json`；原子结果完整且未受影响，已依据 manifest 重新构建包含全部 400 项的正式汇总，并生成 10000 次配对种子 bootstrap 统计。
+
+## 2026-09-12：冻结 OOD 协议更正
+
+运行审计发现 `run_frozen_ood.py` 从在线入口复制后仍在评估期间拟合 A1′、A2、A5-receding。此前 smoke 与 formal 目录均新增 `INVALID_FOR_FROZEN_OOD.json`，原始结果保留，运行中的错误协议已停止。修正为评估 observe 立即返回，并在每条评估轨迹结束时断言整个模型 state_dict、训练计步及缓冲区长度不变。此前“冻结 smoke 通过”表述撤回。免疫逃逸实际从第 0 周开始，容量对所有臂公开，均已更正元数据。当前只覆盖幅度未知且名义结构不编辑的动力学测试，不能替代幅度已知结构编辑实验。
+
+## 2026-09-12
+
+冻结 OOD 的 escape 与 beta 修正版正式结果均已完成（各 120 条，四臂、10 seeds、全部冲击条件），并由 `summarize_frozen_ood.py` 完成组合覆盖、冻结不变性、轨迹长度和回报求和审计。escape 的变化后指标按第 0 周重算；beta 按第 8 周重算。
+
+冻结 OOD capacity 场景完成：80/80 条（四臂、10 seeds、无冲击/容量减半），通过组合覆盖、轨迹及冻结状态审计；统计输出已生成。
+
+报告观测审计复核显示当前 `SEIHREnv.vector()` 仍暴露 9 维全状态（尽管 reset observation 为 4 维），因此报告观测正式实验继续阻塞，不能将当前实现冒充部分观测结果；需先实现 report-conditioned planner。
+
+为支持 H={2,4,8} 视界/叶值实验，`run_arms.py` 的 rollout 深度改由 `planning.rollout_depth` 配置，默认仍为 4；已完成 H=2、4、8 的 A2 12 周 smoke 验证，结果分别落盘于 `results/iclr_epidemic_horizon_smoke_20260912`。
+
+修正 smoke 输出元数据以记录实际 `rollout_depth`；H=2、4、8 的短程运行再次核验配置值分别正确落盘。
+
+视界 rollout 正式小矩阵完成：A2、H=2/4/8、各 3 seeds，共 9/9 原子结果，均为 52 周、16 simulations；结果目录为 `results/iclr_epidemic_horizon_rollout_formal_20260912`。
+
+视界 learned-leaf 对照矩阵完成：A2、H=2/4/8、各 3 seeds，共 9/9 原子结果，配置与 rollout 矩阵一致，仅叶值模式切换；结果目录为 `results/iclr_epidemic_horizon_learned_formal_20260912`。
+
+先验失配正式矩阵完成：A2 在 σ、γ 各 ±30% 四种变体下各运行 3 个种子，共 12/12 原子结果；结果目录为 `results/iclr_epidemic_prior_mismatch_formal_20260912`。
+
+A2-full-θ 参考臂完成：学习 σ、γ、ρ，固定 3 seeds、52 周和 16 simulations，共 3/3 结果，目录 `results/iclr_epidemic_a2_full_theta_formal_20260912`。
+
+A3 冻结先验正式参照完成：3 seeds、52 周、16 simulations，共 3/3 结果，目录 `results/iclr_epidemic_a3_frozen_formal_20260912`。
+
+A4 oracle-parameter reference 完成：3 seeds、52 周、16 simulations，共 3/3 结果，目录 `results/iclr_epidemic_a4_oracle_reference_formal_20260912`。该臂仅作参数参照，不宣称策略上界。
+
+统一外部决策器参照完成：3 seeds、52 周，`include-mpc` 同时记录 oracle MPC 与 adaptive MPC，结果目录 `results/iclr_epidemic_mpc_reference_formal_20260912`。
+
+A2-known-init 参照完成：3 seeds、52 周、16 simulations，共 3/3 结果，目录 `results/iclr_epidemic_a2_known_init_formal_20260912`。
+
+实现 `structure.omit_R_to_S` 开关，环境与模型统一读取该配置；现有 24 项测试通过。试跑发现默认 omega=0，移除 R→S 在默认任务中无实际效果，因此该次结果仅为接口 smoke，不可作为结构失配正式证据；仍需在 omega>0 的真实环境与缺边模型之间构造失配。
+
+真实结构失配实验完成：omega=0.05，完整模型与缺失 R→S 模型各 3 seeds，共 6/6 结果；目录 `results/iclr_epidemic_structure_mismatch_corrected_20260912`。结构边审计确认两模型动力学差异有效，结果显示缺边模型性能变化，作为结构失配边界证据。
+## 2026-09-12
+
+实现了 `multi_region_transition` 多区域 SEIHR 同步转移核：使用行随机接触矩阵计算跨区域感染压力，区域库存独立守恒，支持逐区域干预动作及随机/确定性两种模式。单区域 SEIHR 测试通过；多区域环境与规划器接入将在此核上继续完成。
+## 2026-09-12 多区域 smoke
+
+在 `sd-mcts` 环境中完成 5 区域单位接触矩阵的确定性与随机性三周运行；两种模式区域守恒误差均为 0，最小库存分别为 3.71 与 2.0。结果保存于 `results/iclr_epidemic_multiregion_smoke_20260912.json`。
+
+## 2026-09-14
+
+为避免 Beer Game 图拓扑矩阵任务再次占满共享服务器，将 `experiments/beer_game_graph/launch.py` 的默认并发从 64 调整为 4，并同步更新启动示例。每个子进程继续固定为单线程 OpenMP/MKL/PyTorch，并使用 `nice(10)`；显式传入 `--workers` 仍可用于受控的资源配置。该修改只影响后续 launcher 的默认调度，不改变已有结果或 checkpoint。
+
+## 2026-09-14（迁移快照）
+
+依据迁移安排，停止 Beer Game 图拓扑矩阵 launcher（PID 13076）及其全部 worker，未发现残留实验进程。中断前第一子波的已落盘结果为 53/90：T1 20/20、T2 20/20、T3 13/25、T4 0/25；依赖 SD checkpoint 的 20 个 `sd_mpc` 任务尚未启动。结果目录保留 108 条可解析实验 JSON 与 47 个可加载 checkpoint；重新生成 `summary.json`，其 `n_records` 为 108。该快照连同 Beer Game 图实验代码、T1–T5 拓扑 YAML、相关测试和运行文档一并同步，供另一台服务器继续接续。

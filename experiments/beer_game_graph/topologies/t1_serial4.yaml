@@ -1,0 +1,20 @@
+id: T1
+nodes:
+  - {id: Retailer, kind: retail, holding: 0.5}
+  - {id: Wholesaler, kind: warehouse, holding: 0.5}
+  - {id: Distributor, kind: warehouse, holding: 0.5}
+  - {id: Factory, kind: source, holding: 0.5}
+edges:
+  - {u: Wholesaler, v: Retailer, L: 2, tau: 2, backlog_cost: 1.0}
+  - {u: Distributor, v: Wholesaler, L: 2, tau: 2, backlog_cost: 1.0}
+  - {u: Factory, v: Distributor, L: 2, tau: 2, backlog_cost: 1.0}
+meta:
+  demand_low: 4
+  demand_high: 8
+  demand_step_time: 5
+  T: 36
+  initial_inventory: 12
+  initial_pipeline: 4
+  O_max: 16
+  order_levels: 9
+  shared_demand: true

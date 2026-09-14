@@ -1,0 +1,151 @@
+{
+ "topology": "T1",
+ "arm": "basestock",
+ "budget": 1000,
+ "seed": 0,
+ "simulations": 100,
+ "leaf": "rollout",
+ "state_dim": 24,
+ "tag": "",
+ "allocation": "backlog_proportional",
+ "prior_step_offset": 0.0,
+ "node_demand": {
+  "Retailer": 8.0,
+  "Wholesaler": 8.0,
+  "Distributor": 8.0,
+  "Factory": 8.0
+ },
+ "eval": {
+  "returns": [
+   -726.0,
+   -726.0,
+   -726.0,
+   -726.0,
+   -726.0,
+   -726.0,
+   -726.0,
+   -726.0,
+   -726.0,
+   -726.0
+  ],
+  "mean_return": -726.0,
+  "episodes": [
+   {
+    "return": -726.0,
+    "order_var": [
+     3.8888919353485107,
+     6.555558681488037,
+     9.222227096557617,
+     11.987659454345703
+    ],
+    "final_backlog": 0.0
+   },
+   {
+    "return": -726.0,
+    "order_var": [
+     3.8888919353485107,
+     6.555558681488037,
+     9.222227096557617,
+     11.987659454345703
+    ],
+    "final_backlog": 0.0
+   },
+   {
+    "return": -726.0,
+    "order_var": [
+     3.8888919353485107,
+     6.555558681488037,
+     9.222227096557617,
+     11.987659454345703
+    ],
+    "final_backlog": 0.0
+   },
+   {
+    "return": -726.0,
+    "order_var": [
+     3.8888919353485107,
+     6.555558681488037,
+     9.222227096557617,
+     11.987659454345703
+    ],
+    "final_backlog": 0.0
+   },
+   {
+    "return": -726.0,
+    "order_var": [
+     3.8888919353485107,
+     6.555558681488037,
+     9.222227096557617,
+     11.987659454345703
+    ],
+    "final_backlog": 0.0
+   },
+   {
+    "return": -726.0,
+    "order_var": [
+     3.8888919353485107,
+     6.555558681488037,
+     9.222227096557617,
+     11.987659454345703
+    ],
+    "final_backlog": 0.0
+   },
+   {
+    "return": -726.0,
+    "order_var": [
+     3.8888919353485107,
+     6.555558681488037,
+     9.222227096557617,
+     11.987659454345703
+    ],
+    "final_backlog": 0.0
+   },
+   {
+    "return": -726.0,
+    "order_var": [
+     3.8888919353485107,
+     6.555558681488037,
+     9.222227096557617,
+     11.987659454345703
+    ],
+    "final_backlog": 0.0
+   },
+   {
+    "return": -726.0,
+    "order_var": [
+     3.8888919353485107,
+     6.555558681488037,
+     9.222227096557617,
+     11.987659454345703
+    ],
+    "final_backlog": 0.0
+   },
+   {
+    "return": -726.0,
+    "order_var": [
+     3.8888919353485107,
+     6.555558681488037,
+     9.222227096557617,
+     11.987659454345703
+    ],
+    "final_backlog": 0.0
+   }
+  ]
+ },
+ "provenance": {
+  "git_commit": "7074686f946d5a13d71a0f1dcc6aa3899dfda873",
+  "source_sha256": {
+   "/home/round/code/sd-world-model-rl/experiments/beer_game_graph/run_arm.py": "b9279c36137b30327f1fe34a2d14bd246c2e08e135e3a29323a2f8184036951b",
+   "experiments/beer_game_graph/common.py": "4ed30f5826608c0132a1f511a7bf829badb9fdab8135ec4a9de91849d72e1d39",
+   "src/env/graph_beer_game.py": "7291679c9c3071b6adb57fb77e9cc6d67d33daafc0e4640c28ebd17808d91eed",
+   "src/world_model/graph_beer_game_sd_model.py": "c88a784c71d869f114c5af3e725c8eb60a70e0aa77a01e4c4556abd5ecce5dc2",
+   "src/planning/period_aware_mcts.py": "5eb9477220bf789bd808517d97e2bdbe6ae4128560826237dc2057557ff6a60f",
+   "src/planning/mcts.py": "c2baf1c1867a1aa4c5bf050ec88ba2c9a7e5e7ac82ad7035644bbe36afb1b967"
+  },
+  "versions": {
+   "torch": "2.1.2+cu118",
+   "numpy": "1.26.4"
+  }
+ },
+ "seconds": 19.397085905075073
+}

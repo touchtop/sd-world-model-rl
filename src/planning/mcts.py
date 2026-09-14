@@ -72,6 +72,7 @@ def mcts_search(
     n_workers: int = None,
     rollout_depth: int = 10,
     imagined_state_recorder: Optional[Callable[[np.ndarray], None]] = None,
+    terminal_fn: Optional[Callable[[np.ndarray], bool]] = None,
 ):
     """MuZero风格MCTS搜索
 
@@ -89,6 +90,9 @@ def mcts_search(
         else:
             reward_fn = default_reward_fn
 
+    def is_terminal(state):
+        return terminal_fn is not None and bool(terminal_fn(state.detach().cpu().numpy()))
+
     root_tensor = torch.tensor(root_state, dtype=torch.float32)
     root = MCTSNode(root_tensor)
 
@@ -97,7 +101,7 @@ def mcts_search(
         path = [node]
 
         # Selection: 沿PUCT最大路径下降（只要有子节点就可以选择）
-        while node.children:
+        while node.children and not is_terminal(node.state):
             # 如果未完全扩展，以一定概率扩展新动作（渐进拓宽）
             if not node.is_fully_expanded(n_actions):
                 # Progressive widening: 根据访问次数决定是否扩展
@@ -109,7 +113,7 @@ def mcts_search(
             path.append(node)
 
         # Expansion: 渐进扩展 - 每次只扩展一个动作
-        if not node.is_fully_expanded(n_actions):
+        if not is_terminal(node.state) and not node.is_fully_expanded(n_actions):
             # 获取策略先验
             if policy_net is not None:
                 with torch.no_grad():
@@ -142,7 +146,9 @@ def mcts_search(
             path.append(node)
 
         # Leaf evaluation: 使用Value网络，或Monte Carlo rollout
-        if value_net is not None:
+        if is_terminal(node.state):
+            leaf_value = 0.0
+        elif value_net is not None:
             with torch.no_grad():
                 leaf_value = value_net(node.state.unsqueeze(0)).item()
         else:
@@ -151,6 +157,8 @@ def mcts_search(
             rollout_return = 0.0
             discount = 1.0
             for _ in range(rollout_depth):
+                if is_terminal(rollout_state):
+                    break
                 rand_action = np.random.randint(n_actions)
                 with torch.no_grad():
                     next_state = world_model(

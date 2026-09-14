@@ -385,6 +385,14 @@ class BeerGameEnvSequential(BeerGameEnv):
         # Override action space to single echelon order
         self.action_space = spaces.Discrete(self.order_levels)
 
+        # Observation gains one dimension for the current echelon index
+        base_space = self.observation_space
+        self.observation_space = spaces.Box(
+            low=np.concatenate([base_space.low, [0.0]]),
+            high=np.concatenate([base_space.high, [float(self.n_echelons - 1)]]),
+            dtype=np.float32,
+        )
+
         # Track substep within environment step
         self.current_echelon = 0
         self.pending_orders = np.zeros(self.n_echelons, dtype=np.int64)
@@ -399,14 +407,6 @@ class BeerGameEnvSequential(BeerGameEnv):
     def _augment_obs(self, obs: np.ndarray) -> np.ndarray:
         """Add current echelon index to observation."""
         return np.concatenate([obs, [float(self.current_echelon)]])
-
-    @property
-    def observation_space(self):
-        # Add one dimension for current echelon
-        base_space = super().observation_space
-        low = np.concatenate([base_space.low, [0.0]])
-        high = np.concatenate([base_space.high, [float(self.n_echelons - 1)]])
-        return spaces.Box(low=low, high=high, dtype=np.float32)
 
     def step(self, action: int) -> Tuple[np.ndarray, float, bool, bool, dict]:
         """Execute substep (single echelon order decision)."""

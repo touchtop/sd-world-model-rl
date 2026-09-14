@@ -1,0 +1,437 @@
+{
+ "topology": "T2",
+ "arm": "sd_oracle",
+ "budget": 1000,
+ "seed": 4,
+ "simulations": 100,
+ "leaf": "rollout",
+ "state_dim": 48,
+ "tag": "",
+ "allocation": "backlog_proportional",
+ "prior_step_offset": 0.0,
+ "node_demand": {
+  "n0": 8.0,
+  "n1": 8.0,
+  "n2": 8.0,
+  "n3": 8.0,
+  "n4": 8.0,
+  "n5": 8.0,
+  "n6": 8.0,
+  "n7": 8.0
+ },
+ "theta_dim": 3,
+ "model_params": 0,
+ "theta_init": {
+  "demand_low": 4.0,
+  "demand_high": 8.0,
+  "demand_step_time": 5.0,
+  "true_step_time": 5.0,
+  "theta_dim": 3,
+  "graph_id": "T2",
+  "shared_demand": true
+ },
+ "train": {
+  "episodes": 28,
+  "train_returns": [
+   -4458.0,
+   -4715.0,
+   -6364.0,
+   -3571.0,
+   -4195.0,
+   -5319.0,
+   -5360.0,
+   -4260.0,
+   -5653.0,
+   -5101.0,
+   -5344.0,
+   -4461.0,
+   -5177.0,
+   -5707.0,
+   -972.0,
+   -1014.0,
+   -1040.0,
+   -1172.0,
+   -968.0,
+   -1244.0,
+   -1101.0,
+   -1178.0,
+   -1021.0,
+   -1056.0,
+   -1331.0,
+   -945.0,
+   -1114.0,
+   -789.0
+  ],
+  "theta_trajectory": [
+   {
+    "steps": 36,
+    "demand_low": 4.0,
+    "demand_high": 8.0,
+    "demand_step_time": 5.0
+   },
+   {
+    "steps": 72,
+    "demand_low": 4.0,
+    "demand_high": 8.0,
+    "demand_step_time": 5.0
+   },
+   {
+    "steps": 108,
+    "demand_low": 4.0,
+    "demand_high": 8.0,
+    "demand_step_time": 5.0
+   },
+   {
+    "steps": 144,
+    "demand_low": 4.0,
+    "demand_high": 8.0,
+    "demand_step_time": 5.0
+   },
+   {
+    "steps": 180,
+    "demand_low": 4.0,
+    "demand_high": 8.0,
+    "demand_step_time": 5.0
+   },
+   {
+    "steps": 216,
+    "demand_low": 4.0,
+    "demand_high": 8.0,
+    "demand_step_time": 5.0
+   },
+   {
+    "steps": 252,
+    "demand_low": 4.0,
+    "demand_high": 8.0,
+    "demand_step_time": 5.0
+   },
+   {
+    "steps": 288,
+    "demand_low": 4.0,
+    "demand_high": 8.0,
+    "demand_step_time": 5.0
+   },
+   {
+    "steps": 324,
+    "demand_low": 4.0,
+    "demand_high": 8.0,
+    "demand_step_time": 5.0
+   },
+   {
+    "steps": 360,
+    "demand_low": 4.0,
+    "demand_high": 8.0,
+    "demand_step_time": 5.0
+   },
+   {
+    "steps": 396,
+    "demand_low": 4.0,
+    "demand_high": 8.0,
+    "demand_step_time": 5.0
+   },
+   {
+    "steps": 432,
+    "demand_low": 4.0,
+    "demand_high": 8.0,
+    "demand_step_time": 5.0
+   },
+   {
+    "steps": 468,
+    "demand_low": 4.0,
+    "demand_high": 8.0,
+    "demand_step_time": 5.0
+   },
+   {
+    "steps": 504,
+    "demand_low": 4.0,
+    "demand_high": 8.0,
+    "demand_step_time": 5.0
+   },
+   {
+    "steps": 540,
+    "demand_low": 4.0,
+    "demand_high": 8.0,
+    "demand_step_time": 5.0
+   },
+   {
+    "steps": 576,
+    "demand_low": 4.0,
+    "demand_high": 8.0,
+    "demand_step_time": 5.0
+   },
+   {
+    "steps": 612,
+    "demand_low": 4.0,
+    "demand_high": 8.0,
+    "demand_step_time": 5.0
+   },
+   {
+    "steps": 648,
+    "demand_low": 4.0,
+    "demand_high": 8.0,
+    "demand_step_time": 5.0
+   },
+   {
+    "steps": 684,
+    "demand_low": 4.0,
+    "demand_high": 8.0,
+    "demand_step_time": 5.0
+   },
+   {
+    "steps": 720,
+    "demand_low": 4.0,
+    "demand_high": 8.0,
+    "demand_step_time": 5.0
+   },
+   {
+    "steps": 756,
+    "demand_low": 4.0,
+    "demand_high": 8.0,
+    "demand_step_time": 5.0
+   },
+   {
+    "steps": 792,
+    "demand_low": 4.0,
+    "demand_high": 8.0,
+    "demand_step_time": 5.0
+   },
+   {
+    "steps": 828,
+    "demand_low": 4.0,
+    "demand_high": 8.0,
+    "demand_step_time": 5.0
+   },
+   {
+    "steps": 864,
+    "demand_low": 4.0,
+    "demand_high": 8.0,
+    "demand_step_time": 5.0
+   },
+   {
+    "steps": 900,
+    "demand_low": 4.0,
+    "demand_high": 8.0,
+    "demand_step_time": 5.0
+   },
+   {
+    "steps": 936,
+    "demand_low": 4.0,
+    "demand_high": 8.0,
+    "demand_step_time": 5.0
+   },
+   {
+    "steps": 972,
+    "demand_low": 4.0,
+    "demand_high": 8.0,
+    "demand_step_time": 5.0
+   },
+   {
+    "steps": 1000,
+    "demand_low": 4.0,
+    "demand_high": 8.0,
+    "demand_step_time": 5.0
+   }
+  ],
+  "random_steps": 500
+ },
+ "train_seconds": 1151.0509948730469,
+ "train_model_calls": 297600,
+ "theta_final": {
+  "demand_low": 4.0,
+  "demand_high": 8.0,
+  "demand_step_time": 5.0,
+  "true_step_time": 5.0,
+  "theta_dim": 3,
+  "graph_id": "T2",
+  "shared_demand": true
+ },
+ "eval": {
+  "returns": [
+   -968.0,
+   -879.0,
+   -959.0,
+   -977.0,
+   -921.0,
+   -1073.0,
+   -953.0,
+   -1038.0,
+   -971.0,
+   -937.0
+  ],
+  "mean_return": -967.6,
+  "episodes": [
+   {
+    "return": -968.0,
+    "order_var": [
+     20.691354751586914,
+     18.333332061767578,
+     17.061729431152344,
+     18.4783992767334,
+     12.527776718139648,
+     13.441359519958496,
+     15.28394889831543,
+     19.580244064331055
+    ],
+    "final_backlog": 0.0
+   },
+   {
+    "return": -879.0,
+    "order_var": [
+     15.666666984558105,
+     21.024690628051758,
+     18.70061492919922,
+     14.802470207214355,
+     14.182098388671875,
+     12.69135856628418,
+     19.283950805664062,
+     13.765433311462402
+    ],
+    "final_backlog": 0.0
+   },
+   {
+    "return": -959.0,
+    "order_var": [
+     19.959871292114258,
+     17.135801315307617,
+     18.691356658935547,
+     15.888887405395508,
+     26.22222137451172,
+     11.219135284423828,
+     19.728395462036133,
+     19.219135284423828
+    ],
+    "final_backlog": 0.0
+   },
+   {
+    "return": -977.0,
+    "order_var": [
+     25.145063400268555,
+     20.33332633972168,
+     16.111112594604492,
+     16.55555534362793,
+     14.330245971679688,
+     12.88888931274414,
+     13.320989608764648,
+     14.617283821105957
+    ],
+    "final_backlog": 2.0
+   },
+   {
+    "return": -921.0,
+    "order_var": [
+     12.77469253540039,
+     23.617286682128906,
+     26.76543426513672,
+     17.209877014160156,
+     15.44135570526123,
+     15.209880828857422,
+     16.10802459716797,
+     18.25617218017578
+    ],
+    "final_backlog": 6.0
+   },
+   {
+    "return": -1073.0,
+    "order_var": [
+     26.108020782470703,
+     20.75,
+     16.765432357788086,
+     13.44444465637207,
+     17.145063400268555,
+     24.749998092651367,
+     22.552467346191406,
+     14.88888931274414
+    ],
+    "final_backlog": 2.0
+   },
+   {
+    "return": -953.0,
+    "order_var": [
+     24.9135799407959,
+     14.972224235534668,
+     18.527774810791016,
+     21.194440841674805,
+     15.811728477478027,
+     14.083333015441895,
+     16.44444465637207,
+     15.589508056640625
+    ],
+    "final_backlog": 0.0
+   },
+   {
+    "return": -1038.0,
+    "order_var": [
+     21.469135284423828,
+     13.86111068725586,
+     21.999996185302734,
+     19.777774810791016,
+     13.81173038482666,
+     16.182096481323242,
+     21.555551528930664,
+     18.70061492919922
+    ],
+    "final_backlog": 10.0
+   },
+   {
+    "return": -971.0,
+    "order_var": [
+     22.444438934326172,
+     18.62653923034668,
+     19.209877014160156,
+     13.663578033447266,
+     16.527774810791016,
+     15.07098388671875,
+     17.839506149291992,
+     16.333335876464844
+    ],
+    "final_backlog": 2.0
+   },
+   {
+    "return": -937.0,
+    "order_var": [
+     11.55555534362793,
+     17.81173324584961,
+     20.52777862548828,
+     20.97222137451172,
+     16.22222137451172,
+     15.617283821105957,
+     16.33024787902832,
+     15.638890266418457
+    ],
+    "final_backlog": 10.0
+   }
+  ],
+  "rollout_rmse": {
+   "1": 0.0,
+   "2": 0.0,
+   "3": 0.0,
+   "4": 0.0,
+   "5": 0.0,
+   "6": 0.0,
+   "7": 0.0,
+   "8": 0.0
+  },
+  "imagined_violation": {
+   "total": 9504000,
+   "rate": 0.0
+  },
+  "model_calls": 288000
+ },
+ "eval_seconds": 1169.18221616745,
+ "provenance": {
+  "git_commit": "7074686f946d5a13d71a0f1dcc6aa3899dfda873",
+  "source_sha256": {
+   "/home/round/code/sd-world-model-rl/experiments/beer_game_graph/run_arm.py": "2d33e21a039ed831ac00e7ad4756fb7ded1149aaa13d5d80213e2532a058168e",
+   "experiments/beer_game_graph/common.py": "4ed30f5826608c0132a1f511a7bf829badb9fdab8135ec4a9de91849d72e1d39",
+   "src/env/graph_beer_game.py": "7291679c9c3071b6adb57fb77e9cc6d67d33daafc0e4640c28ebd17808d91eed",
+   "src/world_model/graph_beer_game_sd_model.py": "c88a784c71d869f114c5af3e725c8eb60a70e0aa77a01e4c4556abd5ecce5dc2",
+   "src/planning/period_aware_mcts.py": "5eb9477220bf789bd808517d97e2bdbe6ae4128560826237dc2057557ff6a60f",
+   "src/planning/mcts.py": "c2baf1c1867a1aa4c5bf050ec88ba2c9a7e5e7ac82ad7035644bbe36afb1b967"
+  },
+  "versions": {
+   "torch": "2.1.2+cu118",
+   "numpy": "1.26.4"
+  }
+ },
+ "seconds": 2320.254454612732
+}

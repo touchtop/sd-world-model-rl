@@ -1,0 +1,52 @@
+id: T5
+nodes:
+  - {id: s0, kind: source, holding: 0.5}
+  - {id: s1, kind: source, holding: 0.5}
+  - {id: s2, kind: source, holding: 0.5}
+  - {id: w0, kind: warehouse, holding: 0.5}
+  - {id: w1, kind: warehouse, holding: 0.5}
+  - {id: w2, kind: warehouse, holding: 0.5}
+  - {id: w3, kind: warehouse, holding: 0.5}
+  - {id: w4, kind: warehouse, holding: 0.5}
+  - {id: w5, kind: warehouse, holding: 0.5}
+  - {id: r0, kind: retail, holding: 0.5}
+  - {id: r1, kind: retail, holding: 0.5}
+  - {id: r2, kind: retail, holding: 0.5}
+  - {id: r3, kind: retail, holding: 0.5}
+  - {id: r4, kind: retail, holding: 0.5}
+  - {id: r5, kind: retail, holding: 0.5}
+  - {id: r6, kind: retail, holding: 0.5}
+  - {id: r7, kind: retail, holding: 0.5}
+  - {id: r8, kind: retail, holding: 0.5}
+edges:
+  - {u: s0, v: w0, L: 2, tau: 2, backlog_cost: 1.0}
+  - {u: s0, v: w1, L: 2, tau: 2, backlog_cost: 1.0}
+  - {u: s1, v: w1, L: 2, tau: 2, backlog_cost: 1.0}
+  - {u: s1, v: w2, L: 2, tau: 2, backlog_cost: 1.0}
+  - {u: s2, v: w2, L: 2, tau: 2, backlog_cost: 1.0}
+  - {u: s2, v: w3, L: 2, tau: 2, backlog_cost: 1.0}
+  - {u: w0, v: w4, L: 2, tau: 2, backlog_cost: 1.0}
+  - {u: w1, v: w4, L: 2, tau: 2, backlog_cost: 1.0}
+  - {u: w1, v: w5, L: 2, tau: 2, backlog_cost: 1.0}
+  - {u: w2, v: w5, L: 2, tau: 2, backlog_cost: 1.0}
+  - {u: w3, v: w5, L: 2, tau: 2, backlog_cost: 1.0}
+  - {u: w4, v: r0, L: 2, tau: 2, backlog_cost: 1.0}
+  - {u: w4, v: r1, L: 2, tau: 2, backlog_cost: 1.0}
+  - {u: w4, v: r2, L: 2, tau: 2, backlog_cost: 1.0}
+  - {u: w5, v: r3, L: 2, tau: 2, backlog_cost: 1.0}
+  - {u: w5, v: r4, L: 2, tau: 2, backlog_cost: 1.0}
+  - {u: w5, v: r5, L: 2, tau: 2, backlog_cost: 1.0}
+  - {u: w4, v: r6, L: 2, tau: 2, backlog_cost: 1.0}
+  - {u: w5, v: r7, L: 2, tau: 2, backlog_cost: 1.0}
+  - {u: w3, v: r8, L: 2, tau: 2, backlog_cost: 1.0}
+  - {u: s0, v: w4, L: 2, tau: 2, backlog_cost: 1.0}
+  - {u: s2, v: w5, L: 2, tau: 2, backlog_cost: 1.0}
+  - {u: w2, v: r2, L: 2, tau: 2, backlog_cost: 1.0}
+  - {u: w0, v: r0, L: 2, tau: 2, backlog_cost: 1.0}
+meta:
+  demand_low: 4
+  demand_high: 8
+  demand_step_time: 5
+  T: 36
+  shared_demand: true
+  scale_audit_only: true

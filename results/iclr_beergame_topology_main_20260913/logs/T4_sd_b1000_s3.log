@@ -1,0 +1,4 @@
+/home/round/.conda/envs/sd-mcts/lib/python3.10/site-packages/torch/autograd/__init__.py:251: UserWarning: CUDA initialization: Unexpected error from cudaGetDeviceCount(). Did you run some cuda functions before calling NumCudaDevices() that might have already set an error? Error 304: OS call failed or operation not supported on this OS (Triggered internally at ../c10/cuda/CUDAFunctions.cpp:108.)
+  Variable._execution_engine.run_backward(  # Calls into the C++ engine to run the backward pass
+[T4_sd_b1000_s3] steps 360/1000 ep 10 return -5603.1
+[T4_sd_b1000_s3] steps 720/1000 ep 20 return -3674.6
