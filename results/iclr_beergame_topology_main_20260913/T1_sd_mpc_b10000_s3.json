@@ -1,0 +1,176 @@
+{
+ "topology": "T1",
+ "arm": "sd_mpc",
+ "budget": 10000,
+ "seed": 3,
+ "simulations": 100,
+ "leaf": "rollout",
+ "state_dim": 24,
+ "tag": "",
+ "allocation": "backlog_proportional",
+ "prior_step_offset": 0.0,
+ "node_demand": {
+  "Retailer": 8.0,
+  "Wholesaler": 8.0,
+  "Distributor": 8.0,
+  "Factory": 8.0
+ },
+ "theta_final": {
+  "demand_low": 4.000001430511475,
+  "demand_high": 7.999997615814209,
+  "demand_step_time": 4.995681285858154,
+  "true_step_time": 5.0,
+  "theta_dim": 3,
+  "graph_id": "T1",
+  "shared_demand": true
+ },
+ "source_job": "T1_sd_b10000_s3",
+ "mpc": {
+  "num_samples": 500,
+  "horizon_periods": 4
+ },
+ "eval": {
+  "returns": [
+   -428.0,
+   -416.0,
+   -784.0,
+   -359.0,
+   -452.0,
+   -762.0,
+   -539.0,
+   -433.0,
+   -375.0,
+   -1006.0
+  ],
+  "mean_return": -555.4,
+  "episodes": [
+   {
+    "return": -428.0,
+    "order_var": [
+     16.395061492919922,
+     16.527780532836914,
+     14.44444465637207,
+     16.25617218017578
+    ],
+    "final_backlog": 0.0
+   },
+   {
+    "return": -416.0,
+    "order_var": [
+     26.92284393310547,
+     24.469133377075195,
+     20.182098388671875,
+     24.99691390991211
+    ],
+    "final_backlog": 0.0
+   },
+   {
+    "return": -784.0,
+    "order_var": [
+     20.08333396911621,
+     24.77777671813965,
+     20.922840118408203,
+     24.774694442749023
+    ],
+    "final_backlog": 0.0
+   },
+   {
+    "return": -359.0,
+    "order_var": [
+     24.30555534362793,
+     23.63888931274414,
+     22.305553436279297,
+     21.194442749023438
+    ],
+    "final_backlog": 2.0
+   },
+   {
+    "return": -452.0,
+    "order_var": [
+     26.774694442749023,
+     24.03394889831543,
+     21.36728286743164,
+     25.21912956237793
+    ],
+    "final_backlog": 0.0
+   },
+   {
+    "return": -762.0,
+    "order_var": [
+     21.777774810791016,
+     19.36728286743164,
+     22.24691390991211,
+     20.209877014160156
+    ],
+    "final_backlog": 0.0
+   },
+   {
+    "return": -539.0,
+    "order_var": [
+     18.30555534362793,
+     23.95061683654785,
+     22.0,
+     16.55555534362793
+    ],
+    "final_backlog": 0.0
+   },
+   {
+    "return": -433.0,
+    "order_var": [
+     20.22222137451172,
+     21.194442749023438,
+     26.444440841674805,
+     22.76543426513672
+    ],
+    "final_backlog": 10.0
+   },
+   {
+    "return": -375.0,
+    "order_var": [
+     19.959877014160156,
+     24.839506149291992,
+     23.63888931274414,
+     28.97222137451172
+    ],
+    "final_backlog": 4.0
+   },
+   {
+    "return": -1006.0,
+    "order_var": [
+     25.728391647338867,
+     26.246912002563477,
+     24.765432357788086,
+     29.617286682128906
+    ],
+    "final_backlog": 0.0
+   }
+  ],
+  "rollout_rmse": {
+   "1": 0.0,
+   "2": 4.904670788619114e-07,
+   "3": 8.587157765305164e-07,
+   "4": 1.2636258759357588e-06,
+   "5": 1.743942664234055e-06,
+   "6": 2.1170350464672082e-06,
+   "7": 2.4885489551707e-06,
+   "8": 2.8747706210197067e-06
+  },
+  "model_calls": 720000
+ },
+ "provenance": {
+  "git_commit": "d731b098ed961cb8c039bd1fce8ee40f7b630ede",
+  "source_sha256": {
+   "/home/round/projects/sd-world-model-rl/experiments/beer_game_graph/run_arm.py": "2d33e21a039ed831ac00e7ad4756fb7ded1149aaa13d5d80213e2532a058168e",
+   "experiments/beer_game_graph/common.py": "4ed30f5826608c0132a1f511a7bf829badb9fdab8135ec4a9de91849d72e1d39",
+   "src/env/graph_beer_game.py": "7291679c9c3071b6adb57fb77e9cc6d67d33daafc0e4640c28ebd17808d91eed",
+   "src/world_model/graph_beer_game_sd_model.py": "c88a784c71d869f114c5af3e725c8eb60a70e0aa77a01e4c4556abd5ecce5dc2",
+   "src/planning/period_aware_mcts.py": "5eb9477220bf789bd808517d97e2bdbe6ae4128560826237dc2057557ff6a60f",
+   "src/planning/mcts.py": "c2baf1c1867a1aa4c5bf050ec88ba2c9a7e5e7ac82ad7035644bbe36afb1b967"
+  },
+  "versions": {
+   "torch": "2.14.0+cu130",
+   "numpy": "2.2.6"
+  }
+ },
+ "seconds": 12.967765092849731
+}
